@@ -1,3 +1,5 @@
+#DEPRICATED
+
 all: join.o test.o relation.o
 	g++ -o test test.o join.o relation.o
 
