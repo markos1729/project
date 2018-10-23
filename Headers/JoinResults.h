@@ -3,14 +3,14 @@
 
 
 #include <iostream>
-#include <stdint-gcc.h>
+#include "FieldTypes.h"
 
 using namespace std;
 
 #define BUFFER_SIZE (1024*1024)    // buffer size for each ResultNode
 
 struct ResultNode{
-    uint32_t buffer[BUFFER_SIZE / sizeof(uint32_t)];
+    intField buffer[BUFFER_SIZE / sizeof(intField)];
     ResultNode *next;
     ResultNode() : next(NULL) {}
 };

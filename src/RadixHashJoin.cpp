@@ -1,9 +1,9 @@
 #include "../Headers/RadixHashJoin.h"
 
 /* Local Functions */
-bool partitionRelation(Relation &R, uint32_t *&Psum);
-bool indexRelation(uint32_t *bucketJoinField, int bucketSize, uint32_t *&chain, uint32_t *&H2HashTable);
-bool probeResults(uint32_t *LbucketJoinField, uint32_t *LbucketRowIds, uint32_t *IbucketJoinField, uint32_t *IbucketRowIds, const uint32_t *&chain, const uint32_t *&H2HashTable, int bucketSize, Result &result);
+bool partitionRelation(Relation &R, intField *&Psum);
+bool indexRelation(intField *bucketJoinField, int bucketSize, unsigned int *&chain, unsigned int *&H2HashTable);
+bool probeResults(intField *LbucketJoinField, unsigned int *LbucketRowIds, intField *IbucketJoinField, unsigned int *IbucketRowIds, const unsigned int *&chain, const unsigned int *&H2HashTable, int bucketSize, Result &result);
 
 
 Result *radixHashJoin(Relation &R, Relation &S) {
@@ -20,19 +20,19 @@ Result *radixHashJoin(Relation &R, Relation &S) {
 
 /* Local Function Implementation */
 // phase 1: partition in place Relation R into buckets and fill Psum to distinguish them (|Psum| = 2^n)
-bool partitionRelation(Relation &R, uint32_t *&Psum){
+bool partitionRelation(Relation &R, unsigned int *&Psum){
     //TODO
 }
 
 // phase 2: index I's given bucket by creating 'H2HashTable' and 'chain' structures
-bool indexRelation(uint32_t *bucketJoinField, int bucketSize, uint32_t *&chain, uint32_t *&H2HashTable){
+bool indexRelation(intField *bucketJoinField, int bucketSize, unsigned int *&chain, unsigned int *&H2HashTable){
     //TODO
 }
 
 // phase 3: probe linearly L's given bucket and add results based on equal values in indexed I's given bucket
-bool probeResults(uint32_t *LbucketJoinField, uint32_t *LbucketRowIds,
-                  uint32_t *IbucketJoinField, uint32_t *IbucketRowIds,
-                  const uint32_t *&chain, const uint32_t *&H2HashTable,
+bool probeResults(intField *LbucketJoinField, unsigned int *LbucketRowIds,
+                  intField *IbucketJoinField, unsigned int *IbucketRowIds,
+                  const unsigned int *&chain, const unsigned int *&H2HashTable,
                   int bucketSize, Result &result){
     //TODO
 }

@@ -1,14 +1,15 @@
 #ifndef RELATION_H
 #define RELATION_H
 
-#include <cstdint>
+#include "FieldTypes.h"
 
 class Relation {
 	private:
 		int size;
-		uint32_t *joinField, *rowids;
+        intField *joinField;
+        unsigned int *rowids;
 	public:
-		Relation(int _size, uint32_t *_joinField, uint32_t *_rowids);
+		Relation(int _size, intField *_joinField, unsigned int *_rowids);
 		~Relation();
 };
 
