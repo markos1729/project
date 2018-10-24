@@ -1,15 +1,8 @@
 #include "Headers/RadixHashJoin.h"
 #include <stdio.h>
 
-
-#define try(a) fprintf(stdout,"%s\n",#a);a();
+#define try(a) fprintf(stdout,"\n%s\n",#a);a();
 #define assert(a) if (!(a)) fprintf(stderr,"assert %s failed\n",#a);
-
-void test_index() {
-	assert(0==1);
-	assert(2==2);
-	assert(3==2);
-}
 
 void test_partition(){
     intField *joinField = new intField[7];
@@ -28,7 +21,23 @@ void test_partition(){
     delete R;
 }
 
+void test_index() {
+	int *chain,*table;
+	intField bucket[10]={3,1,17,23,12,127,123,2,3,10};
+	
+	assert(indexRelation(bucket,10,chain,table));	
+	assert(table[0]==8);
+	assert(chain[1]==-1);
+	assert(chain[2]==-1);
+	assert(chain[3]==2);
+	
+	delete[] chain;
+	delete[] table;
+}
+
 int main() {
 	try(test_partition);
+	try(test_index);
 	return 0;
 }
+

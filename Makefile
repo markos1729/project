@@ -1,15 +1,13 @@
-#DEPRICATED
+all: RadixHashJoin.o test.o Relation.o
+	g++ -o test test.o RadixHashJoin.o Relation.o
 
-all: join.o test.o relation.o
-	g++ -o test test.o join.o relation.o
+Relation.o: src/Relation.cpp Headers/Relation.h
+	g++ -c src/Relation.cpp
 
-relation.o: relation.cpp relation.h
-	g++ -c relation.cpp
-
-join.o: join.cpp join.h relation.h
-	g++ -c join.cpp
+RadixHashJoin.o: src/RadixHashJoin.cpp Headers/RadixHashJoin.h Headers/Relation.h
+	g++ -c src/RadixHashJoin.cpp
 		
-test.o: test.cpp join.h relation.h
+test.o: test.cpp Headers/RadixHashJoin.h Headers/Relation.h
 	g++ -c test.cpp
 	
 clean:

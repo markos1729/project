@@ -4,10 +4,9 @@
 #include "FieldTypes.h"
 
 #define CPU_CACHE 4096
-
+#define H2SIZE 3
 
 unsigned int H1(intField, unsigned int N);
-
 
 class Relation {
 	private:
@@ -20,7 +19,10 @@ class Relation {
 		Relation(unsigned int _size, intField *_joinField, unsigned int *_rowids);
 		~Relation();
 		/* Accessors  */
-        unsigned int *getPsum(unsigned int &size) const { size = numberOfBuckets; return Psum; }
+        unsigned int getBuckets() const { return numberOfBuckets; }
+        unsigned int *getIds(int i) const { return rowids+Psum[i]; }
+        intField *getField(int i) const { return joinField+Psum[i]; }
+        unsigned int getSize(int i) const { return i==numberOfBuckets-1 ? size-Psum[i] : Psum[i+1]-Psum[i]; }
         /* Operations */
 		bool partitionRelation();   // partitions Relation by creating Psum and reordering it's tuples
         /* Debug */
