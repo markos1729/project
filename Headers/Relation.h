@@ -3,10 +3,10 @@
 
 #include "FieldTypes.h"
 
-#define H1_N 10        // number of bits for hash function H1
+#define CPU_CACHE 4096
 
 
-unsigned int H1(intField);
+unsigned int H1(intField, unsigned int N);
 
 
 class Relation {
@@ -15,13 +15,18 @@ class Relation {
         intField *joinField;
         unsigned int *rowids;
         unsigned int *Psum;
-public:
+        unsigned int numberOfBuckets;
+    public:
 		Relation(unsigned int _size, intField *_joinField, unsigned int *_rowids);
 		~Relation();
 		/* Accessors  */
-        unsigned int *getPsum() const { return Psum; }
+        unsigned int *getPsum(unsigned int &size) const { size = numberOfBuckets; return Psum; }
         /* Operations */
 		bool partitionRelation();   // partitions Relation by creating Psum and reordering it's tuples
+        /* Debug */
+        void printDebugInfo();
+    private:
+        unsigned int pickH1_N();
 };
 
 #endif
