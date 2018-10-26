@@ -1,5 +1,5 @@
 #include <iostream>
-#include <string.h>
+#include <cstring>
 #include "../Headers/RadixHashJoin.h"
 
 using namespace std;
@@ -7,7 +7,7 @@ using namespace std;
 #define CHECK(call, msg, action) { if ( ! (call) ) { cerr << msg << endl; action } }
 
 /* Local Functions */
-bool probeResults(intField *LbucketJoinField, unsigned int *LbucketRowIds, intField *IbucketJoinField, unsigned int *IbucketRowIds,int *&chain,int *&H2HashTable,unsigned int bucketSize, Result *result);
+// TODO: readd them here instead of RadixHashJoin.h ?
 
 Result* radixHashJoin(Relation &R, Relation &S) {
     // main Pseudocode
@@ -18,11 +18,11 @@ Result* radixHashJoin(Relation &R, Relation &S) {
     // 1.5. Define a Result object to fill
     Result *result = new Result;
     
-    // 2. choose one of them for indexing, lets say I, and keep the other foc scanning, lets say L
+    // 2. choose one of them for indexing, lets say I, and keep the other for scanning, lets say L
     // for i in range(0, num_of_buckets):
     //      3. index the bucket[i] of Relation I (phase 2) (create "chain" and fill "bucket")
     //      4. scan joinField of L:
-    //              use "bucket" (->change_that_name) and "chain" to find equal joinField values
+    //              use "H2HashTable" and "chain" to find equal joinField values
     //              add rowids of equal joinFields to Result
 	int nbuckets=R.getBuckets();
 	for (int i=0; i<nbuckets; ++i) {
@@ -58,10 +58,21 @@ bool indexRelation(intField *bucketJoinField,unsigned int bucketSize,int *&chain
 }
 
 // phase 3: probe linearly L's given bucket and add results based on equal values in indexed I's given bucket
+// TODO: const parameters
 bool probeResults(intField *LbucketJoinField, unsigned int *LbucketRowIds,
                   intField *IbucketJoinField, unsigned int *IbucketRowIds,
                   int *&chain,int *&H2HashTable,
                   unsigned int bucketSize, Result *result){
-    //TODO
+	for (int i = 0; i < bucketSize; i++) {
+		int h = h2(LbucketJoinField[i]);
+		if (H2HashTable[h] == -1) continue;		// no records in I with that value
+		int chainIndex = H2HashTable[h];
+		while (chainIndex > 0) {
+			if (LbucketJoinField[i] == IbucketJoinField[chainIndex - 1]) {
+				result->addTuple(LbucketRowIds[i], IbucketRowIds[chainIndex - 1]);
+			}
+			chainIndex = chain[chainIndex - 1];
+		}
+	}
+	return true;
 }
-
