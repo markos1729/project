@@ -16,18 +16,17 @@ unsigned int H1(intField value, unsigned int n){
 Relation::Relation(unsigned int _size, intField *_joinField, unsigned int *_rowids) : size(_size), joinField(_joinField), rowids(_rowids), Psum(NULL), numberOfBuckets(0) {}
 
 Relation::~Relation() {
-    if (Psum != NULL) delete[] Psum;
-    if (joinField != NULL) delete[] joinField;
-    if (rowids != NULL) delete[] rowids;
+    delete[] Psum;
+    delete[] joinField;
+    delete[] rowids;
 }
 
 // phase 1: partition in place Relation R into buckets and fill Psum to distinguish them (|Psum| = 2^n)
 bool Relation::partitionRelation() {
     const unsigned int H1_N = pickH1_N();
-    const unsigned int num_of_buckets = pow(2, H1_N);
+    const unsigned int num_of_buckets = (unsigned int) pow(2, H1_N);
     // 1) calculate Hist (in linear time)
-    unsigned int *Hist = new unsigned int[num_of_buckets];
-    for (unsigned int i = 0 ; i < num_of_buckets ; i++){ Hist[i] = 0; }
+    unsigned int *Hist = new unsigned int[num_of_buckets]();    // all Hist[i] are initialized to 0
     unsigned int *bucket_nums = new unsigned int[size];
     for (unsigned int i = 0 ; i < size ; i++){
         bucket_nums[i] = H1(joinField[i], H1_N);
@@ -44,11 +43,9 @@ bool Relation::partitionRelation() {
     Psum = Hist;
     numberOfBuckets = num_of_buckets;
     // 3) create new re-ordered versions for joinField and rowids based on their bucket_nums (in linear time)
-    intField *newJoinField = new intField[size];
-    unsigned int *newRowids = new unsigned int[size];
-    for (unsigned int i = 0 ; i < size ; i++) { newJoinField[i] = 0; newRowids[i] = 0; }
-    unsigned int *nextBucketPos = new unsigned int[num_of_buckets];
-    for (unsigned int i = 0 ; i < num_of_buckets ; i++){ nextBucketPos[i] = 0; }
+    intField *newJoinField = new intField[size]();
+    unsigned int *newRowids = new unsigned int[size]();
+    unsigned int *nextBucketPos = new unsigned int[num_of_buckets]();
     for (unsigned int i = 0 ; i < size ; i++) {
         const int pos = Psum[bucket_nums[i]] + nextBucketPos[bucket_nums[i]];   // value's position in the re-ordered version
         if ( pos < 0 || pos >= size ) { delete[] newJoinField; delete[] newRowids; delete[] bucket_nums; delete[] nextBucketPos; Psum = NULL; numberOfBuckets = 0;  return false; }  // ERROR CHECK

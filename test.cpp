@@ -35,9 +35,37 @@ void test_index() {
 	delete[] table;
 }
 
+void test_probing() {
+    intField test_value = 42;
+    intField IbucketjoinField[8] = {1, 2, test_value, test_value, 5, 6, test_value, 8};
+    unsigned int Ibucketrowids[8];
+    for (unsigned int i = 0 ; i < 8 ; i++) { Ibucketrowids[i] = i+1; }
+
+    intField LbucketjoinField[20] = { 0 };
+    LbucketjoinField[2] = test_value;
+    LbucketjoinField[11] = test_value;
+    unsigned int Lbucketrowids[20];
+    for (unsigned int i = 0 ; i < 20 ; i++) { Lbucketrowids[i] = i+1; }
+
+    int *chain = new int[8]();
+    chain[3] = 3; chain[6] = 4;
+    int *H2HashTable = new int[H2SIZE]();
+    H2HashTable[test_value % H2SIZE] = 7;
+
+    Result *result = new Result();
+    assert( probeResults(LbucketjoinField, Lbucketrowids, IbucketjoinField, Ibucketrowids, chain, H2HashTable, 20, result) );
+    // DEBUG: we could have asserts here, but we're gonna use unit testing instead anyway
+    result->printRowIds();
+
+    delete[] chain;
+    delete[] H2HashTable;
+    delete result;
+}
+
 int main() {
 	try(test_partition);
 	try(test_index);
+	try(test_probing);
 	return 0;
 }
 
