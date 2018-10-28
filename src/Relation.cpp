@@ -13,7 +13,14 @@ unsigned int H1(intField value, unsigned int n){
 }
 
 
-Relation::Relation(unsigned int _size, intField *_joinField, unsigned int *_rowids) : size(_size), joinField(_joinField), rowids(_rowids), Psum(NULL), numberOfBuckets(0) {}
+Relation::Relation(unsigned int _size, const intField *_joinField, const unsigned int *_rowids) : size(_size), joinField(NULL), rowids(NULL), Psum(NULL), numberOfBuckets(0) {
+    joinField = new intField[size];
+    rowids = new unsigned int[size];
+    for (unsigned int i = 0; i < size; i++) {
+        joinField[i] = _joinField[i];
+        rowids[i] = _rowids[i];
+    }
+}
 
 Relation::~Relation() {
     delete[] Psum;

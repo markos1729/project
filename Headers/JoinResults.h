@@ -13,13 +13,11 @@ using namespace std;
 
 struct ResultNode{
     private:
-        ResultNode *next;
-        unsigned int buffer[BUFFER_SIZE / sizeof(unsigned int)];
         int nextpos;
+        unsigned int buffer[BUFFER_SIZE / sizeof(unsigned int)];
     public:
+        ResultNode *next;
         ResultNode();
-        ResultNode *getNext() const;
-        void setNext(ResultNode *next);
         bool isFull();
         bool addTuple(unsigned int val1, unsigned int val2);
         void printRowIds();
@@ -32,6 +30,7 @@ private:
     ResultNode *cur;
 public:
     Result();
+    ~Result();
     bool addTuple(unsigned int rowid1, unsigned int rowid2);
     void printRowIds();
 };

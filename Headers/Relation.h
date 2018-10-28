@@ -16,7 +16,7 @@ class Relation {
         unsigned int *Psum;
         unsigned int numberOfBuckets;
     public:
-		Relation(unsigned int _size, intField *_joinField, unsigned int *_rowids);
+		Relation(unsigned int _size, const intField *_joinField, const unsigned int *_rowids);
 		~Relation();
 		/* Accessors  */
         unsigned int getSize() const { return size; }

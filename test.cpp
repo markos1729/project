@@ -5,16 +5,8 @@
 #define assert(a) if (!(a)) fprintf(stderr,"assert %s failed\n",#a);
 
 void test_partition(){
-    intField *joinField = new intField[7];
-    joinField[0] = 'a';
-    joinField[1] = 'b';
-    joinField[2] = 'a';
-    joinField[3] = 'a';
-    joinField[4] = 'c';
-    joinField[5] = 'b';
-    joinField[6] = 'c';
-    unsigned int *rowids = new unsigned int[7];
-    for (unsigned int i = 0 ; i < 7 ; i++) { rowids[i] = i+1; }
+    intField joinField[7] = {'a', 'b', 'a', 'a', 'c', 'b', 'c'};
+    unsigned int rowids[7] = {1, 2, 3, 4, 5, 6, 7};
     Relation *R = new Relation(7, joinField, rowids);
     assert( R->partitionRelation(0, 2) )   // forced H1_N = 2
     R->printDebugInfo();
@@ -62,10 +54,28 @@ void test_probing() {
     delete result;
 }
 
+void test_join(){
+    intField joinFieldR[] = {1, 2, 3, 4};
+    unsigned int rowidsR[] = {1, 2, 3, 4};
+    Relation *R = new Relation(4, joinFieldR, rowidsR);
+    intField joinFieldS[] = {1, 1, 3};
+    unsigned int rowidsS[] = {1, 2, 3};
+    Relation *S = new Relation(3, joinFieldS, rowidsS);
+    Result *result = radixHashJoin(*R, *S);
+    if (result == NULL){
+        cerr << "RadixHashJoined failed!" << endl;
+    } else{
+        cout << "join results are:" << endl;
+        result->printRowIds();
+        delete result;
+    }
+}
+
 int main() {
 	try(test_partition);
 	try(test_index);
 	try(test_probing);
+    try(test_join);
 	return 0;
 }
 
