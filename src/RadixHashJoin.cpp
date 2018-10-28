@@ -5,15 +5,17 @@
 using namespace std;
 
 #define CHECK(call, msg, action) { if ( ! (call) ) { cerr << msg << endl; action } }
+#define MIN(A, B) ( (A) < (B) ? (A) : (B) )
+
 
 /* Local Functions */
-// TODO: readd them here instead of RadixHashJoin.h ?
+// TODO: read them here instead of RadixHashJoin.h ?
 
 Result* radixHashJoin(Relation &R, Relation &S) {
     // main Pseudocode
-    // 1. partition R and S (in place): keep 'Psum' for each bucket in R and S (phase 1)
-    CHECK( R.partitionRelation() , "partitioning R failed", return NULL; )
-    CHECK( S.partitionRelation() , "partitioning S failed", return NULL; )
+    // 1. partition R and S, whilst keeping a 'Psum' table for each bucket in R and S (phase 1)
+    CHECK( R.partitionRelation(MIN(CPU_CACHE, R.getSize())) , "partitioning R failed", return NULL; )
+    CHECK( S.partitionRelation(MIN(CPU_CACHE, S.getSize())) , "partitioning S failed", return NULL; )
 
     // 1.5. Define a Result object to fill
     Result *result = new Result;
@@ -27,8 +29,8 @@ Result* radixHashJoin(Relation &R, Relation &S) {
 	int nbuckets=R.getBuckets();
 	for (int i=0; i<nbuckets; ++i) {
 		int *chain,*table;
-		indexRelation(R.getField(i),R.getSize(i),chain,table);
-		probeResults(R.getField(i),R.getIds(i),S.getField(i),S.getIds(i),chain,table,S.getSize(i),result);
+		indexRelation(R.getField(i), R.getBucketSize(i),chain,table);
+		probeResults(R.getField(i),R.getIds(i),S.getField(i),S.getIds(i),chain,table, S.getBucketSize(i),result);
 		delete[] chain;
 		delete[] table;
 	}
@@ -63,7 +65,7 @@ bool probeResults(intField *LbucketJoinField, unsigned int *LbucketRowIds,
                   intField *IbucketJoinField, unsigned int *IbucketRowIds,
                   int *&chain,int *&H2HashTable,
                   unsigned int bucketSize, Result *result){
-	for (int i = 0; i < bucketSize; i++) {
+	for (unsigned int i = 0; i < bucketSize; i++) {
 		int h = h2(LbucketJoinField[i]);
 		if (H2HashTable[h] == -1) continue;		// no records in I with that value
 		int chainIndex = H2HashTable[h];

@@ -22,8 +22,8 @@ Relation::~Relation() {
 }
 
 // phase 1: partition in place Relation R into buckets and fill Psum to distinguish them (|Psum| = 2^n)
-bool Relation::partitionRelation() {
-    const unsigned int H1_N = pickH1_N();
+bool Relation::partitionRelation(unsigned int avg_bucket_size, unsigned int forced_H1_N) {
+    const unsigned int H1_N = (forced_H1_N == 0) ? pickH1_N(avg_bucket_size) : forced_H1_N;
     const unsigned int num_of_buckets = (unsigned int) pow(2, H1_N);
     // 1) calculate Hist (in linear time)
     unsigned int *Hist = new unsigned int[num_of_buckets]();    // all Hist[i] are initialized to 0
@@ -64,8 +64,8 @@ bool Relation::partitionRelation() {
 }
 
 // pick a good N value for H1 hash function
-unsigned int Relation::pickH1_N() {       //TODO: make a better scheme?
-    return ( (unsigned int) (sqrt(size) / 2 + 1)) % ((unsigned int) sqrt(CPU_CACHE));    // this way number of buckets is about half of the Relation's tuples, modded by the CPU's cache
+unsigned int Relation::pickH1_N(unsigned int avg_bucket_size) {       //TODO: make a better scheme?
+    return (unsigned int) log2( ((double) size) / avg_bucket_size );
 }
 
 // DEBUG
@@ -76,7 +76,7 @@ void Relation::printDebugInfo() {
             printf("Psum[%u] = %u\n", i, Psum[i]);
         }
     }
-    printf("\n joinField | rowids\n");
+    printf(" joinField | rowids\n");
     for (unsigned int i = 0 ; i < size ; i++){
         printf("%10u | %u\n", (unsigned int) joinField[i], rowids[i]);
     }

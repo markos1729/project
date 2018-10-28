@@ -16,7 +16,7 @@ void test_partition(){
     unsigned int *rowids = new unsigned int[7];
     for (unsigned int i = 0 ; i < 7 ; i++) { rowids[i] = i+1; }
     Relation *R = new Relation(7, joinField, rowids);
-    assert( R->partitionRelation() )
+    assert( R->partitionRelation(0, 2) )   // forced H1_N = 2
     R->printDebugInfo();
     delete R;
 }
