@@ -30,7 +30,7 @@ Result* radixHashJoin(Relation &R, Relation &S) {
 	for (int i=0; i<nbuckets; ++i) {
 		int *chain,*table;
 		indexRelation(R.getField(i), R.getBucketSize(i),chain,table);
-		probeResults(R.getField(i),R.getIds(i),S.getField(i),S.getIds(i),chain,table, S.getBucketSize(i),result);
+		probeResults(S.getField(i),S.getIds(i),R.getField(i),R.getIds(i),chain,table, S.getBucketSize(i),result);
 		delete[] chain;
 		delete[] table;
 	}
@@ -46,13 +46,13 @@ bool indexRelation(intField *bucketJoinField,unsigned int bucketSize,int *&chain
 	table=new int[H2SIZE];
 	chain=new int[bucketSize];
 	int *last=new int[H2SIZE];
-	memset(table,-1,H2SIZE*sizeof(int));
-	memset(chain,-1,bucketSize*sizeof(int));
+	memset(table,0,H2SIZE*sizeof(int));
+	memset(chain,0,bucketSize*sizeof(int));
 	
 	for (int i=bucketSize-1; i>=0; --i) {
 		int h=h2(bucketJoinField[i]);
-		if (table[h]==-1) last[h]=table[h]=i;
-		else last[h]=chain[last[h]]=i;
+		if (table[h]==0) last[h]=table[h]=i+1;
+		else last[h]=chain[last[h]-1]=i+1;
 	}
 	
 	delete[] last;

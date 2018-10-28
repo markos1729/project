@@ -17,7 +17,7 @@ RadixHashJoin.o: src/RadixHashJoin.cpp $(HEADERS)
 	$(CXX) -c $(CXXFLAGS) src/RadixHashJoin.cpp
 
 JoinResults.o: src/JoinResults.cpp $(HEADERS)
-    $(CXX) -c $(CXXFLAGS) src/JoinResults.cpp
+	$(CXX) -c $(CXXFLAGS) src/JoinResults.cpp
 
 test.o: test.cpp $(HEADERS)
 	$(CXX) -c $(CXXFLAGS) test.cpp

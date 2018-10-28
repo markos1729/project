@@ -18,10 +18,10 @@ void test_index() {
 	intField bucket[10]={3,1,17,23,12,127,123,2,3,10};
 	
 	assert(indexRelation(bucket,10,chain,table));	
-	assert(table[0]==8);
-	assert(chain[1]==-1);
-	assert(chain[2]==-1);
-	assert(chain[3]==2);
+	assert(table[0]==9);
+	assert(chain[1]==0);
+	assert(chain[2]==0);
+	assert(chain[3]==3);
 	
 	delete[] chain;
 	delete[] table;

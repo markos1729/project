@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include "../Headers/JoinResults.h"
 
 ResultNode::ResultNode() : next(NULL), nextpos(0) {}
