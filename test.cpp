@@ -1,27 +1,28 @@
 #include "Headers/RadixHashJoin.h"
 #include <stdio.h>
 
-#define try(a) fprintf(stdout,"\n%s\n",#a);a();
-#define assert(a) if (!(a)) fprintf(stderr,"assert %s failed\n",#a);
+#define try(a) { fprintf(stdout, "\n%s\n", #a); a(); }
+#define assert(a) { if ( !(a) ) fprintf(stderr, "assert %s failed\n", #a); }
 
 void test_partition(){
     intField joinField[7] = {'a', 'b', 'a', 'a', 'c', 'b', 'c'};
     unsigned int rowids[7] = {1, 2, 3, 4, 5, 6, 7};
     Relation *R = new Relation(7, joinField, rowids);
-    assert( R->partitionRelation(0, 2) )   // forced H1_N = 2
+    assert( R->partitionRelation(2) )   // forced H1_N = 2
+    // DEBUG: we could have asserts here, but we're gonna use unit testing instead anyway
     R->printDebugInfo();
     delete R;
 }
 
 void test_index() {
-	int *chain,*table;
-	intField bucket[10]={3,1,17,23,12,127,123,2,3,10};
-	
-	assert(indexRelation(bucket,10,chain,table));	
-	assert(table[0]==9);
-	assert(chain[1]==0);
-	assert(chain[2]==0);
-	assert(chain[3]==3);
+	unsigned int *chain, *table;
+	intField bucket[10] = {3, 1, 17, 23, 12, 127, 123, 2, 3, 10};
+
+	assert(indexRelation(bucket, 10, chain, table));
+    assert(table[0] == 9);
+    assert(chain[1] == 0);
+    assert(chain[2] == 0);
+    assert(chain[3] == 3);
 	
 	delete[] chain;
 	delete[] table;
@@ -39,13 +40,13 @@ void test_probing() {
     unsigned int Lbucketrowids[20];
     for (unsigned int i = 0 ; i < 20 ; i++) { Lbucketrowids[i] = i+1; }
 
-    int *chain = new int[8]();
+    unsigned int *chain = new unsigned int[8]();
     chain[3] = 3; chain[6] = 4;
-    int *H2HashTable = new int[H2SIZE]();
+    unsigned int *H2HashTable = new unsigned int[H2SIZE]();
     H2HashTable[test_value % H2SIZE] = 7;
 
     Result *result = new Result();
-    assert( probeResults(LbucketjoinField, Lbucketrowids, IbucketjoinField, Ibucketrowids, chain, H2HashTable, 20, result) );
+    assert( probeResults(LbucketjoinField, Lbucketrowids, IbucketjoinField, Ibucketrowids, chain, H2HashTable, 20, result, true) );
     // DEBUG: we could have asserts here, but we're gonna use unit testing instead anyway
     result->printRowIds();
 

@@ -1,77 +1,80 @@
 #include <iostream>
 #include <cstring>
+#include <cmath>
 #include "../Headers/RadixHashJoin.h"
 
 using namespace std;
 
 #define CHECK(call, msg, action) { if ( ! (call) ) { cerr << msg << endl; action } }
-#define MIN(A, B) ( (A) < (B) ? (A) : (B) )
+#define MAX(A, B) ( (A) > (B) ? (A) : (B) )
 
 
 /* Local Functions */
 // TODO: read them here instead of RadixHashJoin.h ?
 
-Result* radixHashJoin(Relation &R, Relation &S) {
-    // main Pseudocode
-    // 1. partition R and S, whilst keeping a 'Psum' table for each bucket in R and S (phase 1)
-    CHECK( R.partitionRelation(MIN(CPU_CACHE, R.getSize())) , "partitioning R failed", return NULL; )
-    CHECK( S.partitionRelation(MIN(CPU_CACHE, S.getSize())) , "partitioning S failed", return NULL; )
 
-    // 1.5. Define a Result object to fill
+Result* radixHashJoin(Relation &R, Relation &S) {
+    // Partition R and S, whilst keeping a 'Psum' table for each bucket in R and S (phase 1)
+    unsigned int H1_N = (unsigned int) log2( MAX(R.getSize(), S.getSize()) / CPU_CACHE );       // H1_N is the same for both Relations
+    CHECK( R.partitionRelation(H1_N) , "partitioning R failed", return NULL; )
+    CHECK( S.partitionRelation(H1_N) , "partitioning S failed", return NULL; )
+    // Define a Result object to fill
     Result *result = new Result;
-    
-    // 2. choose one of them for indexing, lets say I, and keep the other for scanning, lets say L
-    // for i in range(0, num_of_buckets):
-    //      3. index the bucket[i] of Relation I (phase 2) (create "chain" and fill "bucket")
-    //      4. scan joinField of L:
-    //              use "H2HashTable" and "chain" to find equal joinField values
-    //              add rowids of equal joinFields to Result
-	int nbuckets=R.getBuckets();
-	for (int i=0; i<nbuckets; ++i) {
-		int *chain,*table;
-		indexRelation(R.getField(i), R.getBucketSize(i),chain,table);
-		probeResults(S.getField(i),S.getIds(i),R.getField(i),R.getIds(i),chain,table, S.getBucketSize(i),result);
+    // Choose one of them for indexing, lets say I, and keep the other for scanning, lets say L
+    bool saveLfirst;
+    Relation *L = NULL, *I = NULL;
+    if (R.getSize() < S.getSize()){   // index the smaller of the two Relations
+        I = &R;
+        L = &S;
+        saveLfirst = true;
+    } else{
+        I = &S;
+        L = &R;
+        saveLfirst = false;
+    }
+    // Iteratively perform phases 2 and 3 for all buckets of both similarly partitioned Relations and add results bucket by bucket
+	for (unsigned int i = 0 ; i < I->getNumberOfBuckets() ; i++) {
+		unsigned int *chain = NULL, *table = NULL;
+		CHECK ( indexRelation(I->getJoinField(i), I->getBucketSize(i), chain, table) , "indexing of a bucket failed", delete[] chain; delete[] table; delete result; return NULL; )
+		CHECK( probeResults(L->getJoinField(i), L->getRowIds(i), I->getJoinField(i), I->getRowIds(i), chain, table, L->getBucketSize(i), result, saveLfirst) , "probing a bucket for results failed", delete[] chain; delete[] table; delete result; return NULL; )
 		delete[] chain;
 		delete[] table;
 	}
-
     return result;
 }
 
-inline int h2(intField key) { return key%H2SIZE; }
+inline unsigned int h2(intField key) { return (unsigned int) (key % H2SIZE); }
 
 /* Local Function Implementation */
 // phase 2: index I's given bucket by creating 'H2HashTable' and 'chain' structures
-bool indexRelation(intField *bucketJoinField,unsigned int bucketSize,int *&chain,int *&table){
-	table=new int[H2SIZE];
-	chain=new int[bucketSize];
-	int *last=new int[H2SIZE];
-	memset(table,0,H2SIZE*sizeof(int));
-	memset(chain,0,bucketSize*sizeof(int));
-	
-	for (int i=bucketSize-1; i>=0; --i) {
-		int h=h2(bucketJoinField[i]);
-		if (table[h]==0) last[h]=table[h]=i+1;
-		else last[h]=chain[last[h]-1]=i+1;
-	}
-	
-	delete[] last;
-	return true;
+bool indexRelation(intField *bucketJoinField, unsigned int bucketSize, unsigned int *&chain, unsigned int *&table){
+    table = new unsigned int[H2SIZE];
+    chain = new unsigned int[bucketSize];
+    unsigned int *last = new unsigned int[H2SIZE];
+    memset(table, 0, H2SIZE * sizeof(int));
+    memset(chain, 0, bucketSize * sizeof(int));
+    for (unsigned int i = bucketSize ; i > 0 ; --i) {
+        unsigned int h = h2(bucketJoinField[i - 1]);
+        if (table[h] == 0) last[h] = table[h] = i;
+        else last[h] = chain[last[h] - 1] = i;
+    }
+    delete[] last;
+    return true;
 }
 
 // phase 3: probe linearly L's given bucket and add results based on equal values in indexed I's given bucket
-// TODO: const parameters
-bool probeResults(intField *LbucketJoinField, unsigned int *LbucketRowIds,
-                  intField *IbucketJoinField, unsigned int *IbucketRowIds,
-                  int *&chain,int *&H2HashTable,
-                  unsigned int bucketSize, Result *result){
-	for (unsigned int i = 0; i < bucketSize; i++) {
-		int h = h2(LbucketJoinField[i]);
-		if (H2HashTable[h] == -1) continue;		// no records in I with that value
-		int chainIndex = H2HashTable[h];
+bool probeResults(const intField *LbucketJoinField, const unsigned int *LbucketRowIds,
+                  const intField *IbucketJoinField, const unsigned int *IbucketRowIds,
+                  const unsigned int *chain, const unsigned int *H2HashTable,
+                  unsigned int LbucketSize, Result *result, bool saveLfirst){
+	for (unsigned int i = 0; i < LbucketSize; i++) {
+		unsigned int h = h2(LbucketJoinField[i]);
+		if (H2HashTable[h] == 0) continue;		// no records in I with that value
+		unsigned int chainIndex = H2HashTable[h];
 		while (chainIndex > 0) {
 			if (LbucketJoinField[i] == IbucketJoinField[chainIndex - 1]) {
-				result->addTuple(LbucketRowIds[i], IbucketRowIds[chainIndex - 1]);
+			    if (saveLfirst) result->addTuple(IbucketRowIds[chainIndex - 1], LbucketRowIds[i]);
+			    else result->addTuple(LbucketRowIds[i], IbucketRowIds[chainIndex - 1]);
 			}
 			chainIndex = chain[chainIndex - 1];
 		}
