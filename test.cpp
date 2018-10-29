@@ -1,14 +1,12 @@
-#include "Headers/RadixHashJoin.h"
 #include <stdio.h>
-
-#define try(a) { fprintf(stdout, "\n%s\n", #a); a(); }
-#define assert(a) { if ( !(a) ) fprintf(stderr, "assert %s failed\n", #a); }
+#include "Headers/RadixHashJoin.h"
+#include "Headers/catch.hpp"
 
 void test_partition(){
     intField joinField[7] = {'a', 'b', 'a', 'a', 'c', 'b', 'c'};
     unsigned int rowids[7] = {1, 2, 3, 4, 5, 6, 7};
     Relation *R = new Relation(7, joinField, rowids);
-    assert( R->partitionRelation(2) )   // forced H1_N = 2
+    assert( R->partitionRelation(2) );   // forced H1_N = 2
     // DEBUG: we could have asserts here, but we're gonna use unit testing instead anyway
     R->printDebugInfo();
     delete R;
@@ -72,11 +70,9 @@ void test_join(){
     }
 }
 
-int main() {
-	try(test_partition);
-	try(test_index);
-	try(test_probing);
-    try(test_join);
-	return 0;
+TEST_CASE("Simple test", "[test]") {
+    CHECK( 1 == 1 );
+    CHECK( 2 == 1 );
+    REQUIRE( 2 == 1 );
+    CHECK( 2 == 1 );
 }
-
