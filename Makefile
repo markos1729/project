@@ -1,33 +1,34 @@
-CXX	      = g++
+CXX       = g++
 CXXFLAGS  = -g3 -pedantic -std=c++11 -Wall -Wextra
 OBJECTS   = main.o Relation.o RadixHashJoin.o JoinResults.o test.o
 SOURCES   = src/*.cpp
 HEADERS   = Headers/*.h
 
 
-all: main
+all: project
 
-main: $(OBJECTS)
-    $(CXX) $(CXXFLAGS) $(OBJECTS) -o project
+project: $(OBJECTS)
+	$(CXX) $(CXXFLAGS) $(OBJECTS) -o project
 
-test.o: $(OBJECTS)
-    $(CXX) -c $(CXXFLAGS) test.cpp
+main.o: $(OBJECTS)
+	$(CXX) -c $(CXXFLAGS) main.cpp
 
 Relation.o: src/Relation.cpp $(HEADERS)
-    $(CXX) -c $(CXXFLAGS) src/Relation.cpp
+	$(CXX) -c $(CXXFLAGS) src/Relation.cpp
 
 RadixHashJoin.o: src/RadixHashJoin.cpp $(HEADERS)
-    $(CXX) -c $(CXXFLAGS) src/RadixHashJoin.cpp
+	$(CXX) -c $(CXXFLAGS) src/RadixHashJoin.cpp
 
 JoinResults.o: src/JoinResults.cpp $(HEADERS)
-    $(CXX) -c $(CXXFLAGS) src/JoinResults.cpp
+	$(CXX) -c $(CXXFLAGS) src/JoinResults.cpp
 
 test.o: test.cpp $(HEADERS)
-    $(CXX) -c $(CXXFLAGS) test.cpp
+	$(CXX) -c $(CXXFLAGS) test.cpp
 
 
 clean:
-    rm -f $(OBJECTS) test
+	rm -f $(OBJECTS) test
 
 count:
-    wc $(SOURCES) $(HEADERS)
+	wc $(SOURCES) $(HEADERS)
+

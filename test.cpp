@@ -2,31 +2,31 @@
 #include "Headers/RadixHashJoin.h"
 #include "Headers/catch.hpp"
 
-void test_partition(){
+TEST_CASE("Relation is being partitioned", "[partition]") {
     intField joinField[7] = {'a', 'b', 'a', 'a', 'c', 'b', 'c'};
     unsigned int rowids[7] = {1, 2, 3, 4, 5, 6, 7};
     Relation *R = new Relation(7, joinField, rowids);
-    assert( R->partitionRelation(2) );   // forced H1_N = 2
-    // DEBUG: we could have asserts here, but we're gonna use unit testing instead anyway
+    REQUIRE( R->partitionRelation(2) );   // forced H1_N = 2
+    // TODO: add CHECKs here
     R->printDebugInfo();
     delete R;
 }
 
-void test_index() {
-	unsigned int *chain, *table;
-	intField bucket[10] = {3, 1, 17, 23, 12, 127, 123, 2, 3, 10};
+TEST_CASE("Index is created", "[index]") {
+    unsigned int *chain, *table;
+    intField bucket[10] = {3, 1, 17, 23, 12, 127, 123, 2, 3, 10};
 
-	assert(indexRelation(bucket, 10, chain, table));
-    assert(table[0] == 9);
-    assert(chain[1] == 0);
-    assert(chain[2] == 0);
-    assert(chain[3] == 3);
-	
-	delete[] chain;
-	delete[] table;
+    REQUIRE(indexRelation(bucket, 10, chain, table));
+    CHECK(table[0] == 9);
+    CHECK(chain[1] == 0);
+    CHECK(chain[2] == 0);
+    CHECK(chain[3] == 3);
+
+    delete[] chain;
+    delete[] table;
 }
 
-void test_probing() {
+TEST_CASE("Results are being created", "[results]") {
     intField test_value = 42;
     intField IbucketjoinField[8] = {1, 2, test_value, test_value, 5, 6, test_value, 8};
     unsigned int Ibucketrowids[8];
@@ -44,8 +44,8 @@ void test_probing() {
     H2HashTable[test_value % H2SIZE] = 7;
 
     Result *result = new Result();
-    assert( probeResults(LbucketjoinField, Lbucketrowids, IbucketjoinField, Ibucketrowids, chain, H2HashTable, 20, result, true) );
-    // DEBUG: we could have asserts here, but we're gonna use unit testing instead anyway
+    REQUIRE( probeResults(LbucketjoinField, Lbucketrowids, IbucketjoinField, Ibucketrowids, chain, H2HashTable, 20, result, true) );
+    // TODO: add CHECKs here
     result->printRowIds();
 
     delete[] chain;
@@ -53,26 +53,20 @@ void test_probing() {
     delete result;
 }
 
-void test_join(){
-    intField joinFieldR[] = {1, 2, 3, 4};
-    unsigned int rowidsR[] = {1, 2, 3, 4};
-    Relation *R = new Relation(4, joinFieldR, rowidsR);
-    intField joinFieldS[] = {1, 1, 3};
-    unsigned int rowidsS[] = {1, 2, 3};
-    Relation *S = new Relation(3, joinFieldS, rowidsS);
-    Result *result = radixHashJoin(*R, *S);
-    if (result == NULL){
-        cerr << "RadixHashJoined failed!" << endl;
-    } else{
-        cout << "join results are:" << endl;
+SCENARIO("The entire join is being tested", "[RHJ]") {
+    GIVEN("The assignment's example R and S") {
+        intField joinFieldR[] = {1, 2, 3, 4};
+        unsigned int rowidsR[] = {1, 2, 3, 4};
+        Relation *R = new Relation(4, joinFieldR, rowidsR);
+        intField joinFieldS[] = {1, 1, 3};
+        unsigned int rowidsS[] = {1, 2, 3};
+        Relation *S = new Relation(3, joinFieldS, rowidsS);
+        Result *result = radixHashJoin(*R, *S);
+
+        REQUIRE( result != NULL );
+        // TODO: add CHECKs here
+        cout << "Join results are:" << endl;
         result->printRowIds();
         delete result;
     }
-}
-
-TEST_CASE("Simple test", "[test]") {
-    CHECK( 1 == 1 );
-    CHECK( 2 == 1 );
-    REQUIRE( 2 == 1 );
-    CHECK( 2 == 1 );
 }
