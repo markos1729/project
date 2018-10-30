@@ -3,7 +3,6 @@
 #include "stdint.h"
 #include "../Headers/Relation.h"
 
-
 unsigned int H1(intField value, unsigned int n){
     intField mask = 0;
     for (int i = 0 ; i < n ; i++ ){
@@ -11,7 +10,6 @@ unsigned int H1(intField value, unsigned int n){
     }
     return (unsigned int) (mask & value);
 }
-
 
 Relation::Relation(unsigned int _size, const intField *_joinField, const unsigned int *_rowids) : size(_size), joinField(NULL), rowids(NULL), Psum(NULL), numberOfBuckets(0) {
     joinField = new intField[size];
