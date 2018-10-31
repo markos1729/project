@@ -30,6 +30,7 @@ Relation::~Relation() {
 
 // phase 1: partition in place Relation R into buckets and fill Psum to distinguish them (|Psum| = 2^n)
 bool Relation::partitionRelation(unsigned int H1_N) {
+    if (this->getSize() == 0 || rowids == NULL || joinField == NULL ) return true;     // nothing to partition
     const unsigned int num_of_buckets = (unsigned int) pow(2, H1_N);
     // 1) calculate Hist (in linear time)
     unsigned int *Hist = new unsigned int[num_of_buckets]();    // all Hist[i] are initialized to 0

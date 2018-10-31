@@ -2,15 +2,27 @@
 #include "Headers/RadixHashJoin.h"
 #include "Headers/catch.hpp"
 
-TEST_CASE("Relation is being partitioned", "[partition]") {
+
+TEST_CASE("Trivial partition check", "[partition]") {
+    Relation R(0, NULL, NULL);
+    REQUIRE( R.partitionRelation(2) );   // H1_N = 2
+}
+
+TEST_CASE("Simple case partition check", "[partition]") {
     intField joinField[7] = {'a', 'b', 'a', 'a', 'c', 'b', 'c'};
     unsigned int rowids[7] = {1, 2, 3, 4, 5, 6, 7};
     Relation *R = new Relation(7, joinField, rowids);
-    REQUIRE( R->partitionRelation(2) );   // forced H1_N = 2
-    // TODO: add CHECKs here
-    R->printDebugInfo();
+    REQUIRE( R->partitionRelation(2) );   // H1_N = 2
+    CHECK( R->getJoinField(0) == 'a' );
+    CHECK( R->getJoinField(1) == 'a' );
+    CHECK( R->getJoinField(2) == 'a' );
+    CHECK( R->getJoinField(3) == 'b' );
+    CHECK( R->getJoinField(4) == 'b' );
+    CHECK( R->getJoinField(5) == 'c' );
+    CHECK( R->getJoinField(6) == 'c' );
     delete R;
 }
+
 
 TEST_CASE("Index is created", "[index]") {
     unsigned int *chain, *table;
