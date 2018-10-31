@@ -3,8 +3,8 @@
 
 #include "FieldTypes.h"
 
-#define CPU_CACHE 4096
-#define H2SIZE 3
+#define L1 4096  //32KB
+#define L2 32768 //256KB
 
 unsigned int H1(intField, unsigned int N);
 
