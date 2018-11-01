@@ -14,7 +14,7 @@ using namespace std;
 unsigned int H2_N;
 unsigned int H2(intField value) { return value&((1<<H2_N)-1); }
 
-Result* radixHashJoin(Relation &R, Relation &S) {
+Result* radixHashJoin(JoinRelation &R, JoinRelation &S) {
     // Partition R and S, whilst keeping a 'Psum' table for each bucket in R and S (phase 1)
     int H1_N = (unsigned int) (log2( MAX(R.getSize(), S.getSize()) / L2 )+0.5); // H1_N is the same for both Relations round up
     H2_N=H1_N/2;
@@ -24,7 +24,7 @@ Result* radixHashJoin(Relation &R, Relation &S) {
     Result *result = new Result;
     // Choose one of them for indexing, lets say I, and keep the other for scanning, lets say L
     bool saveLfirst;
-    Relation *L = NULL, *I = NULL;
+    JoinRelation *L = NULL, *I = NULL;
     if (R.getSize() < S.getSize()){   // index the smaller of the two Relations
         I = &R;
         L = &S;

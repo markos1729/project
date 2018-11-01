@@ -4,14 +4,14 @@
 
 
 TEST_CASE("Trivial partition check", "[partition]") {
-    Relation R(0, NULL, NULL);
+    JoinRelation R(0, NULL, NULL);
     REQUIRE( R.partitionRelation(2) );   // H1_N = 2
 }
 
 TEST_CASE("Simple case partition check", "[partition]") {
     intField joinField[7] = {'a', 'b', 'a', 'a', 'c', 'b', 'c'};
     unsigned int rowids[7] = {1, 2, 3, 4, 5, 6, 7};
-    Relation *R = new Relation(7, joinField, rowids);
+    JoinRelation *R = new JoinRelation(7, joinField, rowids);
     REQUIRE( R->partitionRelation(2) );   // H1_N = 2
     CHECK( R->getJoinField(0) == 'a' );
     CHECK( R->getJoinField(1) == 'a' );
@@ -69,10 +69,10 @@ SCENARIO("The entire join is being tested", "[RHJ]") {
     GIVEN("The assignment's example R and S") {
         intField joinFieldR[] = {1, 2, 3, 4};
         unsigned int rowidsR[] = {1, 2, 3, 4};
-        Relation *R = new Relation(4, joinFieldR, rowidsR);
+        JoinRelation *R = new JoinRelation(4, joinFieldR, rowidsR);
         intField joinFieldS[] = {1, 1, 3};
         unsigned int rowidsS[] = {1, 2, 3};
-        Relation *S = new Relation(3, joinFieldS, rowidsS);
+        JoinRelation *S = new JoinRelation(3, joinFieldS, rowidsS);
         Result *result = radixHashJoin(*R, *S);
 
         REQUIRE( result != NULL );

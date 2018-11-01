@@ -3,6 +3,7 @@
 #include "stdint.h"
 #include "../Headers/Relation.h"
 
+/* H1 Function used in partitioning*/
 unsigned int H1(intField value, unsigned int n){
     intField mask = 0;
     for (int i = 0 ; i < n ; i++ ){
@@ -11,7 +12,9 @@ unsigned int H1(intField value, unsigned int n){
     return (unsigned int) (mask & value);
 }
 
-Relation::Relation(unsigned int _size, const intField *_joinField, const unsigned int *_rowids) : size(_size), joinField(NULL), rowids(NULL), Psum(NULL), numberOfBuckets(0) {
+
+/* _______________ Join Relation _______________ */
+JoinRelation::JoinRelation(unsigned int _size, const intField *_joinField, const unsigned int *_rowids) : size(_size), joinField(NULL), rowids(NULL), Psum(NULL), numberOfBuckets(0) {
     joinField = new intField[size];
     rowids = new unsigned int[size];
     for (unsigned int i = 0; i < size; i++) {
@@ -20,14 +23,14 @@ Relation::Relation(unsigned int _size, const intField *_joinField, const unsigne
     }
 }
 
-Relation::~Relation() {
+JoinRelation::~JoinRelation() {
     delete[] Psum;
     delete[] joinField;
     delete[] rowids;
 }
 
-// phase 1: partition in place Relation R into buckets and fill Psum to distinguish them (|Psum| = 2^n)
-bool Relation::partitionRelation(unsigned int H1_N) {
+// phase 1: partition in place JoinRelation R into buckets and fill Psum to distinguish them (|Psum| = 2^n)
+bool JoinRelation::partitionRelation(unsigned int H1_N) {
     if (this->getSize() == 0 || rowids == NULL || joinField == NULL ) return true;     // nothing to partition
     const unsigned int num_of_buckets = (unsigned int) pow(2, H1_N);
     // 1) calculate Hist (in linear time)
@@ -69,9 +72,9 @@ bool Relation::partitionRelation(unsigned int H1_N) {
 }
 
 // DEBUG
-void Relation::printDebugInfo() {
+void JoinRelation::printDebugInfo() {
     if (Psum != NULL) {
-        printf("This Relation is partitioned.\n%u buckets created with Psum as follows:\n", numberOfBuckets);
+        printf("This JoinRelation is partitioned.\n%u buckets created with Psum as follows:\n", numberOfBuckets);
         for (unsigned int i = 0; i < numberOfBuckets; i++) {
             printf("Psum[%u] = %u\n", i, Psum[i]);
         }
@@ -80,4 +83,37 @@ void Relation::printDebugInfo() {
     for (unsigned int i = 0 ; i < size ; i++){
         printf("%10u | %u\n", (unsigned int) joinField[i], rowids[i]);
     }
+}
+
+
+/* _________________ Relation _________________ */
+Relation::Relation(unsigned int _size, unsigned int _num_of_columns) : size(_size), num_of_columns(_num_of_columns) {
+    columns = new intField*[_num_of_columns]();   // initialize to NULL
+}
+
+Relation::~Relation() {
+    for (int i = 0 ; i < num_of_columns ; i++){
+        delete[] columns[i];   // "delete" accounts for possible NULL value
+    }
+    delete[] columns;
+}
+
+bool Relation::addColumn(unsigned int col_num, const intField *values) {   // (!) values must be of length == size, lest we get seg fault
+    if (col_num >= num_of_columns) return false;
+    if (columns[col_num] != NULL) {
+        delete[] columns[col_num];   // overwrite previous column
+    }
+    columns[col_num] = new intField[size];
+    for (int i = 0 ; i < size ; i++){
+        columns[col_num][i] = values[i];
+    }
+    return true;
+}
+
+JoinRelation *Relation::extractJoinRelation(unsigned int index_of_JoinField) {
+    unsigned int *rowids = new unsigned int[size];
+    for (unsigned int i = 0 ; i < size ; i++) { rowids[i] = i+1; }
+    JoinRelation *res = new JoinRelation(size, columns[index_of_JoinField], rowids);
+    delete[] rowids;
+    return res;
 }
