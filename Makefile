@@ -1,14 +1,17 @@
 CXX	      = g++
-CXXFLAGS  = -g3 -pedantic -std=c++98 #-Wall -Wextra
+CXXFLAGS  = -g3 -pedantic -std=c++11 #-Wall -Wextra
 OBJECTS   = Relation.o RadixHashJoin.o JoinResults.o test.o
 SOURCES   = src/*.cpp
 HEADERS   = Headers/*.h
 
 
-all: test
+all: project
 
-test: $(OBJECTS)
-	$(CXX) $(CXXFLAGS) $(OBJECTS) -o test
+project: $(OBJECTS)
+	$(CXX) $(CXXFLAGS) $(OBJECTS) -o project
+
+main.o: $(OBJECTS)
+	$(CXX) -c $(CXXFLAGS) main.cpp
 
 Relation.o: src/Relation.cpp $(HEADERS)
 	$(CXX) -c $(CXXFLAGS) src/Relation.cpp
@@ -28,3 +31,4 @@ clean:
 
 count:
 	wc $(SOURCES) $(HEADERS)
+

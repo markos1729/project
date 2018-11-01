@@ -37,8 +37,8 @@ Result* radixHashJoin(Relation &R, Relation &S) {
     // Iteratively perform phases 2 and 3 for all buckets of both similarly partitioned Relations and add results bucket by bucket
 	for (unsigned int i = 0 ; i < I->getNumberOfBuckets() ; i++) {
 		unsigned int *chain = NULL, *table = NULL;
-		CHECK ( indexRelation(I->getJoinField(i), I->getBucketSize(i), chain, table) , "indexing of a bucket failed", delete[] chain; delete[] table; delete result; return NULL; )
-		CHECK( probeResults(L->getJoinField(i), L->getRowIds(i), I->getJoinField(i), I->getRowIds(i), chain, table, L->getBucketSize(i), result, saveLfirst) , "probing a bucket for results failed", delete[] chain; delete[] table; delete result; return NULL; )
+		CHECK ( indexRelation(I->getJoinFieldBucket(i), I->getBucketSize(i), chain, table) , "indexing of a bucket failed", delete[] chain; delete[] table; delete result; return NULL; )
+		CHECK( probeResults(L->getJoinFieldBucket(i), L->getRowIdsBucket(i), I->getJoinFieldBucket(i), I->getRowIdsBucket(i), chain, table, L->getBucketSize(i), result, saveLfirst) , "probing a bucket for results failed", delete[] chain; delete[] table; delete result; return NULL; )
 		delete[] chain;
 		delete[] table;
 	}

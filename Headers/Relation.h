@@ -20,10 +20,12 @@ class Relation {
 		~Relation();
 		/* Accessors  */
         unsigned int getSize() const { return size; }
+        intField getJoinField(int pos) const { return (rowids != NULL && pos >= 0 && pos < size) ? joinField[pos] : 0; }
+        unsigned int getRowId(int pos) const { return (rowids != NULL && pos >= 0 && pos < size) ? rowids[pos] : 0; }
         unsigned int getNumberOfBuckets() const { return numberOfBuckets; }
-        unsigned int *getRowIds(int i) const { return rowids + Psum[i]; }
-        intField *getJoinField(int i) const { return joinField + Psum[i]; }
-        unsigned int getBucketSize(int i) const { return (i == numberOfBuckets - 1) ? size - Psum[i] : Psum[i + 1] - Psum[i]; }
+        unsigned int *getRowIdsBucket(int i) const { return (Psum != NULL && i >= 0 && i < numberOfBuckets) ? rowids + Psum[i] : 0; }
+        intField *getJoinFieldBucket(int i) const { return (Psum != NULL && i >= 0 && i < numberOfBuckets) ? joinField + Psum[i] : 0; }
+        unsigned int getBucketSize(int i) const { return (Psum != NULL &&  i >= 0 && i < numberOfBuckets) ? ((i == numberOfBuckets - 1) ? size - Psum[i] : Psum[i + 1] - Psum[i]) : 0; }
         /* Operations */
         bool partitionRelation(unsigned int H1_N);     // partitions Relation by creating Psum and reordering it's tuples
         /* Debug */
