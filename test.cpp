@@ -52,8 +52,8 @@ TEST_CASE("Results are being created", "[results]") {
 
     unsigned int *chain = new unsigned int[8]();
     chain[3] = 3; chain[6] = 4;
-    unsigned int *H2HashTable = new unsigned int[H2SIZE]();
-    H2HashTable[test_value % H2SIZE] = 7;
+    unsigned int *H2HashTable = new unsigned int[L1]();
+    H2HashTable[test_value % L1] = 7;
 
     Result *result = new Result();
     REQUIRE( probeResults(LbucketjoinField, Lbucketrowids, IbucketjoinField, Ibucketrowids, chain, H2HashTable, 20, result, true) );
