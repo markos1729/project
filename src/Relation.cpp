@@ -1,6 +1,9 @@
 #include <cmath>
 #include <cstdio>
 #include "stdint.h"
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
 #include "../Headers/Relation.h"
 
 /* H1 Function used in partitioning*/
@@ -11,7 +14,6 @@ unsigned int H1(intField value, unsigned int n){
     }
     return (unsigned int) (mask & value);
 }
-
 
 /* _______________ Join Relation _______________ */
 JoinRelation::JoinRelation(unsigned int _size, const intField *_joinField, const unsigned int *_rowids) : size(_size), joinField(NULL), rowids(NULL), Psum(NULL), numberOfBuckets(0) {
@@ -92,9 +94,14 @@ Relation::Relation(unsigned int _size, unsigned int _num_of_columns) : size(_siz
 }
 
 Relation::~Relation() {
+	if (size) munmap(columns[0]-2,(size*num_of_columns+2)*sizeof(intField));
+
+	/* not needed see munmap above ^^^
     for (int i = 0 ; i < num_of_columns ; i++){
         delete[] columns[i];   // "delete" accounts for possible NULL value
-    }
+        free(columns[i]);
+    }*/
+    
     delete[] columns;
 }
 
@@ -117,3 +124,26 @@ JoinRelation *Relation::extractJoinRelation(unsigned int index_of_JoinField) {
     delete[] rowids;
     return res;
 }
+
+Relation::Relation(const char* file) {
+	int fd=open(file,O_RDONLY);
+	if (fd==-1) throw;
+
+	struct stat sb;
+	if (fstat(fd,&sb)==-1) throw;
+
+	void *p=mmap(0,sb.st_size,PROT_READ,MAP_PRIVATE,fd,0);
+	if (p==MAP_FAILED) throw;
+	
+	intField *all=(intField*)p;
+	size=all[0];
+	num_of_columns=all[1];
+	columns=new intField*[num_of_columns]();
+	all+=2;
+
+	for (int i=0; i<num_of_columns; ++i) {
+		columns[i]=all;
+		all+=size;
+	}
+}
+

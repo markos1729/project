@@ -11,12 +11,24 @@ using namespace std;
 /* Local Functions */
 // TODO: read them here instead of RadixHashJoin.h ?
 
-unsigned int H2_N;
-unsigned int H2(intField value) { return value&((1<<H2_N)-1); }
+/* *** Hash Functions Example ***
+
+...0000000001111 (take last 4 bits for H1) = value & ((1<<H1_N)-1)
+...0000000110000 (take the next 4/2=2 bits for H2) = value & (((1<<H2_N)-1)^((1<<H1_N)-1))
+        
+...0000000111111 \
+		^		  -> ......0000000110000 !!!
+...0000000001111 /
+
+   ****************************** */
+
+unsigned int H1_N,H2_N;
+unsigned int H2_OLD_MAY_REPLACE_H1_SEE_EXPLANATION(intField value) { return value&((1<<H2_N)-1); }
+unsigned int H2(intField value) { return value&(((1<<(H1_N+H2_N))-1)^((1<<H1_N)-1)); }
 
 Result* radixHashJoin(JoinRelation &R, JoinRelation &S) {
     // Partition R and S, whilst keeping a 'Psum' table for each bucket in R and S (phase 1)
-    int H1_N = (unsigned int) (log2( MAX(R.getSize(), S.getSize()) / L2 )+0.5); // H1_N is the same for both Relations round up
+    H1_N = (unsigned int) (log2( MAX(R.getSize(), S.getSize()) / CACHE )+0.5); // H1_N is the same for both Relations round up
     H2_N=H1_N/2;
     CHECK( R.partitionRelation(H1_N) , "partitioning R failed", return NULL; )
     CHECK( S.partitionRelation(H1_N) , "partitioning S failed", return NULL; )
@@ -48,10 +60,11 @@ Result* radixHashJoin(JoinRelation &R, JoinRelation &S) {
 /* Local Function Implementation */
 // phase 2: index I's given bucket by creating 'H2HashTable' and 'chain' structures
 bool indexRelation(intField *bucketJoinField, unsigned int bucketSize, unsigned int *&chain, unsigned int *&table){
-    table = new unsigned int[L1];
+	unsigned int sz=1<<H2_N;
+    table = new unsigned int[sz];
     chain = new unsigned int[bucketSize];
-    unsigned int *last = new unsigned int[L1];
-    memset(table, 0, L1 * sizeof(int));
+    unsigned int *last = new unsigned int[sz];
+    memset(table, 0, sz * sizeof(int));
     memset(chain, 0, bucketSize * sizeof(int));
     for (unsigned int i = bucketSize ; i > 0 ; --i) {
         unsigned int h = H2(bucketJoinField[i - 1]);

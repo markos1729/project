@@ -4,12 +4,9 @@
 #include <iostream>
 #include "FieldTypes.h"
 
-
-#define L1 4096  //32KB
-#define L2 32768 //256KB
+#define CACHE 4096  //32KB
 
 unsigned int H1(intField, unsigned int N);
-
 
 class JoinRelation {    // Relation struct used for RadixHashJoin, only stores Join Field and rowids
 private:
@@ -43,6 +40,7 @@ private:
     intField **columns; // each column saved as a sequential array of intFields
 public:
     Relation(unsigned int _size, unsigned int _num_of_columns);
+    Relation(const char* file);
     ~Relation();
     bool addColumn(unsigned int col_num, const intField *values);   // NOTE: use addColumns to build Relation column-by-column, (!) values lenth must be == size
     JoinRelation *extractJoinRelation(unsigned int index_of_JoinField);
