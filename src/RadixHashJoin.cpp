@@ -24,11 +24,11 @@ using namespace std;
 
 unsigned int H1_N,H2_N;
 unsigned int H2_OLD_MAY_REPLACE_H1_SEE_EXPLANATION(intField value) { return value&((1<<H2_N)-1); }
-unsigned int H2(intField value) { return value&(((1<<(H1_N+H2_N))-1)^((1<<H1_N)-1)); }
+unsigned int H2(intField value) { return (value&(((1<<(H1_N+H2_N))-1)^((1<<H1_N)-1)))>>H1_N; }
 
 Result* radixHashJoin(JoinRelation &R, JoinRelation &S) {
     // Partition R and S, whilst keeping a 'Psum' table for each bucket in R and S (phase 1)
-    H1_N = (unsigned int) (log2( MAX(R.getSize(), S.getSize()) / CACHE )+0.5); // H1_N is the same for both Relations round up
+    H1_N = (unsigned int) (ceil(log2( MAX(R.getSize(), S.getSize()) / CACHE ))); // H1_N is the same for both Relations round up
     H2_N=H1_N/2;
     CHECK( R.partitionRelation(H1_N) , "partitioning R failed", return NULL; )
     CHECK( S.partitionRelation(H1_N) , "partitioning S failed", return NULL; )
@@ -46,13 +46,14 @@ Result* radixHashJoin(JoinRelation &R, JoinRelation &S) {
         L = &R;
         saveLfirst = false;
     }
+    
     // Iteratively perform phases 2 and 3 for all buckets of both similarly partitioned Relations and add results bucket by bucket
 	for (unsigned int i = 0 ; i < I->getNumberOfBuckets() ; i++) {
 		unsigned int *chain = NULL, *table = NULL;
 		CHECK ( indexRelation(I->getJoinFieldBucket(i), I->getBucketSize(i), chain, table) , "indexing of a bucket failed", delete[] chain; delete[] table; delete result; return NULL; )
-		CHECK( probeResults(L->getJoinFieldBucket(i), L->getRowIdsBucket(i), I->getJoinFieldBucket(i), I->getRowIdsBucket(i), chain, table, L->getBucketSize(i), result, saveLfirst) , "probing a bucket for results failed", delete[] chain; delete[] table; delete result; return NULL; )
-		delete[] chain;
+		CHECK ( probeResults(L->getJoinFieldBucket(i), L->getRowIdsBucket(i), I->getJoinFieldBucket(i), I->getRowIdsBucket(i), chain, table, L->getBucketSize(i), result, saveLfirst) , "probing a bucket for results failed", delete[] chain; delete[] table; delete result; return NULL; )
 		delete[] table;
+		delete[] chain;
 	}
     return result;
 }
@@ -64,8 +65,9 @@ bool indexRelation(intField *bucketJoinField, unsigned int bucketSize, unsigned 
     table = new unsigned int[sz];
     chain = new unsigned int[bucketSize];
     unsigned int *last = new unsigned int[sz];
-    memset(table, 0, sz * sizeof(int));
-    memset(chain, 0, bucketSize * sizeof(int));
+    
+    memset(table, 0, sz * sizeof(unsigned int));
+    memset(chain, 0, bucketSize * sizeof(unsigned int));
     for (unsigned int i = bucketSize ; i > 0 ; --i) {
         unsigned int h = H2(bucketJoinField[i - 1]);
         if (table[h] == 0) last[h] = table[h] = i;

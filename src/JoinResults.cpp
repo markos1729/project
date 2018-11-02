@@ -58,3 +58,16 @@ void Result::printRowIds() {
         current = current->next;
     }
 }
+
+int Iterator::getNext(unsigned int &rid,unsigned int &sid) {
+	if (curr==NULL) return 0;
+    
+    rid=curr->buffer[pos];
+    sid=curr->buffer[pos+1];
+    pos+=2;
+	
+	if (pos>=curr->nextpos) curr=curr->next;
+    
+    return 1;
+}
+

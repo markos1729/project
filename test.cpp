@@ -2,7 +2,6 @@
 #include "Headers/RadixHashJoin.h"
 #include "Headers/catch.hpp"
 
-
 TEST_CASE("Trivial partition check", "[partition]") {
     JoinRelation R(0, NULL, NULL);
     REQUIRE( R.partitionRelation(2) );   // H1_N = 2
@@ -52,8 +51,8 @@ TEST_CASE("Results are being created", "[results]") {
 
     unsigned int *chain = new unsigned int[8]();
     chain[3] = 3; chain[6] = 4;
-    unsigned int *H2HashTable = new unsigned int[L1]();
-    H2HashTable[test_value % L1] = 7;
+    unsigned int *H2HashTable = new unsigned int[CACHE]();
+    H2HashTable[test_value % CACHE] = 7;
 
     Result *result = new Result();
     REQUIRE( probeResults(LbucketjoinField, Lbucketrowids, IbucketjoinField, Ibucketrowids, chain, H2HashTable, 20, result, true) );
@@ -81,4 +80,7 @@ SCENARIO("The entire join is being tested", "[RHJ]") {
         result->printRowIds();
         delete result;
     }
+}
+
+int main() {
 }

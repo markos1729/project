@@ -127,14 +127,14 @@ JoinRelation *Relation::extractJoinRelation(unsigned int index_of_JoinField) {
 
 Relation::Relation(const char* file) {
 	int fd=open(file,O_RDONLY);
-	if (fd==-1) throw;
+	if (fd==-1) throw 0;
 
 	struct stat sb;
-	if (fstat(fd,&sb)==-1) throw;
+	if (fstat(fd,&sb)==-1) throw 0;
 
 	void *p=mmap(0,sb.st_size,PROT_READ,MAP_PRIVATE,fd,0);
-	if (p==MAP_FAILED) throw;
-	
+	if (p==MAP_FAILED) throw 0;
+
 	intField *all=(intField*)p;
 	size=all[0];
 	num_of_columns=all[1];

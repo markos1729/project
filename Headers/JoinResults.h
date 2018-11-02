@@ -12,6 +12,7 @@ using namespace std;
 
 
 struct ResultNode{
+	friend class Iterator;
     private:
         int nextpos;
         unsigned int buffer[BUFFER_SIZE / sizeof(unsigned int)];
@@ -25,14 +26,24 @@ struct ResultNode{
 
 
 class Result {
-private:
-    ResultNode *head;
-    ResultNode *cur;
-public:
-    Result();
-    ~Result();
-    bool addTuple(unsigned int rowid1, unsigned int rowid2);
-    void printRowIds();
+	friend class Iterator;
+	private:
+		ResultNode *head;
+		ResultNode *cur;
+	public:
+		Result();
+		~Result();
+		bool addTuple(unsigned int rowid1, unsigned int rowid2);
+		void printRowIds();
+};
+
+class Iterator {
+	private:
+		unsigned int pos;
+		ResultNode *curr;
+	public:
+		Iterator(Result *r) : pos(0), curr(r->head) {}
+	    int getNext(unsigned int &rid,unsigned int &sid);
 };
 
 #endif
