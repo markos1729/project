@@ -43,7 +43,7 @@ class Iterator {
 		ResultNode *curr;
 	public:
 		Iterator(Result *r) : pos(0), curr(r->head) {}
-	    int getNext(unsigned int &rid,unsigned int &sid);
+	    bool getNext(unsigned int &rid, unsigned int &sid);
 };
 
 #endif

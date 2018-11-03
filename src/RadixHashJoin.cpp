@@ -23,13 +23,14 @@ using namespace std;
    ****************************** */
 
 unsigned int H1_N,H2_N;
-unsigned int H2_OLD_MAY_REPLACE_H1_SEE_EXPLANATION(intField value) { return value&((1<<H2_N)-1); }
-unsigned int H2(intField value) { return (value&(((1<<(H1_N+H2_N))-1)^((1<<H1_N)-1)))>>H1_N; }
+unsigned int H2_OLD_MAY_REPLACE_H1_SEE_EXPLANATION(intField value) { return value & ((1 << H2_N) - 1); }
+unsigned int H2(intField value) { return ( value & ( ((1 << (H1_N + H2_N)) - 1) ^ ( (1 << H1_N) - 1) ) ) >> H1_N; }
+
 
 Result* radixHashJoin(JoinRelation &R, JoinRelation &S) {
     // Partition R and S, whilst keeping a 'Psum' table for each bucket in R and S (phase 1)
-    H1_N = (unsigned int) (ceil(log2( MAX(R.getSize(), S.getSize()) / CACHE ))); // H1_N is the same for both Relations round up
-    H2_N=H1_N/2;
+    H1_N = (unsigned int) ( ceil( log2( MAX(R.getSize(), S.getSize()) / CACHE ))); // H1_N is the same for both Relations rounded up
+    H2_N = H1_N/2;
     CHECK( R.partitionRelation(H1_N) , "partitioning R failed", return NULL; )
     CHECK( S.partitionRelation(H1_N) , "partitioning S failed", return NULL; )
     // Define a Result object to fill

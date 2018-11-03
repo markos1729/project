@@ -4,9 +4,12 @@
 #include <iostream>
 #include "FieldTypes.h"
 
-#define CACHE 4096  //32KB
+
+#define CACHE 4096      //32KB
+
 
 unsigned int H1(intField, unsigned int N);
+
 
 class JoinRelation {    // Relation struct used for RadixHashJoin, only stores Join Field and rowids
 private:

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "../Headers/JoinResults.h"
 
+
 ResultNode::ResultNode() : next(NULL), nextpos(0) {}
 
 bool ResultNode::isFull() {    // can not fit one more tuple
@@ -59,15 +60,11 @@ void Result::printRowIds() {
     }
 }
 
-int Iterator::getNext(unsigned int &rid,unsigned int &sid) {
-	if (curr==NULL) return 0;
-    
-    rid=curr->buffer[pos];
-    sid=curr->buffer[pos+1];
-    pos+=2;
-	
-	if (pos>=curr->nextpos) curr=curr->next;
-    
-    return 1;
+bool Iterator::getNext(unsigned int &rid, unsigned int &sid) {
+	if (curr == NULL) return false;
+    rid = curr->buffer[pos];
+    sid = curr->buffer[pos+1];
+    pos += 2;
+	if (pos >= curr->nextpos) curr = curr->next;
+    return true;
 }
-
