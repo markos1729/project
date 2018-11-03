@@ -2,14 +2,14 @@
 #include "../Headers/JoinResults.h"
 
 
-ResultNode::ResultNode() : next(NULL), nextpos(0) {}
+ResultNode::ResultNode() : nextpos(0), next(NULL) {}
 
 bool ResultNode::isFull() {    // can not fit one more tuple
     return nextpos > (BUFFER_SIZE / sizeof(unsigned int) - 2);
 }
 
 bool ResultNode::addTuple(unsigned int val1, unsigned int val2) {
-    if (nextpos < 0 || nextpos >= BUFFER_SIZE / sizeof(unsigned int) ) return false;
+    if (nextpos >= BUFFER_SIZE / sizeof(unsigned int) ) return false;
     buffer[nextpos] = val1;
     buffer[nextpos+1] = val2;
     nextpos += 2;
@@ -18,7 +18,7 @@ bool ResultNode::addTuple(unsigned int val1, unsigned int val2) {
 
 void ResultNode::printRowIds() {
     printf("| RowIdR | RowIdS |\n");
-    for (int pos = 0; pos < nextpos; pos += 2) {
+    for (unsigned int pos = 0; pos < nextpos; pos += 2) {
         printf("| %6u | %6u |\n", buffer[pos], buffer[pos + 1]);
     }
     printf("\n");

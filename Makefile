@@ -1,5 +1,5 @@
 CXX	      = g++
-CXXFLAGS  = -g3 -pedantic -std=c++11 #-Wall -Wextra
+CXXFLAGS  = -g3 -pedantic -std=c++11 -Wall -Wextra
 OBJECTS   = objects/main.o objects/Relation.o objects/RadixHashJoin.o objects/JoinResults.o objects/test.o
 SOURCES   = src/*.cpp
 HEADERS   = Headers/*.h
@@ -10,7 +10,7 @@ all: project
 project: $(OBJECTS)
 	$(CXX) $(CXXFLAGS) $(OBJECTS) -o project
 
-objects/main.o: $(OBJECTS) $(HEADERS) unit_testing/catch.hpp
+objects/main.o: $(HEADERS) unit_testing/catch.hpp
 	$(CXX) -c $(CXXFLAGS) unit_testing/main.cpp
 	mv main.o objects/main.o
 

@@ -46,7 +46,7 @@ TEST_CASE("Realistic case partition check", "[partition]"){
                      k = 0;    // number of current bucket
         while ( i <= JR->getSize() ){
             unsigned int cur_bucket_count = JR->getBucketSize(k);
-            for (unsigned int j = 0; j < cur_bucket_count ; j++){
+            for (j = 0; j < cur_bucket_count ; j++){
                 CHECK( H1(JR->getJoinField(i + j), H1_N) == k );            // make sure each element of the bucket is actually hashed to its assigned bucket
             }
             k++;
@@ -59,21 +59,89 @@ TEST_CASE("Realistic case partition check", "[partition]"){
 }
 
 /* Index Unit Testing */
-//TODO: add trivial case check for Indexing
+TEST_CASE("Trivial case Indexing check", "[index]") {
+    unsigned int *chain, *table;
+    REQUIRE( indexRelation(NULL, 0, chain, table) );
+    delete[] chain;
+    delete[] table;
+}
+
 
 TEST_CASE("Simple case Indexing check", "[index]") {
     unsigned int *chain, *table;
-    intField bucket[10] = {3, 1, 17, 23, 12, 127, 123, 2, 3, 10};
+    intField bucket[10] = {30, 228, 17, 23, 12, 127, 123, 2018, 3094, 10};
+	//hash function:        1    2   1   1   0    3    3     2     1   0
+	//virtual rowid:        1    2   3   4   5    6    7     8     9  10
 
-    REQUIRE(indexRelation(bucket, 10, chain, table));
-    CHECK(table[0] == 9);
-    CHECK(chain[1] == 0);
-    CHECK(chain[2] == 0);
-    CHECK(chain[3] == 3);
+	setH(4,2); //set hash bits for testing
+    REQUIRE( indexRelation(bucket, 10, chain, table) );
+    
+    //according to the numbers above   
+    CHECK( table[0] == 10 );
+    CHECK( table[1] == 9 );
+    CHECK( table[2] == 8 );
+    CHECK( table[3] == 7 );
+    
+    //also check the chain numbers
+    CHECK( chain[0] == 0 );
+    CHECK( chain[1] == 0 );
+    CHECK( chain[2] == 1 );
+    CHECK( chain[3] == 3 );
+    CHECK( chain[4] == 0 );
+    CHECK( chain[5] == 0 );
+    CHECK( chain[6] == 6 );
+    CHECK( chain[7] == 2 );
+    CHECK( chain[8] == 4 );
+    CHECK( chain[9] == 5 );
 
     delete[] chain;
     delete[] table;
 }
+
+TEST_CASE("Realistic case Indexing check", "[index]") {
+    unsigned int *chain, *table;
+	intField bucket[1000];
+	
+	//1000 sized bucket containing 5 distinct values
+	for (unsigned int i=0; i<1000; ++i) 
+		switch (i%5) {                         // hash
+			case 0: bucket[i]=182172; break;   //   17
+			case 1: bucket[i]=271; break;      //    0
+			case 2: bucket[i]=11381378; break; //   10 
+			case 3: bucket[i]=8912441; break;  //   31
+			case 4: bucket[i]=5516; break;     //    5
+			}
+
+	setH(10,5); //set hash bits for testing
+	REQUIRE( indexRelation(bucket, 1000, chain, table) );
+
+	//only these should be in table
+	CHECK( table[17] ==  996 );
+	CHECK(  table[0] ==  997 );
+	CHECK( table[10] ==  998 );
+	CHECK( table[31] ==  999 );
+	CHECK(  table[5] == 1000 );
+
+	//there should be 27 '0' in table
+	unsigned counter=0;
+	for (unsigned int i=0; i<32; ++i) if (table[i]==0) counter++;
+	CHECK( counter == 27 );
+
+	//the first five values in chain should be '0'
+	CHECK( chain[0] == 0 );
+	CHECK( chain[1] == 0 );
+	CHECK( chain[2] == 0 );
+	CHECK( chain[3] == 0 );
+	CHECK( chain[4] == 0 );
+	
+	//the rest should be the numbers 1..995
+	CHECK( chain[5] == 1 );
+	for (unsigned int i=6; i<1000; ++i) CHECK( chain[i] == chain[i-1]+1 );
+
+    delete[] chain;
+    delete[] table;
+}
+
 
 /* Probing Unit Testing */
 TEST_CASE("Probing for results", "[probing]") {

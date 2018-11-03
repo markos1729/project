@@ -14,7 +14,7 @@ using namespace std;
 struct ResultNode{
 	friend class Iterator;
     private:
-        int nextpos;
+        unsigned int nextpos;
         unsigned int buffer[BUFFER_SIZE / sizeof(unsigned int)];
     public:
         ResultNode *next;

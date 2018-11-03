@@ -27,6 +27,9 @@ unsigned int H2_OLD_MAY_REPLACE_H1_SEE_EXPLANATION(intField value) { return valu
 unsigned int H2(intField value) { return ( value & ( ((1 << (H1_N + H2_N)) - 1) ^ ( (1 << H1_N) - 1) ) ) >> H1_N; }
 
 
+//for unit testing
+void setH(unsigned int _H1_N,unsigned int _H2_N) { H1_N=_H1_N; H2_N=_H2_N; }
+
 Result* radixHashJoin(JoinRelation &R, JoinRelation &S) {
     // Partition R and S, whilst keeping a 'Psum' table for each bucket in R and S (phase 1)
     H1_N = (unsigned int) ( ceil( log2( MAX(R.getSize(), S.getSize()) / CACHE ))); // H1_N is the same for both Relations rounded up
@@ -62,7 +65,7 @@ Result* radixHashJoin(JoinRelation &R, JoinRelation &S) {
 /* Local Function Implementation */
 // phase 2: index I's given bucket by creating 'H2HashTable' and 'chain' structures
 bool indexRelation(intField *bucketJoinField, unsigned int bucketSize, unsigned int *&chain, unsigned int *&table){
-	unsigned int sz=1<<H2_N;
+	unsigned int sz = 1 << H2_N;
     table = new unsigned int[sz];
     chain = new unsigned int[bucketSize];
     unsigned int *last = new unsigned int[sz];
@@ -71,9 +74,14 @@ bool indexRelation(intField *bucketJoinField, unsigned int bucketSize, unsigned 
     memset(chain, 0, bucketSize * sizeof(unsigned int));
     for (unsigned int i = bucketSize ; i > 0 ; --i) {
         unsigned int h = H2(bucketJoinField[i - 1]);
+    //    printf("%d %d\n",i,h);
         if (table[h] == 0) last[h] = table[h] = i;
         else last[h] = chain[last[h] - 1] = i;
     }
+    
+  //  for (int i=0; i<sz; i++) printf("%d ",table[i]); printf("\n");
+//    for (int i=0; i<bucketSize; i++) printf("%d\n",chain[i]);
+    
     delete[] last;
     return true;
 }

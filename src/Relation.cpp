@@ -9,7 +9,7 @@
 /* H1 Function used in partitioning*/
 unsigned int H1(intField value, unsigned int n){
     intField mask = 0;
-    for (int i = 0 ; i < n ; i++ ){
+    for (unsigned int i = 0 ; i < n ; i++ ){
         mask |= 0x01<<i;
     }
     return (unsigned int) (mask & value);
@@ -40,7 +40,7 @@ bool JoinRelation::partitionRelation(unsigned int H1_N) {
     unsigned int *bucket_nums = new unsigned int[size];
     for (unsigned int i = 0 ; i < size ; i++){
         bucket_nums[i] = H1(joinField[i], H1_N);
-        if ( bucket_nums[i] < 0 || bucket_nums[i] >= num_of_buckets ){ delete[] Hist; delete[] bucket_nums; return false; }  // ERROR CHECK
+        if ( bucket_nums[i] >= num_of_buckets ){ delete[] Hist; delete[] bucket_nums; return false; }  // ERROR CHECK
         Hist[bucket_nums[i]]++;
     }
     // 2) convert Hist table to Psum table
@@ -57,8 +57,8 @@ bool JoinRelation::partitionRelation(unsigned int H1_N) {
     unsigned int *newRowids = new unsigned int[size]();
     unsigned int *nextBucketPos = new unsigned int[num_of_buckets]();
     for (unsigned int i = 0 ; i < size ; i++) {
-        const int pos = Psum[bucket_nums[i]] + nextBucketPos[bucket_nums[i]];   // value's position in the re-ordered version
-        if ( pos < 0 || pos >= size ) { delete[] newJoinField; delete[] newRowids; delete[] bucket_nums; delete[] nextBucketPos; Psum = NULL; numberOfBuckets = 0;  return false; }  // ERROR CHECK
+        const unsigned int pos = Psum[bucket_nums[i]] + nextBucketPos[bucket_nums[i]];   // value's position in the re-ordered version
+        if ( pos >= size ) { delete[] newJoinField; delete[] newRowids; delete[] bucket_nums; delete[] nextBucketPos; Psum = NULL; numberOfBuckets = 0;  return false; }  // ERROR CHECK
         newJoinField[pos] = joinField[i];
         newRowids[pos] = rowids[i];
         nextBucketPos[bucket_nums[i]]++;
@@ -111,7 +111,7 @@ bool Relation::addColumn(unsigned int col_num, const intField *values) {   // (!
         delete[] columns[col_num];   // overwrite previous column
     }
     columns[col_num] = new intField[size];
-    for (int i = 0 ; i < size ; i++){
+    for (unsigned int i = 0 ; i < size ; i++){
         columns[col_num][i] = values[i];
     }
     return true;
@@ -141,7 +141,7 @@ Relation::Relation(const char* file) {
 	columns=new intField*[num_of_columns]();
 	all+=2;
 
-	for (int i=0; i<num_of_columns; ++i) {
+	for (unsigned int i=0; i<num_of_columns; ++i) {
 		columns[i]=all;
 		all+=size;
 	}
