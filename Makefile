@@ -6,10 +6,11 @@ COMMON_HEAD = Headers/*.h
 
 all: project test
 
+
 project: objects/project-main.o $(COMMON_OBJ)
 	$(CXX) $(CXXFLAGS) objects/project-main.o $(COMMON_OBJ) -o project
 
-objects/project-main.o: $(COMMON_HEAD)
+objects/project-main.o: project-main.cpp $(COMMON_HEAD)
 	$(CXX) -c $(CXXFLAGS) project-main.cpp
 	mv project-main.o objects/project-main.o
 
@@ -27,10 +28,10 @@ objects/JoinResults.o: src/JoinResults.cpp $(COMMON_HEAD)
 
 
 test: objects/test-main.o objects/test.o $(COMMON_OBJ)
-    $(CXX) $(CXXFLAGS) objects/test-main.o objects/test.o $(COMMON_OBJ) -o test
+	$(CXX) $(CXXFLAGS) objects/test-main.o objects/test.o $(COMMON_OBJ) -o test
 
 objects/test-main.o: unit_testing/test-main.cpp $(COMMON_HEAD) unit_testing/catch.hpp
-    $(CXX) -c $(CXXFLAGS) unit_testing/test-main.cpp
+	$(CXX) -c $(CXXFLAGS) unit_testing/test-main.cpp
 	mv test-main.o objects/test-main.o
 
 objects/test.o: unit_testing/test.cpp $(COMMON_HEAD) unit_testing/catch.hpp

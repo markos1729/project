@@ -128,6 +128,11 @@ Relation::~Relation() {
     delete[] columns;
 }
 
+intField Relation::getValueAt(unsigned int columnNum, unsigned int rowId) const { 
+    if (columns != NULL && columnNum < num_of_columns && columns[columnNum] != NULL && rowId < size) return columns[columnNum][rowId];
+    else return 0; 
+}
+
 bool Relation::addColumn(unsigned int col_num, const intField *values) {   // (!) values must be of length == size, lest we get seg fault
     if (col_num >= num_of_columns) return false;
     if (columns[col_num] != NULL) {

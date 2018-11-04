@@ -48,7 +48,10 @@ public:
     Relation(unsigned int _size, unsigned int _num_of_columns);
     Relation(const char* file);
     ~Relation();
-    bool addColumn(unsigned int col_num, const intField *values);   // NOTE: use addColumns to build Relation column-by-column, (!) values lenth must be == size
+    unsigned int getSize() const { return size; }
+    unsigned int getNumOfColumns() const { return num_of_columns; }
+    intField getValueAt(unsigned int columnNum, unsigned int rowId) const;
+    bool addColumn(unsigned int col_num, const intField *values);
     JoinRelation *extractJoinRelation(unsigned int index_of_JoinField);
 };
 
