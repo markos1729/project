@@ -6,6 +6,7 @@
 #include <vector>
 #include <algorithm>
 
+
 /* Partition Unit Testing */
 TEST_CASE("Trivial case partition check", "[partition]") {
     JoinRelation R(0, NULL, NULL);
@@ -57,6 +58,7 @@ TEST_CASE("Realistic case partition check", "[partition]"){
     }
     catch (...) { printf("Could not load relations\n"); }
 }
+
 
 /* Index Unit Testing */
 TEST_CASE("Trivial case Indexing check", "[index]") {
@@ -144,8 +146,31 @@ TEST_CASE("Realistic case Indexing check", "[index]") {
 }
 
 
-/* Probing Unit Testing */
-TEST_CASE("Probing for results", "[probing]") {
+/* Result Probing Unit Testing */
+TEST_CASE("Trivial case Result Probing check", "[probing]") {
+    intField IbucketjoinField[3] = {1, 2, 3};
+    unsigned int Ibucketrowids[3];
+    for (unsigned int i = 0 ; i < 3 ; i++) { Ibucketrowids[i] = i+1; }
+
+    intField LbucketjoinField[5] = { 0 };
+    unsigned int Lbucketrowids[5];
+    for (unsigned int i = 0 ; i < 5 ; i++) { Lbucketrowids[i] = i+1; }
+
+    unsigned int *chain = new unsigned int[5]();
+    unsigned int *H2HashTable = new unsigned int[3]();   // H1_N = 3
+
+    Result *result = new Result();
+    REQUIRE( probeResults(LbucketjoinField, Lbucketrowids, IbucketjoinField, Ibucketrowids, chain, H2HashTable, 5, result, true) );
+    Iterator iter(result);
+    unsigned int rid, sid;
+    CHECK( !iter.getNext(rid, sid) );       // 0 results expected
+
+    delete[] chain;
+    delete[] H2HashTable;
+    delete result;
+}
+
+TEST_CASE("Simple case Result Probing check", "[probing]") {
     intField test_value = 42;
     intField IbucketjoinField[8] = {1, 2, test_value, test_value, 5, 6, test_value, 8};
     unsigned int Ibucketrowids[8];
@@ -159,18 +184,32 @@ TEST_CASE("Probing for results", "[probing]") {
 
     unsigned int *chain = new unsigned int[8]();
     chain[3] = 3; chain[6] = 4;
-    unsigned int *H2HashTable = new unsigned int[CACHE]();
-    H2HashTable[test_value % CACHE] = 7;
+    unsigned int H2_N = 3;
+    unsigned int *H2HashTable = new unsigned int[H2_N]();
+    H2HashTable[test_value % H2_N] = 7;
 
     Result *result = new Result();
     REQUIRE( probeResults(LbucketjoinField, Lbucketrowids, IbucketjoinField, Ibucketrowids, chain, H2HashTable, 20, result, true) );
-    // TODO: add CHECKs here
-    //result->printRowIds();
+    Iterator iter(result);
+    unsigned int rid, sid;
+    iter.getNext(rid, sid);
+    CHECK( (rid == 7 && sid == 3) );
+    iter.getNext(rid, sid);
+    CHECK( (rid == 4 && sid == 3) );
+    iter.getNext(rid, sid);
+    CHECK( (rid == 3 && sid == 3) );
+    iter.getNext(rid, sid);
+    CHECK( (rid == 7 && sid == 12) );
+    iter.getNext(rid, sid);
+    CHECK( (rid == 4 && sid == 12) );
+    iter.getNext(rid, sid);
+    CHECK( (rid == 3 && sid == 12) );
 
     delete[] chain;
     delete[] H2HashTable;
     delete result;
 }
+
 
 /* Radix Hash Join Unit Testing */
 SCENARIO("The entire join is being tested on a simple case", "[RHJ]") {

@@ -1,6 +1,5 @@
 #include <cmath>
 #include <cstdio>
-#include "stdint.h"
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
