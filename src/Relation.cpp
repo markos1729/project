@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include "../Headers/Relation.h"
 
+
 /* H1 Function used in partitioning*/
 unsigned int H1(intField value, unsigned int n){
     intField mask = 0;
@@ -15,7 +16,8 @@ unsigned int H1(intField value, unsigned int n){
     return (unsigned int) (mask & value);
 }
 
-/* _______________ Join Relation _______________ */
+
+/* Join Relation Implementation */
 JoinRelation::JoinRelation(unsigned int _size, const intField *_joinField, const unsigned int *_rowids) : size(_size), joinField(NULL), rowids(NULL), Psum(NULL), numberOfBuckets(0) {
     joinField = new intField[size];
     rowids = new unsigned int[size];
@@ -31,11 +33,11 @@ JoinRelation::~JoinRelation() {
     delete[] rowids;
 }
 
-// phase 1: partition in place JoinRelation R into buckets and fill Psum to distinguish them (|Psum| = 2^n)
+// phase 1: partition in place JoinRelation R into buckets and fill Psum to distinguish them (|Psum| = num_of_buckets = 2^H1_N)
 bool JoinRelation::partitionRelation(unsigned int H1_N) {
     if (this->getSize() == 0 || rowids == NULL || joinField == NULL ) return true;     // nothing to partition
     const unsigned int num_of_buckets = (unsigned int) pow(2, H1_N);
-    // 1) calculate Hist (in linear time)
+    // 1) calculate Hist - O(n)
     unsigned int *Hist = new unsigned int[num_of_buckets]();    // all Hist[i] are initialized to 0
     unsigned int *bucket_nums = new unsigned int[size];
     for (unsigned int i = 0 ; i < size ; i++){
@@ -52,7 +54,7 @@ bool JoinRelation::partitionRelation(unsigned int H1_N) {
     }
     Psum = Hist;
     numberOfBuckets = num_of_buckets;
-    // 3) create new re-ordered versions for joinField and rowids based on their bucket_nums (in linear time)
+    // 3) create new re-ordered versions for joinField and rowids based on their bucket_nums - O(n)
     intField *newJoinField = new intField[size]();
     unsigned int *newRowids = new unsigned int[size]();
     unsigned int *nextBucketPos = new unsigned int[num_of_buckets]();
@@ -73,7 +75,7 @@ bool JoinRelation::partitionRelation(unsigned int H1_N) {
     return true;
 }
 
-// DEBUG
+#ifdef DDEBUG
 void JoinRelation::printDebugInfo() {
     if (Psum != NULL) {
         printf("This JoinRelation is partitioned.\n%u buckets created with Psum as follows:\n", numberOfBuckets);
@@ -86,22 +88,44 @@ void JoinRelation::printDebugInfo() {
         printf("%10u | %u\n", (unsigned int) joinField[i], rowids[i]);
     }
 }
+#endif
 
 
-/* _________________ Relation _________________ */
-Relation::Relation(unsigned int _size, unsigned int _num_of_columns) : size(_size), num_of_columns(_num_of_columns) {
+/* Relation Implementation */
+Relation::Relation(unsigned int _size, unsigned int _num_of_columns) : allocatedWithMmap(false), size(_size), num_of_columns(_num_of_columns) {
     columns = new intField*[_num_of_columns]();   // initialize to NULL
 }
 
-Relation::~Relation() {
-	if (size) munmap(columns[0]-2,(size*num_of_columns+2)*sizeof(intField));
+Relation::Relation(const char* file) : allocatedWithMmap(true) {
+    int fd = open(file,O_RDONLY);
+    if (fd == -1) throw 0;
 
-	/* not needed see munmap above ^^^
-    for (int i = 0 ; i < num_of_columns ; i++){
-        delete[] columns[i];   // "delete" accounts for possible NULL value
-        free(columns[i]);
-    }*/
-    
+    struct stat sb;
+    if (fstat(fd, &sb) == -1) throw 0;
+
+    void *p = mmap(0,sb.st_size,PROT_READ,MAP_PRIVATE,fd,0);
+    if (p == MAP_FAILED) throw 0;
+
+    intField *all = (intField*) p;
+    size = all[0];
+    num_of_columns = all[1];
+    columns = new intField*[num_of_columns]();
+    all += 2;
+
+    for (unsigned int i = 0; i < num_of_columns; ++i) {
+        columns[i] = all;
+        all += size;
+    }
+}
+
+Relation::~Relation() {
+	if (allocatedWithMmap) {
+        if (size > 0) munmap(columns[0] - 2, (size * num_of_columns + 2) * sizeof(intField));
+	} else {
+        for (unsigned int i = 0 ; i < num_of_columns ; i++){
+            delete[] columns[i];   // "delete" accounts for possible NULL value
+        }
+    }
     delete[] columns;
 }
 
@@ -124,26 +148,3 @@ JoinRelation *Relation::extractJoinRelation(unsigned int index_of_JoinField) {
     delete[] rowids;
     return res;
 }
-
-Relation::Relation(const char* file) {
-	int fd=open(file,O_RDONLY);
-	if (fd==-1) throw 0;
-
-	struct stat sb;
-	if (fstat(fd,&sb)==-1) throw 0;
-
-	void *p=mmap(0,sb.st_size,PROT_READ,MAP_PRIVATE,fd,0);
-	if (p==MAP_FAILED) throw 0;
-
-	intField *all=(intField*)p;
-	size=all[0];
-	num_of_columns=all[1];
-	columns=new intField*[num_of_columns]();
-	all+=2;
-
-	for (unsigned int i=0; i<num_of_columns; ++i) {
-		columns[i]=all;
-		all+=size;
-	}
-}
-

@@ -4,16 +4,17 @@
 #include <iostream>
 #include "FieldTypes.h"
 
+//#define DDEBUG           // define this if functions used for debugging such as printing info should be compiled
 
-#define CACHE 4096      //32KB
+#define CACHE 4096       // 32KB
 
 
 unsigned int H1(intField, unsigned int N);
 
 
-class JoinRelation {    // Relation struct used for RadixHashJoin, only stores Join Field and rowids
+class JoinRelation {     // Relation struct used for RadixHashJoin, only stores Join Field and rowids
 private:
-	unsigned int size;  // number of tuples
+	unsigned int size;   // number of tuples
 	intField *joinField;
 	unsigned int *rowids;
 	unsigned int *Psum;
@@ -31,13 +32,15 @@ public:
 	unsigned int getBucketSize(unsigned int i) const { return (Psum != NULL && i < numberOfBuckets) ? ((i == numberOfBuckets - 1) ? size - Psum[i] : Psum[i + 1] - Psum[i]) : 0; }
 	/* Operations */
 	bool partitionRelation(unsigned int H1_N);     // partitions JoinRelation by creating Psum and reordering it's tuples
-	/* Debug */
+	#ifdef DDEBUG
 	void printDebugInfo();
+	#endif
 };
 
 
 class Relation {        // Relation struct storing all fields for a relation
 private:
+	const bool allocatedWithMmap;
     unsigned int size;  // number of tuples
     unsigned int num_of_columns;
     intField **columns; // each column saved as a sequential array of intFields

@@ -103,14 +103,15 @@ TEST_CASE("Realistic case Indexing check", "[index]") {
 	intField bucket[1000];
 	
 	//1000 sized bucket containing 5 distinct values
-	for (unsigned int i=0; i<1000; ++i) 
+	for (unsigned int i=0; i<1000; ++i) {
 		switch (i%5) {                         // hash
 			case 0: bucket[i]=182172; break;   //   17
 			case 1: bucket[i]=271; break;      //    0
 			case 2: bucket[i]=11381378; break; //   10 
 			case 3: bucket[i]=8912441; break;  //   31
 			case 4: bucket[i]=5516; break;     //    5
-			}
+		}
+    }
 
 	setH(10,5); //set hash bits for testing
 	REQUIRE( indexRelation(bucket, 1000, chain, table) );
@@ -164,7 +165,7 @@ TEST_CASE("Probing for results", "[probing]") {
     Result *result = new Result();
     REQUIRE( probeResults(LbucketjoinField, Lbucketrowids, IbucketjoinField, Ibucketrowids, chain, H2HashTable, 20, result, true) );
     // TODO: add CHECKs here
-    result->printRowIds();
+    //result->printRowIds();
 
     delete[] chain;
     delete[] H2HashTable;
@@ -198,7 +199,7 @@ SCENARIO("The entire join is being tested on a simple case", "[RHJ]") {
     }
 }
 
-SCENARIO("The entire join is being tested on a realistically-sized case", "[RHJ]") {
+SCENARIO("The entire join is being tested on a realistic case", "[RHJ]") {
     GIVEN("Some input files from SIGMOD's assignment") {
         char file_r[]="Files/r7";
         char file_s[]="Files/r12";
@@ -214,7 +215,6 @@ SCENARIO("The entire join is being tested on a realistically-sized case", "[RHJ]
             JoinRelation *JSptr = S.extractJoinRelation(1);
             JoinRelation &JR = *JRptr;
             JoinRelation &JS = *JSptr;
-
 
             for (unsigned int i=0; i<JR.getSize(); ++i) {
                 intField RV=JR.getJoinField(i);

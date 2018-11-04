@@ -5,10 +5,12 @@
 #include <iostream>
 #include "FieldTypes.h"
 
-using namespace std;
-
+//#define DDEBUG                     // define this if functions used for debugging such as printing info should be compiled
 
 #define BUFFER_SIZE (1024*1024)    // buffer size for each ResultNode
+
+
+using namespace std;
 
 
 struct ResultNode{
@@ -21,7 +23,9 @@ struct ResultNode{
         ResultNode();
         bool isFull();
         bool addTuple(unsigned int val1, unsigned int val2);
+        #ifdef DDEBUG
         void printRowIds();
+        #endif
 };
 
 
@@ -34,7 +38,9 @@ class Result {
 		Result();
 		~Result();
 		bool addTuple(unsigned int rowid1, unsigned int rowid2);
+		#ifdef DDEBUG
 		void printRowIds();
+		#endif
 };
 
 class Iterator {

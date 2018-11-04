@@ -8,8 +8,6 @@ using namespace std;
 #define CHECK(call, msg, action) { if ( ! (call) ) { cerr << msg << endl; action } }
 #define MAX(A, B) ( (A) > (B) ? (A) : (B) )
 
-/* Local Functions */
-// TODO: read them here instead of RadixHashJoin.h ?
 
 /* *** Hash Functions Example ***
 
@@ -22,13 +20,15 @@ using namespace std;
 
    ****************************** */
 
-unsigned int H1_N,H2_N;
-unsigned int H2_OLD_MAY_REPLACE_H1_SEE_EXPLANATION(intField value) { return value & ((1 << H2_N) - 1); }
+
+unsigned int H1_N, H2_N;
+//TODO: remove this? -> unsigned int H2_OLD_MAY_REPLACE_H1_SEE_EXPLANATION(intField value) { return value & ((1 << H2_N) - 1); }
 unsigned int H2(intField value) { return ( value & ( ((1 << (H1_N + H2_N)) - 1) ^ ( (1 << H1_N) - 1) ) ) >> H1_N; }
 
 
 //for unit testing
-void setH(unsigned int _H1_N,unsigned int _H2_N) { H1_N=_H1_N; H2_N=_H2_N; }
+void setH(unsigned int _H1_N, unsigned int _H2_N) { H1_N = _H1_N; H2_N = _H2_N; }
+
 
 Result* radixHashJoin(JoinRelation &R, JoinRelation &S) {
     // Partition R and S, whilst keeping a 'Psum' table for each bucket in R and S (phase 1)
@@ -50,7 +50,6 @@ Result* radixHashJoin(JoinRelation &R, JoinRelation &S) {
         L = &R;
         saveLfirst = false;
     }
-    
     // Iteratively perform phases 2 and 3 for all buckets of both similarly partitioned Relations and add results bucket by bucket
 	for (unsigned int i = 0 ; i < I->getNumberOfBuckets() ; i++) {
 		unsigned int *chain = NULL, *table = NULL;
@@ -74,13 +73,9 @@ bool indexRelation(intField *bucketJoinField, unsigned int bucketSize, unsigned 
     memset(chain, 0, bucketSize * sizeof(unsigned int));
     for (unsigned int i = bucketSize ; i > 0 ; --i) {
         unsigned int h = H2(bucketJoinField[i - 1]);
-    //    printf("%d %d\n",i,h);
         if (table[h] == 0) last[h] = table[h] = i;
         else last[h] = chain[last[h] - 1] = i;
     }
-    
-  //  for (int i=0; i<sz; i++) printf("%d ",table[i]); printf("\n");
-//    for (int i=0; i<bucketSize; i++) printf("%d\n",chain[i]);
     
     delete[] last;
     return true;

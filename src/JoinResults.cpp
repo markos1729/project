@@ -2,6 +2,7 @@
 #include "../Headers/JoinResults.h"
 
 
+/* ResultNode Implementation */
 ResultNode::ResultNode() : nextpos(0), next(NULL) {}
 
 bool ResultNode::isFull() {    // can not fit one more tuple
@@ -16,6 +17,7 @@ bool ResultNode::addTuple(unsigned int val1, unsigned int val2) {
     return true;
 }
 
+#ifdef DDEBUG
 void ResultNode::printRowIds() {
     printf("| RowIdR | RowIdS |\n");
     for (unsigned int pos = 0; pos < nextpos; pos += 2) {
@@ -23,7 +25,9 @@ void ResultNode::printRowIds() {
     }
     printf("\n");
 }
+#endif
 
+/* Result Implementation */
 Result::Result() : head(NULL), cur(NULL) {}
 
 Result::~Result() {
@@ -52,6 +56,7 @@ bool Result::addTuple(unsigned int rowid1, unsigned int rowid2) {
     }
 }
 
+#ifdef DDEBUG
 void Result::printRowIds() {
     ResultNode *current = head;
     while (current != NULL) {
@@ -59,7 +64,9 @@ void Result::printRowIds() {
         current = current->next;
     }
 }
+#endif
 
+/* Iterator Implementation */
 bool Iterator::getNext(unsigned int &rid, unsigned int &sid) {
 	if (curr == NULL) return false;
     rid = curr->buffer[pos];
