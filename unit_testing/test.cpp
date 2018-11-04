@@ -255,24 +255,24 @@ SCENARIO("The entire join is being tested on a realistic case", "[RHJ]") {
             JoinRelation &JR = *JRptr;
             JoinRelation &JS = *JSptr;
 
-            for (unsigned int i=0; i<JR.getSize(); ++i) {
-                intField RV=JR.getJoinField(i);
-                for (unsigned int j=0; j<JS.getSize(); ++j) {
-                    intField RS=JS.getJoinField(j);
-                    if (RS==RV) expected.push_back(make_pair(i+1,j+1));
+            for (unsigned int i = 0; i < JR.getSize(); ++i) {
+                intField RV = JR.getJoinField(i);
+                for (unsigned int j = 0; j < JS.getSize(); ++j) {
+                    intField RS = JS.getJoinField(j);
+                    if (RS==RV) expected.push_back(make_pair(i+1, j+1));
                 }   
             }   
             
-            unsigned int i,j;
-            Result *J=radixHashJoin(JR,JS);
+            unsigned int i, j;
+            Result *J = radixHashJoin(JR, JS);
             Iterator I(J);
-            while (I.getNext(i,j)) found.push_back(make_pair(i,j));
+            while (I.getNext(i, j)) found.push_back(make_pair(i, j));
 
             delete JRptr;
             delete JSptr;
 
-            sort(found.begin(),found.end());
-            sort(expected.begin(),expected.end());
+            sort(found.begin(), found.end());
+            sort(expected.begin(), expected.end());
             
             CHECK( found == expected );
         }
