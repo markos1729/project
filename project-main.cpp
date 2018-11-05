@@ -24,12 +24,12 @@ int main(int argc, char *argv[]) {
     }
     try {
         Relation R(argv[1]);
-        if (joinField1 > R.getNumOfColumns()){
+        if ((unsigned int)joinField1 > R.getNumOfColumns()){
             cout << "Invalid JoinField1 parameter: no such column Relation1" << endl;
         }
 
         Relation S(argv[3]);
-        if (joinField2 > S.getNumOfColumns()){
+        if ((unsigned int)joinField2 > S.getNumOfColumns()){
             cout << "Invalid JoinField2 parameter: no such column in Relation2" << endl;
         }
 
@@ -59,21 +59,21 @@ int main(int argc, char *argv[]) {
 void printResults(Result *RxS, const Relation &R, const Relation &S) {
     // Note: This function assumes that column numbers can fit in 2 precision digits and intField values can fit in 12 precision digits in order to be pretty
     printf(" Radix Hash Join results:\n");
-    for (int i = 0 ; i < R.getNumOfColumns() ; i++){
+    for (unsigned int i = 0 ; i < R.getNumOfColumns() ; i++){
         printf(" Relation1.%2d |", i+1);
     }
-    for (int i = 0 ; i < S.getNumOfColumns() ; i++){
+    for (unsigned int i = 0 ; i < S.getNumOfColumns() ; i++){
         printf("| Relation2.%2d ", i+1);
     }
     printf("\n");
     Iterator p(RxS);
     unsigned int Rid, Sid;
     while (p.getNext(Rid, Sid)) {
-        for (int i = 0 ; i < R.getNumOfColumns() ; i++){
-            printf(" %12lu |", R.getValueAt(i, Rid - 1) );
+        for (unsigned int i = 0 ; i < R.getNumOfColumns() ; i++){
+            printf(" %12llu |", R.getValueAt(i, Rid - 1) );
         }
-        for (int i = 0 ; i < S.getNumOfColumns() ; i++){
-            printf("| %12lu ", S.getValueAt(i, Sid - 1));
+        for (unsigned int i = 0 ; i < S.getNumOfColumns() ; i++){
+            printf("| %12llu ", S.getValueAt(i, Sid - 1));
         }
         printf("\n");
     }

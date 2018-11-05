@@ -1,11 +1,13 @@
 CXX         = g++
-CXXFLAGS    = -g3 -pedantic -std=c++11 #-Wall -Wextra
+CXXFLAGS    = -O2 -g3 -pedantic -std=c++11 -Wall -Wextra
 COMMON_OBJ  = objects/Relation.o objects/RadixHashJoin.o objects/JoinResults.o
 COMMON_HEAD = Headers/*.h
 
 
-all: project test
+all: ofile project test
 
+ofile:
+	mkdir -p objects
 
 project: objects/project-main.o $(COMMON_OBJ)
 	$(CXX) $(CXXFLAGS) objects/project-main.o $(COMMON_OBJ) -o project
