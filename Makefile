@@ -1,15 +1,13 @@
 CXX         = g++
-CXXFLAGS    = -O2 -g3 -pedantic -std=c++11 -Wall -Wextra
+CXXFLAGS    = -O2 -g3 -pedantic -std=c++11 #-Wall -Wextra
 COMMON_OBJ  = objects/Relation.o objects/RadixHashJoin.o objects/JoinResults.o
 COMMON_HEAD = Headers/*.h
 
 
-all: ofile project test
+all: project test
 
-ofile:
-	mkdir -p objects
 
-project: objects/project-main.o $(COMMON_OBJ)
+project: assert_objects_dir objects/project-main.o $(COMMON_OBJ)
 	$(CXX) $(CXXFLAGS) objects/project-main.o $(COMMON_OBJ) -o project
 
 objects/project-main.o: project-main.cpp $(COMMON_HEAD)
@@ -29,7 +27,7 @@ objects/JoinResults.o: src/JoinResults.cpp $(COMMON_HEAD)
 	mv JoinResults.o objects/JoinResults.o
 
 
-test: objects/test-main.o objects/test.o $(COMMON_OBJ)
+test: assert_objects_dir objects/test-main.o objects/test.o $(COMMON_OBJ)
 	$(CXX) $(CXXFLAGS) objects/test-main.o objects/test.o $(COMMON_OBJ) -o test
 
 objects/test-main.o: unit_testing/test-main.cpp $(COMMON_HEAD) unit_testing/catch.hpp
@@ -41,6 +39,9 @@ objects/test.o: unit_testing/test.cpp $(COMMON_HEAD) unit_testing/catch.hpp
 	mv test.o objects/test.o
 
 
+assert_objects_dir:
+	mkdir -p objects
+
+
 clean:
 	rm -f $(COMMON_OBJ) objects/project-main.o objects/test-main.o objects/test.o project test
-

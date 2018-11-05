@@ -24,12 +24,12 @@ int main(int argc, char *argv[]) {
     }
     try {
         Relation R(argv[1]);
-        if ((unsigned int)joinField1 > R.getNumOfColumns()){
+        if ((unsigned int) joinField1 > R.getNumOfColumns()){
             cout << "Invalid JoinField1 parameter: no such column Relation1" << endl;
         }
 
         Relation S(argv[3]);
-        if ((unsigned int)joinField2 > S.getNumOfColumns()){
+        if ((unsigned int) joinField2 > S.getNumOfColumns()){
             cout << "Invalid JoinField2 parameter: no such column in Relation2" << endl;
         }
 
