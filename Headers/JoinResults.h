@@ -32,11 +32,13 @@ struct ResultNode{
 class Result {
 	friend class Iterator;
 	private:
+    	unsigned long long int size;
 		ResultNode *head;
 		ResultNode *cur;
 	public:
 		Result();
 		~Result();
+		unsigned long long int getSize() const { return size; }
 		bool addTuple(unsigned int rowid1, unsigned int rowid2);
 		#ifdef DDEBUG
 		void printRowIds();

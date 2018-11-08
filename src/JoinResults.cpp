@@ -28,7 +28,7 @@ void ResultNode::printRowIds() {
 #endif
 
 /* Result Implementation */
-Result::Result() : head(NULL), cur(NULL) {}
+Result::Result() : head(NULL), cur(NULL), size(0) {}
 
 Result::~Result() {
     ResultNode *temp = head;
@@ -43,15 +43,24 @@ bool Result::addTuple(unsigned int rowid1, unsigned int rowid2) {
     if (head == NULL){
         head = new ResultNode;
         cur = head;
-        return head->addTuple(rowid1, rowid2);
+        if ( head->addTuple(rowid1, rowid2) ){
+        	size++;
+        	return true;
+        } else return false;
     } else {
         if ( ! cur->isFull() ){
-            return cur->addTuple(rowid1, rowid2);
+            if ( cur->addTuple(rowid1, rowid2) ){
+            	size++;
+        		return true;
+            } else return false;
         } else {
             ResultNode *temp = cur;
             cur = new ResultNode;
             temp->next = cur;
-            return cur->addTuple(rowid1, rowid2);
+            if ( cur->addTuple(rowid1, rowid2) ){
+            	size++;
+        		return true;
+            } else return false;
         }
     }
 }

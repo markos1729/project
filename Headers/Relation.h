@@ -7,7 +7,7 @@
 //#define DDEBUG           // define this if functions used for debugging such as printing info should be compiled
 
 #define CACHE 4096       // 32KB
-
+#define MAX_JOIN_RELATIONS 32
 
 unsigned int H1(intField, unsigned int N);
 
@@ -53,6 +53,18 @@ public:
     intField getValueAt(unsigned int columnNum, unsigned int rowId) const;
     bool addColumn(unsigned int col_num, const intField *values);
     JoinRelation *extractJoinRelation(unsigned int index_of_JoinField);
+};
+
+
+class IntermediateRelation : public Relation {
+	//TODO: use static arrays (+O(1) access, -limited space) or a list? (ideally this would be a std::vector)
+	int subRelations[MAX_JOIN_RELATIONS];            // the numbers-ids of the Relations that are represented in IntermediateRelation 
+	int subRelationsOffset[MAX_JOIN_RELATIONS];      // the offset where each subRelation's columns start in 'columns' field
+public:
+	IntermediateRelation(Result &result, const Relation &R, const Relation &S) : Relation(result.getSize(), R.getNumOfColumns() + S.getNumOfColumns()) {
+		//TODO: Build IntermediateRElations from join's results, R and S using Relation's addColumn() method
+	}
+	//TODO: overload inherited functions as necessary
 };
 
 #endif

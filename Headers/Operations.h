@@ -16,7 +16,7 @@
  */
 
 
-/* Abstract (pure virtual) base class for all operations involving Relations */
+/* Base class for all operations involving Relations */
 class Operation {
 	const bool isBinary;
 public:
