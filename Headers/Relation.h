@@ -2,6 +2,7 @@
 #define RELATION_H
 
 #include <iostream>
+#include "JoinResults.h"
 #include "FieldTypes.h"
 
 //#define DDEBUG           // define this if functions used for debugging such as printing info should be compiled
@@ -58,11 +59,11 @@ public:
 
 class IntermediateRelation : public Relation {
 	//TODO: use static arrays (+O(1) access, -limited space) or a list? (ideally this would be a std::vector)
-	int subRelations[MAX_JOIN_RELATIONS];            // the numbers-ids of the Relations that are represented in IntermediateRelation 
 	int subRelationsOffset[MAX_JOIN_RELATIONS];      // the offset where each subRelation's columns start in 'columns' field
 public:
 	IntermediateRelation(Result &result, const Relation &R, const Relation &S) : Relation(result.getSize(), R.getNumOfColumns() + S.getNumOfColumns()) {
-		//TODO: Build IntermediateRElations from join's results, R and S using Relation's addColumn() method
+		for (int i = 0 ; i < MAX_JOIN_RELATIONS ; i++) subRelationsOffset[i] = -1;   // guard value
+		//TODO: Build IntermediateRelations from join's results, R and S using Relation's addColumn() method
 	}
 	//TODO: overload inherited functions as necessary
 };

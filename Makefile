@@ -4,7 +4,7 @@ COMMON_OBJ  = objects/Relation.o objects/RadixHashJoin.o objects/JoinResults.o
 COMMON_HEAD = Headers/*.h
 
 
-all: project test
+all: project test joiner
 
 
 project: assert_objects_dir objects/project-main.o $(COMMON_OBJ)
@@ -39,9 +39,21 @@ objects/test.o: unit_testing/test.cpp $(COMMON_HEAD) unit_testing/catch.hpp
 	mv test.o objects/test.o
 
 
+joiner: assert_objects_dir objects/joiner-main.o objects/util.o $(COMMON_OBJ)
+	$(CXX) $(CXXFLAGS) objects/joiner-main.o objects/util.o $(COMMON_OBJ) -o joiner
+
+objects/joiner-main.o: joiner-main.cpp $(COMMON_HEAD)
+	$(CXX) -c $(CXXFLAGS) joiner-main.cpp
+	mv joiner-main.o objects/joiner-main.o
+
+objects/util.o: src/util.cpp $(COMMON_HEAD)
+	$(CXX) -c $(CXXFLAGS) src/util.cpp
+	mv util.o objects/util.o
+
+
 assert_objects_dir:
 	mkdir -p objects
 
 
 clean:
-	rm -f $(COMMON_OBJ) objects/project-main.o objects/test-main.o objects/test.o project test
+	rm -f $(COMMON_OBJ) objects/util.o objects/project-main.o objects/test-main.o objects/test.o objects/util.o project test joiner
