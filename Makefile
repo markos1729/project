@@ -26,7 +26,6 @@ objects/JoinResults.o: src/JoinResults.cpp $(COMMON_HEAD)
 	$(CXX) -c $(CXXFLAGS) src/JoinResults.cpp
 	mv JoinResults.o objects/JoinResults.o
 
-
 test: assert_objects_dir objects/test-main.o objects/test.o $(COMMON_OBJ)
 	$(CXX) $(CXXFLAGS) objects/test-main.o objects/test.o $(COMMON_OBJ) -o test
 
@@ -39,8 +38,8 @@ objects/test.o: unit_testing/test.cpp $(COMMON_HEAD) unit_testing/catch.hpp
 	mv test.o objects/test.o
 
 
-joiner: assert_objects_dir objects/joiner-main.o objects/util.o $(COMMON_OBJ)
-	$(CXX) $(CXXFLAGS) objects/joiner-main.o objects/util.o $(COMMON_OBJ) -o joiner
+joiner: assert_objects_dir objects/joiner-main.o objects/util.o objects/Parser.o $(COMMON_OBJ)
+	$(CXX) $(CXXFLAGS) objects/joiner-main.o objects/util.o objects/Parser.o $(COMMON_OBJ) -o joiner
 
 objects/joiner-main.o: joiner-main.cpp $(COMMON_HEAD)
 	$(CXX) -c $(CXXFLAGS) joiner-main.cpp
@@ -50,6 +49,9 @@ objects/util.o: src/util.cpp $(COMMON_HEAD)
 	$(CXX) -c $(CXXFLAGS) src/util.cpp
 	mv util.o objects/util.o
 
+objects/Parser.o: src/Parser.cpp $(COMMON_HEAD)
+	$(CXX) -c $(CXXFLAGS) src/Parser.cpp
+	mv Parser.o objects/Parser.o
 
 assert_objects_dir:
 	mkdir -p objects
