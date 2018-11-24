@@ -4,7 +4,8 @@
 #include "Headers/util.h"
 #include "Headers/Relation.h"
 #include "Headers/RadixHashJoin.h"
-#include "Headers/Parser.h"
+#include "Headers/SQLParser.h"
+
 
 using namespace std;
 
@@ -13,16 +14,10 @@ using namespace std;
 
 
 #define MAX_FILE_NAME_SIZE 1024
+#define MAX_QUERY_SIZE 4096
 
 
 int main(){
-	//TODO remove example from here
-	char s[]="0 2 4|0.1=1.2&1.0=2.1&0.1>3000|0.0 1.1";
-	Parser *p = new Parser(s);
-	p->show();
-	//access members p->relations[0] or p->predicates[1].rela_id ... see Headers/Parser.h
-	return 0;
-
 	// first read line-by-line for relations' file names until read "DONE"
 	CString_List fileList;
 	{	// do this in a block so that the buffer will be free-ed up afterwards from stack
@@ -47,9 +42,34 @@ int main(){
 	// wait for 1 second
 	sleep(1);
 	// then start parsing 'sql' statements
-	
-	//TODO
+	char buffer[MAX_QUERY_SIZE];
+	while (!cin.eof() && !cin.fail()){
+		cin.getline(buffer, MAX_FILE_NAME_SIZE);
+		SQLParser *p = new SQLParser(buffer);     // example: "0 2 4|0.1=1.2&1.0=2.1&0.1>3000|0.0 1.1";
+
+		//DEBUG
+		p->show();
 		
+		//TODO: execute query
+		// Arbitrary order: Do filters first, predicates next (query optimization will be part of the next assignment)
+		for (int i = 0 ; i < p->nfilters ; i++){
+			//FILTER
+			//TODO
+		}
+		for (int i = 0 ; i < p->npredicates ; i++){
+			if ( p->predicates[i].rela_id == p->predicates[i].relb_id && p->predicates[i].cola_id != p->predicates[i].colb_id){
+			// EQUAL COLUMNS UNARY OPERATION
+			//TODO
+			} 
+			else if ( p->predicates[i].rela_id != p->predicates[i].relb_id ){
+			// JOIN
+			//TODO
+			} 
+			//else same relation and same columns -> ignore operation
+		}
+
+		delete p;
+	}
 	// cleanup
 	for (i = 0 ; i < number_of_relations ; i++ ){
 		//DEBUG: cout << R[i]->getNumOfColumns() << endl;

@@ -1,7 +1,8 @@
-#ifndef PARSER_H
-#define PARSER_H
+#ifndef SQLPARSER_H
+#define SQLPARSER_H
 
 #include "FieldTypes.h"
+
 
 struct projection {
 	unsigned int rel_id;
@@ -22,7 +23,8 @@ struct filter {
 	unsigned int col_id;
 };
 
-struct Parser {
+
+struct SQLParser {
 	unsigned int nrelations;
 	unsigned int npredicates;
 	unsigned int nfilters;
@@ -34,8 +36,8 @@ struct Parser {
 	projection* projections;
 	
 	void show();
-	Parser(char *query);
-	~Parser();
+	SQLParser(char *query);
+	~SQLParser();
 };
 
 #endif

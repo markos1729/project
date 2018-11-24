@@ -38,8 +38,8 @@ objects/test.o: unit_testing/test.cpp $(COMMON_HEAD) unit_testing/catch.hpp
 	mv test.o objects/test.o
 
 
-joiner: assert_objects_dir objects/joiner-main.o objects/util.o objects/Parser.o $(COMMON_OBJ)
-	$(CXX) $(CXXFLAGS) objects/joiner-main.o objects/util.o objects/Parser.o $(COMMON_OBJ) -o joiner
+joiner: assert_objects_dir objects/joiner-main.o objects/util.o objects/SQLParser.o $(COMMON_OBJ)
+	$(CXX) $(CXXFLAGS) objects/joiner-main.o objects/util.o objects/SQLParser.o $(COMMON_OBJ) -o joiner
 
 objects/joiner-main.o: joiner-main.cpp $(COMMON_HEAD)
 	$(CXX) -c $(CXXFLAGS) joiner-main.cpp
@@ -49,13 +49,13 @@ objects/util.o: src/util.cpp $(COMMON_HEAD)
 	$(CXX) -c $(CXXFLAGS) src/util.cpp
 	mv util.o objects/util.o
 
-objects/Parser.o: src/Parser.cpp $(COMMON_HEAD)
-	$(CXX) -c $(CXXFLAGS) src/Parser.cpp
-	mv Parser.o objects/Parser.o
+objects/SQLParser.o: src/SQLParser.cpp $(COMMON_HEAD) Headers/SQLParser.h
+	$(CXX) -c $(CXXFLAGS) src/SQLParser.cpp
+	mv SQLParser.o objects/SQLParser.o
 
 assert_objects_dir:
 	mkdir -p objects
 
 
 clean:
-	rm -f $(COMMON_OBJ) objects/util.o objects/project-main.o objects/test-main.o objects/test.o objects/util.o project test joiner
+	rm -f $(COMMON_OBJ) objects/util.o objects/project-main.o objects/test-main.o objects/joiner-main.o objects/SQLParser.o project test joiner
