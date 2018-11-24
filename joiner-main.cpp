@@ -18,10 +18,10 @@ using namespace std;
 int main(){
 	//TODO remove example from here
 	char s[]="0 2 4|0.1=1.2&1.0=2.1&0.1>3000|0.0 1.1";
-	Parser *p=new Parser(s);
+	Parser *p = new Parser(s);
 	p->show();
 	//access members p->relations[0] or p->predicates[1].rela_id ... see Headers/Parser.h
-
+	return 0;
 
 	// first read line-by-line for relations' file names until read "DONE"
 	CString_List fileList;

@@ -57,15 +57,18 @@ public:
 };
 
 
-class IntermediateRelation : public Relation {
-	//TODO: use static arrays (+O(1) access, -limited space) or a list? (ideally this would be a std::vector)
-	int subRelationsOffset[MAX_JOIN_RELATIONS];      // the offset where each subRelation's columns start in 'columns' field
+class IntermediateRelation {          // Intermediate Relations need only store the rowids of tuples from their original Relations
+	unsigned int size;                // number of rowid tuples
+	unsigned int numberOfRelations;   // number of original Relations represented by this Intermediate Relation
+	unsigned int **rowids;            // rowids[0] -> rowids for the first original Relation this IntermediateRelation represents, etc
 public:
-	IntermediateRelation(Result &result, const Relation &R, const Relation &S) : Relation(result.getSize(), R.getNumOfColumns() + S.getNumOfColumns()) {
-		for (int i = 0 ; i < MAX_JOIN_RELATIONS ; i++) subRelationsOffset[i] = -1;   // guard value
-		//TODO: Build IntermediateRelations from join's results, R and S using Relation's addColumn() method
-	}
-	//TODO: overload inherited functions as necessary
+	IntermediateRelation();
+	JoinRelation *extractJoinRelation(unsigned int number_of_relation, const Relation &R, unsigned int index_of_JoinField);
+	// either we do the next one and then create another Intermediate Relation using the selected tuples 
+	unsigned int *selectTuplesWithIndexes(unsigned int *indexes, unsigned int length);   // return subtable of "rowids" for the indexes given
+	// OR we do the following and transform this IntermediateRelation into a completely new one using already stored rowids (but only if their index is in 'rowids_that_stay') and new ones 
+	bool addResults(unsigned int *rowids_that_stay, unsigned int *new_rowids, unsigned int length);   // all: size, numberOfRelations, rowids will potentially change
+	// I prefer the second way!
 };
 
 #endif

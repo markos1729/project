@@ -9,10 +9,10 @@
 #define DEFAULT_COST 100  // TODO
 
 
-/* Thoughts:
- * Should BinaryOperations return fully constructed Relation objects even if some of their fields will not be used in future Operations?
- * Maybe, because all of them could be selected at the end. However, we can know in advance which of them are in the 'select' part
- * so maybe we should use NULL pointers instead of storing the rows that are not "interesting" in that way?
+/* Thoughts(Updated):
+ * This idea will probably not work. Each time a predicate is executed the following operations change as their arguements change.
+ * We should probably figure out an order for the operations initially parsed and then execute it without further optimization.
+ * This code should be changed (or dumped) later
  */
 
 
@@ -38,7 +38,7 @@ class BinaryOperation : public Operation {       // binary operations do not mod
 	const Relation &R, &S;
 public:
 	Operation(const Relation &_R, const Relation &_S) : Operation(true), R(_R), S(_S) {}
-	virtual Relation *performBinary() = 0;       // returns a pointer to the new Relation after performing the operation
+	virtual Result *performBinary() = 0;       // returns a pointer to the new Relation after performing the operation
 };
 
 
@@ -66,7 +66,14 @@ class JoinOp : public BinaryOperation {
 	unsigned int joinFieldR, joinFieldS;
 public:
 	JoinOp(const Relation &_R, const Relation &_S, unsigned int _joinFieldR, unsigned int _joinFieldS) : BinaryOperation(_R, _S), joinFieldR(_joinFieldR), joinFieldS(_joinFieldS) {}
-	Relation *performBinary();                   // performs RadixHashJoin betweeen R, S: R|><|S --> JoinR|><|JoinS --RHJ--> Result(rowidR,rowidS) --> Relation RxS
+	Result *performBinary();                   // performs RadixHashJoin betweeen R, S: R|><|S --> JoinR|><|JoinS --RHJ--> Result(rowidR,rowidS) --> Relation RxS
+	double calculateCost() const;
+};
+
+class CrossProductOp : public BinaryOperation {
+public:
+	CrossProductOp(const Relation &_R, const Relation &_S) : BinaryOperation(_R, _S) {}
+	Result *performBinary();
 	double calculateCost() const;
 };
 
