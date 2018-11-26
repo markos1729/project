@@ -1,0 +1,11 @@
+Pseudocode:
+
+1. filter query relations & get passing rowids for each one (just an array for each one)
+2. for each join binding (x.y=q.z) (order may have been changed by optimizer = next step)
+        extract correct joinRelations from intermediate if not empty & from initial rowids
+        Result=RadixHashJoin(Jbinding0,Jbinding1)
+        update intermediate relation list with Result
+            -if only one of the two is already in intermediate
+                for each tuple in intermediate: append ???
+                  
+3. get checksums from intermediate relation ids
