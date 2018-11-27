@@ -21,3 +21,5 @@ public:
 	void append(const char *str);
 	char *pop();         // (!) user has the responsibility of "delete[]"ing popped string from heap
 };
+
+unsigned int count_not_null(void **ptrarray, unsigned int size);

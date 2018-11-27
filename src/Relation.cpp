@@ -91,11 +91,11 @@ void JoinRelation::printDebugInfo() {
 
 
 /* Relation Implementation */
-Relation::Relation(unsigned int _size, unsigned int _num_of_columns) : allocatedWithMmap(false), size(_size), num_of_columns(_num_of_columns) {
+Relation::Relation(unsigned int _size, unsigned int _num_of_columns) : QueryRelation(false), allocatedWithMmap(false), size(_size), num_of_columns(_num_of_columns) {
     columns = new intField*[_num_of_columns]();   // initialize to NULL
 }
 
-Relation::Relation(const char* file) : allocatedWithMmap(true) {
+Relation::Relation(const char* file) : QueryRelation(false), allocatedWithMmap(true) {
     int fd = open(file,O_RDONLY);
     if (fd == -1) throw 0;
 

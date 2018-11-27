@@ -5,7 +5,7 @@
 #include "JoinResults.h"
 #include "FieldTypes.h"
 
-//#define DDEBUG           // define this if functions used for debugging such as printing info should be compiled
+//#define DDEBUG         // define this if functions used for debugging such as printing info should be compiled
 
 #define CACHE 4096       // 32KB
 #define MAX_JOIN_RELATIONS 32
@@ -39,7 +39,18 @@ public:
 };
 
 
-class Relation {        // Relation struct storing all fields for a relation
+class QueryRelation {    // QueryRelation is an interface for the orginal and the intermediate relations
+public:
+	const bool isIntermediate;
+	QueryRelation(bool _isIntermediate) : isIntermediate(_isIntermediate) {}
+	Intermediate *performFilter(col_id, value, cmp) = 0;   // create an Intermediate if isIntermediate == false but change yourself if isIntermediate == true
+	Intermediate *performEqColumns(cola_id, colb_id) = 0;  // ^^
+	Intermediate *performJoinWith(const QueryRelation B, cola_id, colb_id) = 0;  // create a new Intermediate for the result and replace yourself with it
+	Intermediate *performCrossProductWith(const QueryRelation B) = 0;            // ^^
+}
+
+
+class Relation : public QueryRelation {        // Relation struct storing all fields for a relation
 private:
 	const bool allocatedWithMmap;
     unsigned int size;  // number of tuples
@@ -57,12 +68,13 @@ public:
 };
 
 
-class IntermediateRelation {          // Intermediate Relations need only store the rowids of tuples from their original Relations
+class IntermediateRelation : public QueryRelation {          // Intermediate Relations need only store the rowids of tuples from their original Relations
+	bool orginalRelations[MAX_JOIN_RELATIONS];   // orginalRelations[i] = true if i-th original relation "exists" in intermediate else false
 	unsigned int size;                // number of rowid tuples
 	unsigned int numberOfRelations;   // number of original Relations represented by this Intermediate Relation
 	unsigned int **rowids;            // rowids[0] -> rowids for the first original Relation this IntermediateRelation represents, etc
 public:
-	IntermediateRelation();
+	IntermediateRelation() : QueryRelation(true) { /*TODO*/ }
 	JoinRelation *extractJoinRelation(unsigned int number_of_relation, const Relation &R, unsigned int index_of_JoinField);
 	// either we do the next one and then create another Intermediate Relation using the selected tuples 
 	unsigned int *selectTuplesWithIndexes(unsigned int *indexes, unsigned int length);   // return subtable of "rowids" for the indexes given

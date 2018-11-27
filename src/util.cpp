@@ -41,3 +41,11 @@ char *CString_List::pop() {          // (!) user has the responsibility of "dele
 		return rval;
 	}
 }
+
+unsigned int count_not_null(void **ptrarray, unsigned int size){
+	unsigned int count = 0;
+	for (unsigned int i = 0 ; i < size ; i++){
+		if ( ptrarray[i] != NULL ) count++;
+	}
+	return count;
+}
