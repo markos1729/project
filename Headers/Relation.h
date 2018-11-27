@@ -43,33 +43,37 @@ class QueryRelation {    // QueryRelation is an interface for the orginal and th
 public:
 	const bool isIntermediate;
 	QueryRelation(bool _isIntermediate) : isIntermediate(_isIntermediate) {}
-	Intermediate *performFilter(col_id, value, cmp) = 0;   // create an Intermediate if isIntermediate == false but change yourself if isIntermediate == true
-	Intermediate *performEqColumns(cola_id, colb_id) = 0;  // ^^
-	Intermediate *performJoinWith(const QueryRelation B, cola_id, colb_id) = 0;  // create a new Intermediate for the result and replace yourself with it
-	Intermediate *performCrossProductWith(const QueryRelation B) = 0;            // ^^
+	virtual Intermediate *performFilter(col_id, value, cmp) = 0;   // create an Intermediate if isIntermediate == false but change yourself if isIntermediate == true
+	virtual Intermediate *performEqColumns(cola_id, colb_id) = 0;  // ^^
+	virtual Intermediate *performJoinWith(const QueryRelation B, cola_id, colb_id) = 0;  // create a new Intermediate for the result and replace yourself with it
+	virtual Intermediate *performCrossProductWith(const QueryRelation B) = 0;            // ^^
+	virtual bool containsRelation(unsigned int rel_id) = 0;
 }
 
 
 class Relation : public QueryRelation {        // Relation struct storing all fields for a relation
 private:
+	unsigned int id;
 	const bool allocatedWithMmap;
     unsigned int size;  // number of tuples
     unsigned int num_of_columns;
     intField **columns; // each column saved as a sequential array of intFields
 public:
-    Relation(unsigned int _size, unsigned int _num_of_columns);
-    Relation(const char* file);
+    Relation(unsigned int _size, unsigned int _num_of_columns, unsigned int _id);
+    Relation(const char* file, unsigned int _id);
     ~Relation();
     unsigned int getSize() const { return size; }
     unsigned int getNumOfColumns() const { return num_of_columns; }
     intField getValueAt(unsigned int columnNum, unsigned int rowId) const;
     bool addColumn(unsigned int col_num, const intField *values);
     JoinRelation *extractJoinRelation(unsigned int index_of_JoinField);
+    /* @Overide */
+    bool containsRelation(unsigned int rel_id) { return rel_id == id; }
 };
 
 
-class IntermediateRelation : public QueryRelation {          // Intermediate Relations need only store the rowids of tuples from their original Relations
-	bool orginalRelations[MAX_JOIN_RELATIONS];   // orginalRelations[i] = true if i-th original relation "exists" in intermediate else false
+class IntermediateRelation : public QueryRelation {    // Intermediate Relations need only store the rowids of tuples from their original Relations
+	bool orginalRelations[MAX_JOIN_RELATIONS];         // orginalRelations[i] = true if i-th original relation "exists" in intermediate else false
 	unsigned int size;                // number of rowid tuples
 	unsigned int numberOfRelations;   // number of original Relations represented by this Intermediate Relation
 	unsigned int **rowids;            // rowids[0] -> rowids for the first original Relation this IntermediateRelation represents, etc
@@ -81,6 +85,8 @@ public:
 	// OR we do the following and transform this IntermediateRelation into a completely new one using already stored rowids (but only if their index is in 'rowids_that_stay') and new ones 
 	bool addResults(unsigned int *rowids_that_stay, unsigned int *new_rowids, unsigned int length);   // all: size, numberOfRelations, rowids will potentially change
 	// I prefer the second way!
+	/* @Overide */
+	bool containsRelation(unsigned int rel_id) { return (rel_id < MAX_JOIN_RELATIONS) ? originalRelations[rel_id] : false; }
 };
 
 #endif

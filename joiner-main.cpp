@@ -17,6 +17,10 @@ using namespace std;
 #define MAX_QUERY_SIZE 4096
 
 
+/* Local Functions */
+unsigned int find_rel_pos(QueryRelation *QueryRelations, unsigned int size, unsigned int rel_id);
+
+
 int main(){
 	// first read line-by-line for relations' file names until read "DONE"
 	CString_List fileList;
@@ -35,7 +39,7 @@ int main(){
 	unsigned int i;
 	char *filename;
 	for (i = 0 ; i < number_of_relations && (filename = fileList.pop()) != NULL ; i++ ){
-		R[i] = new Relation(filename);
+		R[i] = new Relation(filename, i);
 		delete[] filename;
 	}
 	CHECK( i == number_of_relations, "Warning: Unexpected number of relations", )   // should not happen
@@ -89,14 +93,17 @@ int main(){
 				const predicate &predicate = p->predicates[i];
 				CHECK( predicate.rela_id < p->nrelations && predicate.relb_id < p->nrelations, "SQL Error: SQL join predicate contains a relation that does not exist in \'FROM\'. Aborting query...", 
 					   for (int i = 0 ; i < p->nrelations; i++) { if ( p->isIntermediate ) delete QueryRelations[i]; } delete[] QueryRelations; delete p; abort = true; break; )
-				if (predicate.rela_id < predicate.relb_id){
-					QueryRelations[predicate.rela_id] = QueryRelations[predicate.rela_id]->performJoinWith(QueryRelations[predicate.relb_id], predicate.cola_id, predicate.colb_id);
-					if ( QueryRelations[predicate.relb_id]->isIntermediate ) delete QueryRelations[predicate.relb_id];
-					QueryRelations[predicate.relb_id] = NULL;
+				unsigned int rela_pos = find_rel_pos(QueryRelations, p->nrelations, predicate.rela_id);
+				unsigned int relb_pos = find_rel_pos(QueryRelations, p->nrelations, predicate.relb_id);
+				CHECK( rela_pos != -1 && relb_pos != -1, "Warning: Something went wrong joining relations, cannot find intermediate for one. Please debug.", continue; )
+				if (rela_pos < relb_pos){
+					QueryRelations[rela_pos] = QueryRelations[rela_pos]->performJoinWith(QueryRelations[relb_pos], predicate.cola_id, predicate.colb_id);
+					if ( QueryRelations[relb_pos]->isIntermediate ) delete QueryRelations[relb_pos];
+					QueryRelations[relb_pos] = NULL;
 				} else {
-					QueryRelations[predicate.relb_id] = QueryRelations[predicate.relb_id]->performJoinWith(QueryRelations[predicate.rela_id], predicate.colb_id, predicate.cola_id);
-					if ( QueryRelations[predicate.rela_id]->isIntermediate ) delete QueryRelations[predicate.rela_id];
-					QueryRelations[predicate.rela_id] = NULL;
+					QueryRelations[relb_pos] = QueryRelations[relb_pos]->performJoinWith(QueryRelations[rela_pos], predicate.colb_id, predicate.cola_id);
+					if ( QueryRelations[rela_pos]->isIntermediate ) delete QueryRelations[rela_pos];
+					QueryRelations[rela_pos] = NULL;
 				}
 			}
 		}
@@ -130,4 +137,15 @@ int main(){
 	}
 	delete[] R;
 	return 0;
+}
+
+
+/* Local Function Implementation */
+unsigned int find_rel_pos(QueryRelation *QueryRelations, unsigned int size, unsigned int rel_id){
+	for (int i = 0 ; i < size ; i++){
+		if (QueryRelations[i] != NULL && QueryRelations[i]->containsRelation(rel_id)){
+			return i;
+		}
+	}
+	return -1;  // unsigned -> 111..1 -> should be caught by a CHECK(..)
 }
