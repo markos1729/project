@@ -3,7 +3,7 @@
 #include <cmath>
 #include "../Headers/RadixHashJoin.h"
 
-#define CHECK(call, msg, action) { if ( ! (call) ) { cerr << msg << endl; action } }
+#define CHECK(call, msg, action) { if ( ! (call) ) { std::cerr << msg << std::endl; action } }
 #define MAX(A, B) ( (A) > (B) ? (A) : (B) )
 
 using namespace std;

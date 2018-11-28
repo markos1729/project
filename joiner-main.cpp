@@ -7,15 +7,12 @@
 #include "Headers/RadixHashJoin.h"
 #include "Headers/SQLParser.h"
 
-
-using namespace std;
-
-
-#define CHECK(call, msg, actions) { if ( !(call) ) { cerr << msg << endl; actions } }
-
+#define CHECK(call, msg, actions) { if ( !(call) ) { std::cerr << msg << std::endl; actions } }
 
 #define STARTING_VECTOR_SIZE 16
 
+
+using namespace std;
 
 /* Local Functions */
 unsigned int find_rel_pos(QueryRelation **QueryRelations, unsigned int size, unsigned int rel_id);
@@ -92,11 +89,11 @@ int main(){
             if ( rela_pos != relb_pos ){
                 // JOIN
                 if (rela_pos < relb_pos){
-                    QueryRelations[rela_pos] = QueryRelations[rela_pos]->performJoinWith(QueryRelations[relb_pos], predicate.cola_id, predicate.colb_id);
+                    QueryRelations[rela_pos] = QueryRelations[rela_pos]->performJoinWith(*QueryRelations[relb_pos], predicate.cola_id, predicate.colb_id);
                     if ( QueryRelations[relb_pos]->isIntermediate ) delete QueryRelations[relb_pos];
                     QueryRelations[relb_pos] = NULL;
                 } else {
-                    QueryRelations[relb_pos] = QueryRelations[relb_pos]->performJoinWith(QueryRelations[rela_pos], predicate.colb_id, predicate.cola_id);
+                    QueryRelations[relb_pos] = QueryRelations[relb_pos]->performJoinWith(*QueryRelations[rela_pos], predicate.colb_id, predicate.cola_id);
                     if ( QueryRelations[rela_pos]->isIntermediate ) delete QueryRelations[rela_pos];
                     QueryRelations[rela_pos] = NULL;
                 }
@@ -114,13 +111,13 @@ int main(){
             int i = 1;
             while ( i < p->nrelations && QueryRelations[i] == NULL ) i++;
             if ( i == p->nrelations) { cerr << "Warning: should not happen" << endl; break; }
-            QueryRelations[0] = QueryRelations[0]->performCrossProductWith(QueryRelations[i]);
+            QueryRelations[0] = QueryRelations[0]->performCrossProductWith(*QueryRelations[i]);
             if (QueryRelations[i]->isIntermediate) delete QueryRelations[i];
             QueryRelations[i] = NULL;
         }
 
         // execute SELECT : not SUM yet -> TODO change later after it's working
-        R[0]->performSelect(R, p->projections, p->nprojections);
+        QueryRelations[0]->performSelect((const Relation**) R, p->projections, p->nprojections);
 
         // cleanup
         for (int i = 0 ; i < p->nrelations; i++){

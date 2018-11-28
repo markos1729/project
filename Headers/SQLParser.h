@@ -36,7 +36,7 @@ struct SQLParser {
 	projection* projections;
 	
 	void show();
-	SQLParser(const char *query);
+	explicit SQLParser(const char *query);
 	~SQLParser();
 };
 

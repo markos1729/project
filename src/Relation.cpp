@@ -173,6 +173,10 @@ IntermediateRelation *Relation::performCrossProductWith(const QueryRelation &B) 
     return nullptr;
 }
 
+void Relation::performSelect(const Relation **OrginalRelations, projection *projections, unsigned int size) {
+    // TODO
+}
+
 JoinRelation *IntermediateRelation::extractJoinRelation(unsigned int number_of_relation, const Relation &R, unsigned int index_of_JoinField) {
     // TODO
     return nullptr;
@@ -186,4 +190,18 @@ IntermediateRelation *IntermediateRelation::performFilter(unsigned int col_id, i
 IntermediateRelation *IntermediateRelation::performEqColumns(unsigned int cola_id, unsigned int colb_id, unsigned int rela_id, unsigned int relb_id) {
     // TODO
     return nullptr;
+}
+
+IntermediateRelation *IntermediateRelation::performJoinWith(const QueryRelation &B, unsigned int cola_id, unsigned int colb_id) {
+    // TODO
+    return nullptr;
+}
+
+IntermediateRelation *IntermediateRelation::performCrossProductWith(const QueryRelation &B) {
+    // TODO
+    return nullptr;
+}
+
+void IntermediateRelation::performSelect(const Relation **OrginalRelations, projection *projections, unsigned int size) {
+    // TODO
 }
