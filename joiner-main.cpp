@@ -48,7 +48,7 @@ int main(){
 	// then start parsing 'sql' statements
 	char buffer[MAX_QUERY_SIZE];
 	while (!cin.eof() && !cin.fail()){
-		cin.getline(buffer, MAX_FILE_NAME_SIZE);
+		cin.getline(buffer, MAX_QUERY_SIZE);
 		SQLParser *p = new SQLParser(buffer);     // example: "0 2 4|0.1=1.2&1.0=2.1&0.1>3000|0.0 1.1";
 
 		//DEBUG
@@ -88,14 +88,14 @@ int main(){
 		if (abort) continue;
 		// And afterwards all the joins
 		for (int i = 0 ; i < p->npredicates ; i++){
-			if ( p->predicates[i].rela_id != p->predicates[i].relb_id ){
+			CHECK( predicate.rela_id < p->nrelations && predicate.relb_id < p->nrelations, "SQL Error: SQL join predicate contains a relation that does not exist in \'FROM\'. Aborting query...", 
+				   for (int i = 0 ; i < p->nrelations; i++) { if ( p->isIntermediate ) delete QueryRelations[i]; } delete[] QueryRelations; delete p; abort = true; break; )
+			const predicate &predicate = p->predicates[i];
+			unsigned int rela_pos = find_rel_pos(QueryRelations, p->nrelations, predicate.rela_id);
+			unsigned int relb_pos = find_rel_pos(QueryRelations, p->nrelations, predicate.relb_id);
+			CHECK( rela_pos != -1 && relb_pos != -1, "Warning: Something went wrong joining relations, cannot find intermediate for one. Please debug.", continue; )
+			if ( rela_pos != relb_pos ){
 				// JOIN
-				const predicate &predicate = p->predicates[i];
-				CHECK( predicate.rela_id < p->nrelations && predicate.relb_id < p->nrelations, "SQL Error: SQL join predicate contains a relation that does not exist in \'FROM\'. Aborting query...", 
-					   for (int i = 0 ; i < p->nrelations; i++) { if ( p->isIntermediate ) delete QueryRelations[i]; } delete[] QueryRelations; delete p; abort = true; break; )
-				unsigned int rela_pos = find_rel_pos(QueryRelations, p->nrelations, predicate.rela_id);
-				unsigned int relb_pos = find_rel_pos(QueryRelations, p->nrelations, predicate.relb_id);
-				CHECK( rela_pos != -1 && relb_pos != -1, "Warning: Something went wrong joining relations, cannot find intermediate for one. Please debug.", continue; )
 				if (rela_pos < relb_pos){
 					QueryRelations[rela_pos] = QueryRelations[rela_pos]->performJoinWith(QueryRelations[relb_pos], predicate.cola_id, predicate.colb_id);
 					if ( QueryRelations[relb_pos]->isIntermediate ) delete QueryRelations[relb_pos];
@@ -105,11 +105,15 @@ int main(){
 					if ( QueryRelations[rela_pos]->isIntermediate ) delete QueryRelations[rela_pos];
 					QueryRelations[rela_pos] = NULL;
 				}
+			} else {   // (!) if two tables are joined two times then the first it will be join whilst the second time it will be an equal columns operation!
+				// EQUAL COLUMNS UNARY OPERATION
+				QueryRelations[rela_pos] = QueryRelations[rela_pos]->performEqColumns(predicate.cola_id, predicate.colb_id);
 			}
 		}
 		if (abort) continue;
+		CHECK( QueryRelations[0] != NULL, "Warning: Something not supposed to happen happened. Please debug...", 
+			   for (int i = 0 ; i < p->nrelations; i++) { if ( p->isIntermediate ) delete QueryRelations[i]; } delete[] QueryRelations; delete p; break; )
 		// Last but not least any cross-products left to do
-		CHECK( QueryRelations[0] != NULL, "Warning: Something not supposed to happen happened. Please debug...", )
 		while ( count_not_null(QueryRelations, p->nrelations) > 1 ){
 			// CROSS PRODUCT: perform cross product between remaining Relations uniting them into one in the leftest position until only one QueryRelation remains
 			int i = 1;
@@ -120,8 +124,8 @@ int main(){
 			QueryRelations[i] = NULL;
 		}
 
-		// execute SELECT SUM(..)
-		//TODO
+		// execute SELECT : not SUM yet -> TODO change later after it's working
+		R[0]->performSelect(R, p->projections, p->nprojections);
 
 		// cleanup
 		for (int i = 0 ; i < p->nrelations; i++){

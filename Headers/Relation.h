@@ -10,6 +10,7 @@
 #define CACHE 4096       // 32KB
 #define MAX_JOIN_RELATIONS 32
 
+
 unsigned int H1(intField, unsigned int N);
 
 
@@ -43,11 +44,13 @@ class QueryRelation {    // QueryRelation is an interface for the orginal and th
 public:
 	const bool isIntermediate;
 	QueryRelation(bool _isIntermediate) : isIntermediate(_isIntermediate) {}
-	virtual Intermediate *performFilter(col_id, value, cmp) = 0;   // create an Intermediate if isIntermediate == false but change yourself if isIntermediate == true
-	virtual Intermediate *performEqColumns(cola_id, colb_id) = 0;  // ^^
-	virtual Intermediate *performJoinWith(const QueryRelation B, cola_id, colb_id) = 0;  // create a new Intermediate for the result and replace yourself with it
-	virtual Intermediate *performCrossProductWith(const QueryRelation B) = 0;            // ^^
+	virtual Intermediate *performFilter(unsigned int col_id, intField value, char cmp) = 0;       // create an Intermediate if isIntermediate == false but change yourself if isIntermediate == true
+	virtual Intermediate *performEqColumns(unsigned int cola_id, unsigned int colb_id) = 0;       // ^^
+	virtual Intermediate *performEqColumns(unsigned int cola_id, unsigned int colb_id, unsigned int rela_id, unsigned int relb_id) = 0;    // ^^
+	virtual Intermediate *performJoinWith(const QueryRelation &B, unsigned int cola_id, unsigned int colb_id) = 0;      // create a new Intermediate for the result and replace yourself with it
+	virtual Intermediate *performCrossProductWith(const QueryRelation &B) = 0;                                          // ^^
 	virtual bool containsRelation(unsigned int rel_id) = 0;
+	virtual void performSelect(const Relation *&OrginalRelations, projection *projections, unsigned int size) = 0;      // write select to stdout
 }
 
 
@@ -69,6 +72,12 @@ public:
     JoinRelation *extractJoinRelation(unsigned int index_of_JoinField);
     /* @Overide */
     bool containsRelation(unsigned int rel_id) { return rel_id == id; }
+    Intermediate *performFilter(unsigned int col_id, intField value, char cmp);
+	Intermediate *performEqColumns(unsigned int cola_id, unsigned int colb_id);
+	Intermediate *performEqColumns(unsigned int cola_id, unsigned int colb_id, unsigned int rela_id, unsigned int relb_id) { return performEqColumns(cola_id, colb_id); }
+	Intermediate *performJoinWith(const QueryRelation &B, unsigned int cola_id, unsigned int colb_id);
+	Intermediate *performCrossProductWith(const QueryRelation &B);
+	void performSelect(const Relation *&OrginalRelations, projection *projections, unsigned int size);
 };
 
 
@@ -80,13 +89,14 @@ class IntermediateRelation : public QueryRelation {    // Intermediate Relations
 public:
 	IntermediateRelation() : QueryRelation(true) { /*TODO*/ }
 	JoinRelation *extractJoinRelation(unsigned int number_of_relation, const Relation &R, unsigned int index_of_JoinField);
-	// either we do the next one and then create another Intermediate Relation using the selected tuples 
-	unsigned int *selectTuplesWithIndexes(unsigned int *indexes, unsigned int length);   // return subtable of "rowids" for the indexes given
-	// OR we do the following and transform this IntermediateRelation into a completely new one using already stored rowids (but only if their index is in 'rowids_that_stay') and new ones 
-	bool addResults(unsigned int *rowids_that_stay, unsigned int *new_rowids, unsigned int length);   // all: size, numberOfRelations, rowids will potentially change
-	// I prefer the second way!
 	/* @Overide */
 	bool containsRelation(unsigned int rel_id) { return (rel_id < MAX_JOIN_RELATIONS) ? originalRelations[rel_id] : false; }
+	Intermediate *performFilter(unsigned int col_id, intField value, char cmp);
+	Intermediate *performEqColumns(unsigned int cola_id, unsigned int colb_id) { return NULL; }
+	Intermediate *performEqColumns(unsigned int cola_id, unsigned int colb_id, unsigned int rela_id, unsigned int relb_id);
+	Intermediate *performJoinWith(const QueryRelation &B, unsigned int cola_id, unsigned int colb_id);
+	Intermediate *performCrossProductWith(const QueryRelation &B);
+	void performSelect(const Relation *&OrginalRelations, projection *projections, unsigned int size);
 };
 
 #endif
