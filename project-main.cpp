@@ -26,11 +26,13 @@ int main(int argc, char *argv[]) {
         Relation R(argv[1]);
         if ((unsigned int) joinField1 > R.getNumOfColumns()){
             cout << "Invalid JoinField1 parameter: no such column Relation1" << endl;
+            return -3;
         }
 
         Relation S(argv[3]);
         if ((unsigned int) joinField2 > S.getNumOfColumns()){
             cout << "Invalid JoinField2 parameter: no such column in Relation2" << endl;
+            return -3;
         }
 
         JoinRelation *JRptr = R.extractJoinRelation(joinField1 - 1);
@@ -49,7 +51,7 @@ int main(int argc, char *argv[]) {
         delete JSptr;
     } catch (...) {
         printf("Could not load relations\n");
-        return -3;
+        return -4;
     }
     return 0;
 }

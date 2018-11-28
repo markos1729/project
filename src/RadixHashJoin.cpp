@@ -3,10 +3,10 @@
 #include <cmath>
 #include "../Headers/RadixHashJoin.h"
 
-using namespace std;
-
 #define CHECK(call, msg, action) { if ( ! (call) ) { cerr << msg << endl; action } }
 #define MAX(A, B) ( (A) > (B) ? (A) : (B) )
+
+using namespace std;
 
 
 /* *** Hash Functions Example ***
