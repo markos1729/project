@@ -6,7 +6,6 @@
 
 /* Local FUnctions */
 void split3(char *query, char* &first, char* &second, char* &third) {
-	char *token;
 	first = strtok(query, "|");
 	second = strtok(NULL, "|");
 	third = strtok(NULL, "|");
@@ -72,12 +71,15 @@ void parse_bindings(char *s, unsigned int &npredicates, predicate* &predicates, 
 
 
 /* SQLParser Implementation */
-SQLParser::SQLParser(char *query) {
+SQLParser::SQLParser(const char *query) {
 	char *first,*second,*third;
-	split3(query, first, second, third);
+	char *queryCopy = new char[strlen(query) + 1];
+	strcpy(queryCopy, query);
+	split3(queryCopy, first, second, third);
 	parse_relations(first, nrelations, relations);
 	parse_bindings(second, npredicates, predicates, nfilters, filters);
 	parse_projections(third, nprojections, projections);
+	delete[] queryCopy;
 }
 
 SQLParser::~SQLParser() {

@@ -152,3 +152,38 @@ JoinRelation *Relation::extractJoinRelation(unsigned int index_of_JoinField) {
     delete[] rowids;
     return res;
 }
+
+IntermediateRelation *Relation::performFilter(unsigned int col_id, intField value, char cmp) {
+    // TODO
+    return nullptr;
+}
+
+IntermediateRelation *Relation::performEqColumns(unsigned int cola_id, unsigned int colb_id) {
+    // TODO
+    return nullptr;
+}
+
+IntermediateRelation *Relation::performJoinWith(const QueryRelation &B, unsigned int cola_id, unsigned int colb_id) {
+    // TODO
+    return nullptr;
+}
+
+IntermediateRelation *Relation::performCrossProductWith(const QueryRelation &B) {
+    // TODO
+    return nullptr;
+}
+
+JoinRelation *IntermediateRelation::extractJoinRelation(unsigned int number_of_relation, const Relation &R, unsigned int index_of_JoinField) {
+    // TODO
+    return nullptr;
+}
+
+IntermediateRelation *IntermediateRelation::performFilter(unsigned int col_id, intField value, char cmp) {
+    // TODO
+    return nullptr;
+}
+
+IntermediateRelation *IntermediateRelation::performEqColumns(unsigned int cola_id, unsigned int colb_id, unsigned int rela_id, unsigned int relb_id) {
+    // TODO
+    return nullptr;
+}
