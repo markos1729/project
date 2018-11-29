@@ -1,10 +1,10 @@
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
+#include <cstdio>
+#include <cstring>
+#include <cstdlib>
 #include "../Headers/SQLParser.h"
 
 
-/* Local FUnctions */
+/* Local Functions */
 void split3(char *query, char* &first, char* &second, char* &third) {
 	first = strtok(query, "|");
 	second = strtok(NULL, "|");
