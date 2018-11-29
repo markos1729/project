@@ -1,6 +1,6 @@
 #include <iostream>
 #include <cmath>
-#include <vector>
+#include <unordered_map>
 #include <cstdio>
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -9,6 +9,9 @@
 
 
 using namespace std;
+
+
+extern Relation **R;
 
 
 /* H1 Function used in partitioning*/
@@ -95,6 +98,33 @@ void JoinRelation::printDebugInfo() {
 #endif
 
 
+/* QueryRelation Implementation */
+bool *filterField(intField *field, unsigned int size, intField value, char cmp, unsigned int &count){
+    bool *filter = new bool[size]();
+    switch(cmp){
+        case '>':
+            for (unsigned int i = 0 ; i < size ; i++) {
+                filter[i] = field[i] > value;
+            }
+            break;
+        case '<':
+            for (unsigned int i = 0 ; i < size ; i++) {
+                filter[i] = field[i] < value;
+            }
+            break;
+        case '=':
+            for (unsigned int i = 0 ; i < size ; i++) {
+                filter[i] = field[i] == value;
+            }
+            break;
+        default:
+            cerr << "Warning: Unknown comparison symbol from parsing" << endl;
+            break;
+    }
+    return filter;
+}
+
+
 /* Relation Implementation */
 Relation::Relation(unsigned int _size, unsigned int _num_of_columns) : QueryRelation(false), allocatedWithMmap(false), id(-1), size(_size), num_of_columns(_num_of_columns) {
     columns = new intField*[_num_of_columns]();   // initialize to NULL
@@ -158,18 +188,29 @@ JoinRelation *Relation::extractJoinRelation(unsigned int index_of_JoinField) {
     return res;
 }
 
-IntermediateRelation *Relation::performFilter(unsigned int col_id, intField value, char cmp) {
-    unsigned int size = 0;
-    unsigned int *passing_rowids = QueryRelation::filterField(columns[col_id], value, cmp, &size);
-    return new IntermediateRelation(this->id, passing_rowids, size);
+IntermediateRelation *Relation::performFilter(unsigned int rel_id, unsigned int col_id, intField value, char cmp) {
+    // Note: rel_id is not needed here as there is only one relation to filter
+    unsigned int count = 0;
+    bool *passing_rowids = QueryRelation::filterField(columns[col_id], size, value, cmp, count);   // count will change accordingly
+    unsigned int *newrowids = new unsigned int[count];
+    unsigned int j = 0;
+    for (unsigned int i = 0 ; i < size; i++){
+        if ( j >= count ) { cerr << "Warning: miscounted passing rowids?" << endl; break; }
+        if ( passing_rowids[i] ){
+            newrowids[j++] = i+1;   // keep rowid for intermediate, not the intField columns[cold_id][i].
+        }
+    }
+    delete[] passing_rowids;
+    return new IntermediateRelation(this->id, newrowids, count);
 }
 
-IntermediateRelation *Relation::performEqColumns(unsigned int cola_id, unsigned int colb_id) {
+IntermediateRelation *Relation::performEqColumns(unsigned int rel_id, unsigned int cola_id, unsigned int colb_id) {
     // TODO
     return nullptr;
 }
 
-IntermediateRelation *Relation::performJoinWith(const QueryRelation &B, unsigned int cola_id, unsigned int colb_id) {
+IntermediateRelation *Relation::performJoinWith(const QueryRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id,
+                                                unsigned int colb_id) {
     // TODO
     return nullptr;
 }
@@ -179,7 +220,7 @@ IntermediateRelation *Relation::performCrossProductWith(const QueryRelation &B) 
     return nullptr;
 }
 
-void Relation::performSelect(const Relation **OrginalRelations, projection *projections, unsigned int size) {
+void Relation::performSelect(projection *projections, unsigned int size) {
     // TODO
 }
 
@@ -206,7 +247,7 @@ IntermediateRelation::IntermediateRelation(unsigned int rela_id, unsigned int re
 
 IntermediateRelation::~IntermediateRelation() {
     for (auto iter = rowids.begin() ; iter != rowids.end() ; iter++){
-        delete[] *iter;
+        delete[] iter->second;   // get unsigned int * from <unsigned int, unsigned int *> pair
     }
 }
 
@@ -216,17 +257,44 @@ JoinRelation *IntermediateRelation::extractJoinRelation(unsigned int number_of_r
     return nullptr;
 }
 
-IntermediateRelation *IntermediateRelation::performFilter(unsigned int col_id, intField value, char cmp) {
+IntermediateRelation *IntermediateRelation::performFilter(unsigned int rel_id, unsigned int col_id, intField value, char cmp) {
+    if ( rowids.find(rel_id) == rowids.end() ){   // non existant relation in intermediate
+        return NULL;
+    }
+    // recreate intField to be filtered from rowids
+    const unsigned int *fieldrowids = rowids[rel_id];
+    intField *field = new intField[size];
+    for (int i = 0 ; i < size ; i++){
+        field[i] = R[rel_id]->getValueAt(col_id, fieldrowids[i]);
+    }
+    // filter field
+    unsigned int count = 0;
+    bool *passing_rowids = QueryRelation::filterField(field, size, value, cmp, count);   // count will change accordingly
+    delete[] field;
+    // keep only passing rowids for all relations
+    for (auto iter = rowids.begin() ; iter != rowids.end() ; iter++){
+        unsigned int *rids = iter->second;
+        unsigned int *newrowids = new unsigned int[count];
+        unsigned int j = 0;
+        for (unsigned int i = 0 ; i < size; i++){
+            if ( j >= count ) { cerr << "Warning: miscounted passing rowids?" << endl; break; }
+            if ( passing_rowids[i] ){
+                newrowids[j++] = rids[i];
+            }
+        }
+        delete[] rids;
+        iter->second = newrowids;
+    }
+    delete[] passing_rowids;
+    return this;
+}
+
+IntermediateRelation *IntermediateRelation::performEqColumns(unsigned int rel_id, unsigned int cola_id, unsigned int colb_id) {
     // TODO
     return nullptr;
 }
 
-IntermediateRelation *IntermediateRelation::performEqColumns(unsigned int cola_id, unsigned int colb_id, unsigned int rela_id, unsigned int relb_id) {
-    // TODO
-    return nullptr;
-}
-
-IntermediateRelation *IntermediateRelation::performJoinWith(const QueryRelation &B, unsigned int cola_id, unsigned int colb_id) {
+IntermediateRelation *IntermediateRelation::performJoinWith(const QueryRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) {
     // TODO
     return nullptr;
 }
@@ -236,6 +304,6 @@ IntermediateRelation *IntermediateRelation::performCrossProductWith(const QueryR
     return nullptr;
 }
 
-void IntermediateRelation::performSelect(const Relation **OrginalRelations, projection *projections, unsigned int size) {
+void IntermediateRelation::performSelect(projection *projections, unsigned int size) {
     // TODO
 }

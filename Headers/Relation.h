@@ -49,15 +49,14 @@ public:
     const bool isIntermediate;
     virtual ~QueryRelation() = default;
     explicit QueryRelation(bool _isIntermediate) : isIntermediate(_isIntermediate) {}
-    virtual IntermediateRelation *performFilter(unsigned int col_id, intField value, char cmp) = 0;       // create an Intermediate if isIntermediate == false but change yourself if isIntermediate == true
-    virtual IntermediateRelation *performEqColumns(unsigned int cola_id, unsigned int colb_id) = 0;       // ^^
-    virtual IntermediateRelation *performEqColumns(unsigned int cola_id, unsigned int colb_id, unsigned int rela_id, unsigned int relb_id) = 0;    // ^^
-    virtual IntermediateRelation *performJoinWith(const QueryRelation &B, unsigned int cola_id, unsigned int colb_id) = 0;      // create a new Intermediate for the result and replace yourself with it
-    virtual IntermediateRelation *performCrossProductWith(const QueryRelation &B) = 0;                                          // ^^
     virtual bool containsRelation(unsigned int rel_id) = 0;
-    virtual void performSelect(const Relation **OrginalRelations, projection *projections, unsigned int size) = 0;      // write select to stdout
+    virtual IntermediateRelation *performFilter(unsigned int rel_id, unsigned int col_id, intField value, char cmp) = 0;    // create an Intermediate if isIntermediate == false but change yourself if isIntermediate == true
+    virtual IntermediateRelation *performEqColumns(unsigned int rel_id, unsigned int cola_id, unsigned int colb_id) = 0;    // ^^
+    virtual IntermediateRelation *performJoinWith(const QueryRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id,unsigned int colb_id) = 0;      // create a new Intermediate for the result and replace yourself with it
+    virtual IntermediateRelation *performCrossProductWith(const QueryRelation &B) = 0;                                      // ^^
+    virtual void performSelect(projection *projections, unsigned int size) = 0;          // write select to stdout
 protected:
-	unsigned int *filterField(intField *field, intField value, char cmp, unsigned int &result_size);
+	bool *filterField(intField *field, unsigned int size, intField value, char cmp, unsigned int &count);
 };
 
 
@@ -81,12 +80,11 @@ public:
     JoinRelation *extractJoinRelation(unsigned int index_of_JoinField);
     /* @Override */
     bool containsRelation(unsigned int rel_id) override { return rel_id == id; }
-    IntermediateRelation *performFilter(unsigned int col_id, intField value, char cmp) override;
-    IntermediateRelation *performEqColumns(unsigned int cola_id, unsigned int colb_id) override;
-    IntermediateRelation *performEqColumns(unsigned int cola_id, unsigned int colb_id, unsigned int rela_id, unsigned int relb_id) override { return performEqColumns(cola_id, colb_id); }
-    IntermediateRelation *performJoinWith(const QueryRelation &B, unsigned int cola_id, unsigned int colb_id) override;
+    IntermediateRelation *performFilter(unsigned int rel_id, unsigned int col_id, intField value, char cmp) override;
+    IntermediateRelation *performEqColumns(unsigned int rel_id, unsigned int cola_id, unsigned int colb_id) override;
+    IntermediateRelation *performJoinWith(const QueryRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) override;
     IntermediateRelation *performCrossProductWith(const QueryRelation &B) override;
-    void performSelect(const Relation **OrginalRelations, projection *projections, unsigned int size) override;
+    void performSelect(projection *projections, unsigned int size) override;
 };
 
 
@@ -101,12 +99,11 @@ public:
     JoinRelation *extractJoinRelation(unsigned int number_of_relation, const Relation &R, unsigned int index_of_JoinField);
     /* @Override */
     bool containsRelation(unsigned int rel_id) override { return rowids.find(rel_id) != rowids.end(); }
-    IntermediateRelation *performFilter(unsigned int col_id, intField value, char cmp) override;
-    IntermediateRelation *performEqColumns(unsigned int cola_id, unsigned int colb_id) override { return NULL; }
-    IntermediateRelation *performEqColumns(unsigned int cola_id, unsigned int colb_id, unsigned int rela_id, unsigned int relb_id) override;
-    IntermediateRelation *performJoinWith(const QueryRelation &B, unsigned int cola_id, unsigned int colb_id) override;
+    IntermediateRelation *performFilter(unsigned int rel_id, unsigned int col_id, intField value, char cmp) override;
+    IntermediateRelation *performEqColumns(unsigned int rel_id, unsigned int cola_id, unsigned int colb_id) override;
+    IntermediateRelation *performJoinWith(const QueryRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) override;
     IntermediateRelation *performCrossProductWith(const QueryRelation &B) override;
-    void performSelect(const Relation **OrginalRelations, projection *projections, unsigned int size) override;
+    void performSelect(projection *projections, unsigned int size) override;
 };
 
 #endif
