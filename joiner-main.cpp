@@ -73,7 +73,7 @@ int main(){
             const filter &filter = p->filters[i];
             CHECK( (filter.rel_id < p->nrelations), "SQL Error: SQL filter contains a relation that does not exist in \'FROM\'. Aborting query...",
                    for (int i = 0 ; i < p->nrelations; i++) { if ( QueryRelations[i]->isIntermediate ) delete QueryRelations[i]; } delete[] QueryRelations; delete p; abort = true; break; )
-            QueryRelations[filter.rel_id] = QueryRelations[filter.rel_id]->performFilter(filter.rel_id, filter.col_id, filter.value, filter.cmp);  // first arguement is unimportant here
+            QueryRelations[filter.rel_id] = QueryRelations[filter.rel_id]->performFilter(filter.rel_id, filter.col_id, filter.value, filter.cmp);
         }
         if (abort) continue;
         // Then equal columns operations
