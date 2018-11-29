@@ -12,6 +12,7 @@ using namespace std;
 
 
 extern Relation **R;
+extern int Rlen;
 
 
 /* H1 Function used in partitioning*/
@@ -99,22 +100,25 @@ void JoinRelation::printDebugInfo() {
 
 
 /* QueryRelation Implementation */
-bool *filterField(intField *field, unsigned int size, intField value, char cmp, unsigned int &count){
+bool *QueryRelation::filterField(intField *field, unsigned int size, intField value, char cmp, unsigned int &count){
     bool *filter = new bool[size]();
     switch(cmp){
         case '>':
             for (unsigned int i = 0 ; i < size ; i++) {
                 filter[i] = field[i] > value;
+                if (filter[i]) count++;
             }
             break;
         case '<':
             for (unsigned int i = 0 ; i < size ; i++) {
                 filter[i] = field[i] < value;
+                if (filter[i]) count++;
             }
             break;
         case '=':
             for (unsigned int i = 0 ; i < size ; i++) {
                 filter[i] = field[i] == value;
+                if (filter[i]) count++;
             }
             break;
         default:
@@ -195,7 +199,7 @@ IntermediateRelation *Relation::performFilter(unsigned int rel_id, unsigned int 
     unsigned int *newrowids = new unsigned int[count];
     unsigned int j = 0;
     for (unsigned int i = 0 ; i < size; i++){
-        if ( j >= count ) { cerr << "Warning: miscounted passing rowids?" << endl; break; }
+        if ( j >= count ) { cerr << "Warning: miscounted passing rowids? : count  = " << count << endl; break; }
         if ( passing_rowids[i] ){
             newrowids[j++] = i+1;   // keep rowid for intermediate, not the intField columns[cold_id][i].
         }
@@ -220,8 +224,17 @@ IntermediateRelation *Relation::performCrossProductWith(const QueryRelation &B) 
     return nullptr;
 }
 
-void Relation::performSelect(projection *projections, unsigned int size) {
-    // TODO
+void Relation::performSelect(projection *projections, unsigned int nprojections) {
+    for (unsigned int j = 0 ; j < nprojections ; j++){
+        printf("%3d.%2d", projections[j].rel_id, projections[j].col_id);
+    }
+    printf("\n");
+    for (unsigned int i = 0 ; i < size ; i++){
+        for (unsigned int j = 0 ; j < nprojections ; j++){
+            printf("%6lu", this->getValueAt(projections[i].col_id, i));
+        }
+        printf("\n");
+    }
 }
 
 
@@ -234,7 +247,7 @@ IntermediateRelation::IntermediateRelation(unsigned int rel_id, unsigned int *_r
     rowids.insert(make_pair(rel_id, column));
 }
 
-IntermediateRelation::IntermediateRelation(unsigned int rela_id, unsigned int relb_id, unsigned int *_rowids_a, unsigned int *_rowids_b, unsigned int _size) : QueryRelation(true), numberOfRelations(1), size(_size) {
+IntermediateRelation::IntermediateRelation(unsigned int rela_id, unsigned int relb_id, unsigned int *_rowids_a, unsigned int *_rowids_b, unsigned int _size) : QueryRelation(true), numberOfRelations(2), size(_size) {
     unsigned int *column_a = new unsigned int[size];
     unsigned int *column_b = new unsigned int[size];
     for (unsigned int i = 0 ; i < size ; i++){
@@ -265,7 +278,16 @@ IntermediateRelation *IntermediateRelation::performFilter(unsigned int rel_id, u
     const unsigned int *fieldrowids = rowids[rel_id];
     intField *field = new intField[size];
     for (int i = 0 ; i < size ; i++){
-        field[i] = R[rel_id]->getValueAt(col_id, fieldrowids[i]);
+        // TODO: R[rel_id] is NOT the correct relation as rel_ids are only for the 'FROM' tables. Find a better solution that searching like below:
+        int rel_pos_in_R = -1;
+        for (int i = 0 ; i < Rlen ; i++){
+            if (R[i]->getId() == rel_id){
+                rel_pos_in_R = i;
+                break;
+            }
+        }
+        if (rel_pos_in_R == -1) { cerr << "Warning: rel_id or Rlen invalid in performFilter for intermediate" << endl; delete[] field; return NULL; }
+        field[i] = R[rel_pos_in_R]->getValueAt(col_id, fieldrowids[i]);
     }
     // filter field
     unsigned int count = 0;
@@ -277,7 +299,7 @@ IntermediateRelation *IntermediateRelation::performFilter(unsigned int rel_id, u
         unsigned int *newrowids = new unsigned int[count];
         unsigned int j = 0;
         for (unsigned int i = 0 ; i < size; i++){
-            if ( j >= count ) { cerr << "Warning: miscounted passing rowids?" << endl; break; }
+            if ( j >= count ) { cerr << "Warning: miscounted passing rowids in intermediate?" << endl; break; }
             if ( passing_rowids[i] ){
                 newrowids[j++] = rids[i];
             }
@@ -304,6 +326,32 @@ IntermediateRelation *IntermediateRelation::performCrossProductWith(const QueryR
     return nullptr;
 }
 
-void IntermediateRelation::performSelect(projection *projections, unsigned int size) {
-    // TODO
+void IntermediateRelation::performSelect(projection *projections, unsigned int nprojections) {
+    unsigned int **allrowids = new unsigned int*[numberOfRelations];
+    {   int i = 0;
+        for (auto iter = rowids.begin() ; iter != rowids.end() ; iter++) {
+            if ( i >= numberOfRelations ) { cerr << "Warning: Miscalculated numberOfRelations?" << endl; break; }
+            allrowids[i++] = iter->second;
+        }
+    }
+    for (unsigned int j = 0 ; j < nprojections ; j++){
+        printf("%3d.%2d", projections[j].rel_id, projections[j].col_id);
+    }
+    printf("\n");
+    for (unsigned int i = 0 ; i < size ; i++){
+        for (unsigned int j = 0 ; j < nprojections ; j++){
+            // TODO: R[rel_id] is NOT the correct relation as rel_ids are only for the 'FROM' tables. Find a better solution that searching like below:
+            int rel_pos_in_R = -1;
+            for (int i = 0 ; i < Rlen ; i++){
+                if (R[i]->getId() == projections[i].rel_id){
+                    rel_pos_in_R = i;
+                    break;
+                }
+            }
+            if (rel_pos_in_R == -1) { cerr << "Warning: rel_id or Rlen invalid in performSelect for intermediate" << endl; }
+            else printf("%6lu", R[rel_pos_in_R]->getValueAt(projections[i].col_id, allrowids[projections[i].rel_id][i]));
+        }
+        printf("\n");
+    }
+    delete[] allrowids;
 }

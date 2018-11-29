@@ -54,7 +54,7 @@ public:
     virtual IntermediateRelation *performEqColumns(unsigned int rel_id, unsigned int cola_id, unsigned int colb_id) = 0;    // ^^
     virtual IntermediateRelation *performJoinWith(const QueryRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id,unsigned int colb_id) = 0;      // create a new Intermediate for the result and replace yourself with it
     virtual IntermediateRelation *performCrossProductWith(const QueryRelation &B) = 0;                                      // ^^
-    virtual void performSelect(projection *projections, unsigned int size) = 0;          // write select to stdout
+    virtual void performSelect(projection *projections, unsigned int nprojections) = 0;          // write select to stdout
 protected:
 	bool *filterField(intField *field, unsigned int size, intField value, char cmp, unsigned int &count);
 };
@@ -84,7 +84,7 @@ public:
     IntermediateRelation *performEqColumns(unsigned int rel_id, unsigned int cola_id, unsigned int colb_id) override;
     IntermediateRelation *performJoinWith(const QueryRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) override;
     IntermediateRelation *performCrossProductWith(const QueryRelation &B) override;
-    void performSelect(projection *projections, unsigned int size) override;
+    void performSelect(projection *projections, unsigned int nprojections) override;
 };
 
 
@@ -103,7 +103,7 @@ public:
     IntermediateRelation *performEqColumns(unsigned int rel_id, unsigned int cola_id, unsigned int colb_id) override;
     IntermediateRelation *performJoinWith(const QueryRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) override;
     IntermediateRelation *performCrossProductWith(const QueryRelation &B) override;
-    void performSelect(projection *projections, unsigned int size) override;
+    void performSelect(projection *projections, unsigned int nprojections) override;
 };
 
 #endif

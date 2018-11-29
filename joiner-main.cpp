@@ -17,23 +17,25 @@ using namespace std;
 
 /* Global Variables */
 Relation **R = NULL;
-
+int Rlen = -1;
 
 /* Local Functions */
 unsigned int find_rel_pos(QueryRelation **QueryRelations, unsigned int size, unsigned int rel_id);
 
 
 int main(){
+    cout << "Loading relations..." << endl;
     // first read line-by-line for relations' file names until read "DONE"
     vector<string> *fileList = new vector<string>();
     fileList->reserve(STARTING_VECTOR_SIZE);
     string currName;
-    while ( getline(cin, currName) ) {
+    while ( getline(cin, currName) && currName != "DONE" ) {
         fileList->push_back(currName);
     }
-    CHECK( !cin.eof() , "Error: reading filenames from cin failed", return -1; )
+    CHECK( !cin.eof() && !cin.fail(), "Error: reading filenames from cin failed", return -1; )
     // and load all files into memory
     const unsigned int number_of_relations = (int) fileList->size();
+    Rlen = number_of_relations;
     R = new Relation *[number_of_relations]();
     {
         unsigned int i = 0;
@@ -43,12 +45,14 @@ int main(){
     }
     delete fileList;
     // wait for 1 second
+    cout << "Loading done! Accepting Queries..." << endl;
     sleep(1);
     // then start parsing 'sql' statements
     string currStatement;
     while ( getline(cin, currStatement) ){
         SQLParser *p = new SQLParser(currStatement.c_str());     // example: "0 2 4|0.1=1.2&1.0=2.1&0.1>3000|0.0 1.1";
         //DEBUG
+        cout << "Query:" << endl;
         p->show();
 
         bool abort = false;
@@ -69,8 +73,7 @@ int main(){
             const filter &filter = p->filters[i];
             CHECK( (filter.rel_id < p->nrelations), "SQL Error: SQL filter contains a relation that does not exist in \'FROM\'. Aborting query...",
                    for (int i = 0 ; i < p->nrelations; i++) { if ( QueryRelations[i]->isIntermediate ) delete QueryRelations[i]; } delete[] QueryRelations; delete p; abort = true; break; )
-            QueryRelations[filter.rel_id] = QueryRelations[filter.rel_id]->performFilter(0, filter.col_id, filter.value,
-                                                                                         filter.cmp);
+            QueryRelations[filter.rel_id] = QueryRelations[filter.rel_id]->performFilter(filter.rel_id, filter.col_id, filter.value, filter.cmp);  // first arguement is unimportant here
         }
         if (abort) continue;
         // Then equal columns operations
@@ -80,8 +83,7 @@ int main(){
                 const predicate &predicate = p->predicates[i];
                 CHECK( (predicate.rela_id < p->nrelations), "SQL Error: SQL equal columns predicate on one relation that does not exist in \'FROM\'. Aborting query...",
                        for (int i = 0 ; i < p->nrelations; i++) { if ( QueryRelations[i]->isIntermediate ) delete QueryRelations[i]; } delete[] QueryRelations; delete p; abort = true; break;)
-                QueryRelations[predicate.rela_id] = QueryRelations[predicate.rela_id]->performEqColumns(
-                        predicate.cola_id, predicate.colb_id, 0);
+                QueryRelations[predicate.rela_id] = QueryRelations[predicate.rela_id]->performEqColumns(predicate.rela_id, predicate.cola_id, predicate.colb_id);
             }
             // else if (  p->predicates[i].rela_id == p->predicates[i].relb_id  ) -> ignore predicate
         }
@@ -97,23 +99,17 @@ int main(){
             if ( rela_pos != relb_pos ){
                 // JOIN
                 if (rela_pos < relb_pos){
-                    QueryRelations[rela_pos] = QueryRelations[rela_pos]->performJoinWith(*QueryRelations[relb_pos], 0,
-                                                                                         predicate.cola_id, 0,
-                                                                                         predicate.colb_id);
+                    QueryRelations[rela_pos] = QueryRelations[rela_pos]->performJoinWith(*QueryRelations[relb_pos], predicate.rela_id, predicate.cola_id, predicate.relb_id, predicate.colb_id);
                     if ( QueryRelations[relb_pos]->isIntermediate ) delete QueryRelations[relb_pos];
                     QueryRelations[relb_pos] = NULL;
                 } else {
-                    QueryRelations[relb_pos] = QueryRelations[relb_pos]->performJoinWith(*QueryRelations[rela_pos], 0,
-                                                                                         predicate.colb_id, 0,
-                                                                                         predicate.cola_id);
+                    QueryRelations[relb_pos] = QueryRelations[relb_pos]->performJoinWith(*QueryRelations[rela_pos], predicate.relb_id, predicate.colb_id, predicate.rela_id, predicate.cola_id);
                     if ( QueryRelations[rela_pos]->isIntermediate ) delete QueryRelations[rela_pos];
                     QueryRelations[rela_pos] = NULL;
                 }
             } else {   // (!) if two tables are joined two times then the first it will be join whilst the second time it will be an equal columns operation!
                 // EQUAL COLUMNS UNARY OPERATION
-                QueryRelations[rela_pos] = QueryRelations[rela_pos]->performEqColumns(predicate.rela_id,
-                                                                                      predicate.cola_id,
-                                                                                      predicate.colb_id);
+                QueryRelations[rela_pos] = QueryRelations[rela_pos]->performEqColumns(predicate.rela_id, predicate.cola_id, predicate.colb_id);
             }
         }
         if (abort) continue;
@@ -130,8 +126,12 @@ int main(){
             QueryRelations[i] = NULL;
         }
 
+        cout << "Output:" << endl;
+
         // execute SELECT : not SUM yet -> TODO change later after it's working
         QueryRelations[0]->performSelect(p->projections, p->nprojections);
+
+        cout << "Query finished!" << endl;
 
         // cleanup
         for (int i = 0 ; i < p->nrelations; i++){
