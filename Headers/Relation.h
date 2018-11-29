@@ -2,6 +2,7 @@
 #define RELATION_H
 
 #include <iostream>
+#include <unordered_map>
 #include "JoinResults.h"
 #include "FieldTypes.h"
 #include "SQLParser.h"
@@ -9,8 +10,8 @@
 //#define DDEBUG         // define this if functions used for debugging such as printing info should be compiled
 
 #define CACHE 4096       // 32KB
-#define MAX_JOIN_RELATIONS 32
 
+// Forward delcarations:
 class Relation;
 class IntermediateRelation;
 
@@ -55,6 +56,8 @@ public:
     virtual IntermediateRelation *performCrossProductWith(const QueryRelation &B) = 0;                                          // ^^
     virtual bool containsRelation(unsigned int rel_id) = 0;
     virtual void performSelect(const Relation **OrginalRelations, projection *projections, unsigned int size) = 0;      // write select to stdout
+protected:
+	unsigned int *filterField(intField *field, intField value, char cmp, unsigned int &result_size);
 };
 
 
@@ -66,11 +69,13 @@ private:
     unsigned int num_of_columns;
     intField **columns; // each column saved as a sequential array of intFields
 public:
-    Relation(unsigned int _size, unsigned int _num_of_columns, unsigned int _id);
-    Relation(const char* file, unsigned int _id);
+    Relation(unsigned int _size, unsigned int _num_of_columns);
+    Relation(const char* file);
     ~Relation() override;
     unsigned int getSize() const { return size; }
     unsigned int getNumOfColumns() const { return num_of_columns; }
+    unsigned int getId() const { return id; }
+    void setId(unsigned int _id) { id = _id; }
     intField getValueAt(unsigned int columnNum, unsigned int rowId) const;
     bool addColumn(unsigned int col_num, const intField *values);
     JoinRelation *extractJoinRelation(unsigned int index_of_JoinField);
@@ -85,16 +90,17 @@ public:
 };
 
 
-class IntermediateRelation : public QueryRelation {    // Intermediate Relations need only store the rowids of tuples from their original Relations
-    bool orginalRelations[MAX_JOIN_RELATIONS];         // orginalRelations[i] = true if i-th original relation "exists" in intermediate else false
-    unsigned int size;                // number of rowid tuples
-    unsigned int numberOfRelations;   // number of original Relations represented by this Intermediate Relation
-    unsigned int **rowids;            // rowids[0] -> rowids for the first original Relation this IntermediateRelation represents, etc
+class IntermediateRelation : public QueryRelation {       // Intermediate Relations need only store the rowids of tuples from their original Relations
+    unsigned int size;                                    // size of rowids array for EVERY relation_id in 'rowids' hashmap
+    unsigned int numberOfRelations;                       // number of original Relations represented by this Intermediate Relation
+    unordered_map<unsigned int, unsigned int *> rowids;   // a hash table map for: <key=relation_id, value=rowids_of_that_relation>
 public:
-    IntermediateRelation() : QueryRelation(true) { /*TODO*/ }
+    IntermediateRelation(unsigned int rel_id, unsigned int *_rowids, unsigned int _size);
+    IntermediateRelation(unsigned int rela_id, unsigned int relb_id, unsigned int *_rowids_a, unsigned int *_rowids_b, unsigned int _size);
+    ~IntermediateRelation();
     JoinRelation *extractJoinRelation(unsigned int number_of_relation, const Relation &R, unsigned int index_of_JoinField);
     /* @Override */
-    bool containsRelation(unsigned int rel_id) override { return (rel_id < MAX_JOIN_RELATIONS) ? orginalRelations[rel_id] : false; }
+    bool containsRelation(unsigned int rel_id) override { return rowids.find(rel_id) != rowids.end(); }
     IntermediateRelation *performFilter(unsigned int col_id, intField value, char cmp) override;
     IntermediateRelation *performEqColumns(unsigned int cola_id, unsigned int colb_id) override { return NULL; }
     IntermediateRelation *performEqColumns(unsigned int cola_id, unsigned int colb_id, unsigned int rela_id, unsigned int relb_id) override;

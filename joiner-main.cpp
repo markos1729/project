@@ -2,10 +2,10 @@
 #include <string.h>
 #include <unistd.h>
 #include <vector>
-#include "Headers/util.h"
-#include "Headers/Relation.h"
-#include "Headers/RadixHashJoin.h"
 #include "Headers/SQLParser.h"
+#include "Headers/Relation.h"
+#include "Headers/util.h"
+
 
 #define CHECK(call, msg, actions) { if ( !(call) ) { std::cerr << msg << std::endl; actions } }
 
@@ -13,6 +13,7 @@
 
 
 using namespace std;
+
 
 /* Local Functions */
 unsigned int find_rel_pos(QueryRelation **QueryRelations, unsigned int size, unsigned int rel_id);
@@ -33,7 +34,7 @@ int main(){
     {
         unsigned int i = 0;
         for (vector<string>::const_iterator iter = fileList->begin(); iter != fileList->end(); iter++, i++) {
-            R[i] = new Relation((*iter).c_str(), i);
+            R[i] = new Relation((*iter).c_str());
         }
     }
     delete fileList;
@@ -53,6 +54,7 @@ int main(){
         for (int i = 0; i < p->nrelations ; i++){
             CHECK( p->relations[i] < number_of_relations, "SQL Error: SQL query contains non-existant Relation in \'FROM\'. Aborting query...", delete[] QueryRelations; delete p; abort = true; break; )
             QueryRelations[i] = R[p->relations[i]];
+            R[p->relations[i]]->setId(i);   // id of relations are in accending order in 'FROM'
         }
         if (abort) continue;
 
@@ -61,8 +63,8 @@ int main(){
         for (int i = 0 ; i < p->nfilters ; i++){
             //FILTER
             const filter &filter = p->filters[i];
-            CHECK( filter.rel_id < p->nrelations, "SQL Error: SQL filter contains a relation that does not exist in \'FROM\'. Aborting query...",
-                           for (int i = 0 ; i < p->nrelations; i++) { if ( QueryRelations[i]->isIntermediate ) delete QueryRelations[i]; } delete[] QueryRelations; delete p; abort = true; break; )
+            CHECK( (filter.rel_id < p->nrelations), "SQL Error: SQL filter contains a relation that does not exist in \'FROM\'. Aborting query...",
+                   for (int i = 0 ; i < p->nrelations; i++) { if ( QueryRelations[i]->isIntermediate ) delete QueryRelations[i]; } delete[] QueryRelations; delete p; abort = true; break; )
             QueryRelations[filter.rel_id] = QueryRelations[filter.rel_id]->performFilter(filter.col_id, filter.value, filter.cmp);
         }
         if (abort) continue;
@@ -71,8 +73,8 @@ int main(){
             if ( p->predicates[i].rela_id == p->predicates[i].relb_id && p->predicates[i].cola_id != p->predicates[i].colb_id){
                 // EQUAL COLUMNS UNARY OPERATION
                 const predicate &predicate = p->predicates[i];
-                CHECK( predicate.rela_id < p->nrelations, "SQL Error: SQL equal columns predicate on one relation that does not exist in \'FROM\'. Aborting query...",
-                               for (int i = 0 ; i < p->nrelations; i++) { if ( QueryRelations[i]->isIntermediate ) delete QueryRelations[i]; } delete[] QueryRelations; delete p; abort = true; break;)
+                CHECK( (predicate.rela_id < p->nrelations), "SQL Error: SQL equal columns predicate on one relation that does not exist in \'FROM\'. Aborting query...",
+                       for (int i = 0 ; i < p->nrelations; i++) { if ( QueryRelations[i]->isIntermediate ) delete QueryRelations[i]; } delete[] QueryRelations; delete p; abort = true; break;)
                 QueryRelations[predicate.rela_id] = QueryRelations[predicate.rela_id]->performEqColumns(predicate.cola_id, predicate.colb_id);
             }
             // else if (  p->predicates[i].rela_id == p->predicates[i].relb_id  ) -> ignore predicate
@@ -81,7 +83,7 @@ int main(){
         // And afterwards all the joins
         for (int i = 0 ; i < p->npredicates ; i++){
             const predicate &predicate = p->predicates[i];
-            CHECK( predicate.rela_id < p->nrelations && predicate.relb_id < p->nrelations, "SQL Error: SQL join predicate contains a relation that does not exist in \'FROM\'. Aborting query...",
+            CHECK( (predicate.rela_id < p->nrelations && predicate.relb_id < p->nrelations), "SQL Error: SQL join predicate contains a relation that does not exist in \'FROM\'. Aborting query...",
                    for (int i = 0 ; i < p->nrelations; i++) { if ( QueryRelations[i]->isIntermediate ) delete QueryRelations[i]; } delete[] QueryRelations; delete p; abort = true; break; )
             unsigned int rela_pos = find_rel_pos(QueryRelations, p->nrelations, predicate.rela_id);
             unsigned int relb_pos = find_rel_pos(QueryRelations, p->nrelations, predicate.relb_id);

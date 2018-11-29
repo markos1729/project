@@ -1,9 +1,14 @@
+#include <iostream>
 #include <cmath>
+#include <vector>
 #include <cstdio>
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include "../Headers/Relation.h"
+
+
+using namespace std;
 
 
 /* H1 Function used in partitioning*/
@@ -91,11 +96,11 @@ void JoinRelation::printDebugInfo() {
 
 
 /* Relation Implementation */
-Relation::Relation(unsigned int _size, unsigned int _num_of_columns, unsigned int _id) : QueryRelation(false), allocatedWithMmap(false), id(_id), size(_size), num_of_columns(_num_of_columns) {
+Relation::Relation(unsigned int _size, unsigned int _num_of_columns) : QueryRelation(false), allocatedWithMmap(false), id(-1), size(_size), num_of_columns(_num_of_columns) {
     columns = new intField*[_num_of_columns]();   // initialize to NULL
 }
 
-Relation::Relation(const char* file, unsigned int _id) : QueryRelation(false), allocatedWithMmap(true), id(_id) {
+Relation::Relation(const char* file) : QueryRelation(false), allocatedWithMmap(true), id(-1) {
     int fd = open(file,O_RDONLY);
     if (fd == -1) throw 0;
 
@@ -118,9 +123,9 @@ Relation::Relation(const char* file, unsigned int _id) : QueryRelation(false), a
 }
 
 Relation::~Relation() {
-	if (allocatedWithMmap) {
+    if (allocatedWithMmap) {
         if (size > 0) munmap(columns[0] - 2, (size * num_of_columns + 2) * sizeof(intField));
-	} else {
+    } else {
         for (unsigned int i = 0 ; i < num_of_columns ; i++){
             delete[] columns[i];   // "delete" accounts for possible NULL value
         }
@@ -128,9 +133,9 @@ Relation::~Relation() {
     delete[] columns;
 }
 
-intField Relation::getValueAt(unsigned int columnNum, unsigned int rowId) const { 
+intField Relation::getValueAt(unsigned int columnNum, unsigned int rowId) const {
     if (columns != NULL && columnNum < num_of_columns && columns[columnNum] != NULL && rowId < size) return columns[columnNum][rowId];
-    else return 0; 
+    else return 0;
 }
 
 bool Relation::addColumn(unsigned int col_num, const intField *values) {   // (!) values must be of length == size, lest we get seg fault
@@ -154,8 +159,9 @@ JoinRelation *Relation::extractJoinRelation(unsigned int index_of_JoinField) {
 }
 
 IntermediateRelation *Relation::performFilter(unsigned int col_id, intField value, char cmp) {
-    // TODO
-    return nullptr;
+    unsigned int size = 0;
+    unsigned int *passing_rowids = QueryRelation::filterField(columns[col_id], value, cmp, &size);
+    return new IntermediateRelation(this->id, passing_rowids, size);
 }
 
 IntermediateRelation *Relation::performEqColumns(unsigned int cola_id, unsigned int colb_id) {
@@ -176,6 +182,34 @@ IntermediateRelation *Relation::performCrossProductWith(const QueryRelation &B) 
 void Relation::performSelect(const Relation **OrginalRelations, projection *projections, unsigned int size) {
     // TODO
 }
+
+
+/* IntermediateRelation Implementation */
+IntermediateRelation::IntermediateRelation(unsigned int rel_id, unsigned int *_rowids, unsigned int _size) : QueryRelation(true), numberOfRelations(1), size(_size) {
+    unsigned int *column = new unsigned int[size];
+    for (unsigned int i = 0 ; i < size ; i++){
+        column[i] = _rowids[i];
+    }
+    rowids.insert(make_pair(rel_id, column));
+}
+
+IntermediateRelation::IntermediateRelation(unsigned int rela_id, unsigned int relb_id, unsigned int *_rowids_a, unsigned int *_rowids_b, unsigned int _size) : QueryRelation(true), numberOfRelations(1), size(_size) {
+    unsigned int *column_a = new unsigned int[size];
+    unsigned int *column_b = new unsigned int[size];
+    for (unsigned int i = 0 ; i < size ; i++){
+        column_a[i] = _rowids_a[i];
+        column_b[i] = _rowids_b[i];
+    }
+    rowids.insert(make_pair(rela_id, column_a));
+    rowids.insert(make_pair(relb_id, column_b));
+}
+
+IntermediateRelation::~IntermediateRelation() {
+    for (auto iter = rowids.begin() ; iter != rowids.end() ; iter++){
+        delete[] *iter;
+    }
+}
+
 
 JoinRelation *IntermediateRelation::extractJoinRelation(unsigned int number_of_relation, const Relation &R, unsigned int index_of_JoinField) {
     // TODO
