@@ -105,19 +105,19 @@ bool *QueryRelation::filterField(intField *field, unsigned int size, intField va
     switch(cmp){
         case '>':
             for (unsigned int i = 0 ; i < size ; i++) {
-                filter[i] = field[i] > value;
+                filter[i] = (field[i] > value);
                 if (filter[i]) count++;
             }
             break;
         case '<':
             for (unsigned int i = 0 ; i < size ; i++) {
-                filter[i] = field[i] < value;
+                filter[i] = (field[i] < value);
                 if (filter[i]) count++;
             }
             break;
         case '=':
             for (unsigned int i = 0 ; i < size ; i++) {
-                filter[i] = field[i] == value;
+                filter[i] = (field[i] == value);
                 if (filter[i]) count++;
             }
             break;
@@ -342,14 +342,14 @@ void IntermediateRelation::performSelect(projection *projections, unsigned int n
         for (unsigned int j = 0 ; j < nprojections ; j++){
             // TODO: R[rel_id] is NOT the correct relation as rel_ids are only for the 'FROM' tables. Find a better solution that searching like below:
             int rel_pos_in_R = -1;
-            for (int i = 0 ; i < Rlen ; i++){
-                if (R[i]->getId() == projections[i].rel_id){
-                    rel_pos_in_R = i;
+            for (int k = 0 ; k < Rlen ; k++){
+                if (R[k]->getId() == projections[j].rel_id){
+                    rel_pos_in_R = k;
                     break;
                 }
             }
             if (rel_pos_in_R == -1) { cerr << "Warning: rel_id or Rlen invalid in performSelect for intermediate" << endl; }
-            else printf("%6lu", R[rel_pos_in_R]->getValueAt(projections[i].col_id, allrowids[projections[i].rel_id][i]));
+            else printf("%6lu", R[rel_pos_in_R]->getValueAt(projections[j].col_id, allrowids[projections[j].rel_id][i]));
         }
         printf("\n");
     }
