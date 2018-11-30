@@ -77,7 +77,7 @@ public:
     void setId(unsigned int _id) { id = _id; }
     intField getValueAt(unsigned int columnNum, unsigned int rowId) const;
     bool addColumn(unsigned int col_num, const intField *values);
-    JoinRelation *extractJoinRelation(unsigned int index_of_JoinField);
+    JoinRelation *extractJoinRelation(unsigned int index_of_JoinField) const;
     /* @Override */
     bool containsRelation(unsigned int rel_id) override { return rel_id == id; }
     IntermediateRelation *performFilter(unsigned int rel_id, unsigned int col_id, intField value, char cmp) override;
@@ -94,12 +94,14 @@ private:
 class IntermediateRelation : public QueryRelation {       // Intermediate Relations need only store the temporary_code_dump of tuples from their original Relations
     unsigned int size;                                    // size of temporary_code_dump array for EVERY relation_id in 'temporary_code_dump' hashmap
     unsigned int numberOfRelations;                       // number of original Relations represented by this Intermediate Relation
-    unordered_map<unsigned int, unsigned int *> rowids;   // a hash table map for: <key=relation_id, value=rowids_of_that_relation>
 public:
+    unordered_map<unsigned int, unsigned int *> rowids;   // a hash table map for: <key=relation_id, value=rowids_of_that_relation>
     IntermediateRelation(unsigned int rel_id, unsigned int *_rowids, unsigned int _size);
     IntermediateRelation(unsigned int rela_id, unsigned int relb_id, unsigned int *_rowids_a, unsigned int *_rowids_b, unsigned int _size);
+    IntermediateRelation(unsigned int _size,unsigned int _numberOfRelations,unordered_map<unsigned int,unsigned int*> _rowids) :
+					QueryRelation(true), size(_size), numberOfRelations(_numberOfRelations), rowids(_rowids) {}
     ~IntermediateRelation();
-    JoinRelation *extractJoinRelation(unsigned int number_of_relation, const Relation &R, unsigned int index_of_JoinField);
+    JoinRelation *extractJoinRelation(const Relation &R, unsigned int index_of_JoinField);
     /* @Override */
     bool containsRelation(unsigned int rel_id) override { return rowids.find(rel_id) != rowids.end(); }
     IntermediateRelation *performFilter(unsigned int rel_id, unsigned int col_id, intField value, char cmp) override;

@@ -196,7 +196,7 @@ bool Relation::addColumn(unsigned int col_num, const intField *values) {   // (!
     return true;
 }
 
-JoinRelation *Relation::extractJoinRelation(unsigned int index_of_JoinField) {
+JoinRelation *Relation::extractJoinRelation(unsigned int index_of_JoinField) const {
     unsigned int *rowids = new unsigned int[size];
     for (unsigned int i = 0 ; i < size ; i++) { rowids[i] = i+1; }
     JoinRelation *res = new JoinRelation(size, columns[index_of_JoinField], rowids);
@@ -257,21 +257,113 @@ IntermediateRelation *Relation::performJoinWith(QueryRelation &B, unsigned int r
 }
 
 IntermediateRelation *Relation::performJoinWithOriginal(const Relation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) {
-    //TODO:
-    // extract the correct join relations from Relation
-    // RHJ join relations
-    // convert Result to two columns of unsigned int temporary_code_dump
-    // create and return new IntermediateRelation using the second constructor
-    return nullptr;  // new IntermediateRelation(...);
+    //extract the correct join relations
+    JoinRelation T=*extractJoinRelation(cola_id);
+    JoinRelation S=*B.extractJoinRelation(colb_id);
+    
+    //run the algorithm
+    Result *TxS=radixHashJoin(T,S);
+    Iterator I(TxS);
+    unsigned int tid,sid,pos=0;
+    
+    //get # of join tuples
+    unsigned int new_size=TxS->getSize();
+    
+    //create the new map
+    unordered_map <unsigned int,unsigned int*> new_rowids;
+   	
+	while (I.getNext(tid,sid)) {
+		new_rowids[rela_id][pos]=tid; //relation
+	    new_rowids[relb_id][pos]=sid;
+		pos++; //current # of tuples
+	}
+ 
+    return new IntermediateRelation(size,new_rowids.size(),new_rowids);
 }
 
 IntermediateRelation *Relation::performJoinWithIntermediate(IntermediateRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) {
-    // TODO:
-    // extract join relation from this Relation and IntermediateRelation &B
-    // RHJ join relations
-    // change IntermediateRelation B to represent the join's result (do NOT create new IntermediateRelation)
-    // return the address of (now changed) B
-    return &B;
+	//extract the correct join relations
+    JoinRelation T=*extractJoinRelation(cola_id);
+    JoinRelation S=*B.extractJoinRelation(*R[relb_id],colb_id);
+    
+    //run the algorithm
+    Result *TxS=radixHashJoin(T,S);
+    Iterator I(TxS);
+    unsigned int tid,sid,pos=0;
+    
+    //get # of join tuples
+    unsigned int new_size=TxS->getSize();
+    
+    //create the new map
+    unordered_map <unsigned int,unsigned int*> new_rowids;
+   	
+	while (I.getNext(tid,sid)) {
+		new_rowids[rela_id][pos]=tid; //relation
+	    for (auto &p : B.rowids) new_rowids[p.first][pos]=B.rowids[p.first][sid-1];
+		pos++; //current # of tuples
+	}
+ 
+    return new IntermediateRelation(size,new_rowids.size(),new_rowids);
+}
+
+IntermediateRelation *IntermediateRelation::performJoinWithOriginal(const Relation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) {
+	//extract the correct join relations
+	JoinRelation T=*extractJoinRelation(*R[rela_id],cola_id);
+	JoinRelation S=*B.extractJoinRelation(colb_id);
+
+    //run the algorithm
+    Result *TxS=radixHashJoin(T,S);
+    Iterator I(TxS);
+    unsigned int tid,sid,pos=0;
+    
+    //get # of join tuples
+    unsigned int new_size=TxS->getSize();
+    
+    //create the new map
+    unordered_map <unsigned int,unsigned int*> new_rowids;
+	for (auto &p : rowids) new_rowids[p.first]=new unsigned int[new_size];
+   	
+	while (I.getNext(tid,sid)) {
+		for (auto &p : rowids) new_rowids[p.first][pos]=rowids[p.first][tid-1]; //intermediate
+	   	new_rowids[relb_id][pos]=sid;
+		pos++; //current # of tuples
+	}
+ 
+    //clear the old map
+	for (auto &p : rowids) delete[] p.second;
+	rowids.clear();
+    
+    return new IntermediateRelation(size,new_rowids.size(),new_rowids);
+}
+
+IntermediateRelation *IntermediateRelation::performJoinWithIntermediate(IntermediateRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) {
+	//extract the correct join relations
+	JoinRelation T=*extractJoinRelation(*R[rela_id],cola_id);
+	JoinRelation S=*B.extractJoinRelation(*R[relb_id],colb_id);
+
+    //run the algorithm
+    Result *TxS=radixHashJoin(T,S);
+    Iterator I(TxS);
+    unsigned int tid,sid,pos=0;
+    
+    //get # of join tuples
+    unsigned int new_size=TxS->getSize();
+    
+    //create the new map
+    unordered_map <unsigned int,unsigned int*> new_rowids;
+	for (auto &p : rowids) new_rowids[p.first]=new unsigned int[new_size];
+   	
+	while (I.getNext(tid,sid)) {
+		for (auto &p : rowids) new_rowids[p.first][pos]=rowids[p.first][tid-1]; //intermediate
+	    for (auto &p : B.rowids) new_rowids[p.first][pos]=B.rowids[p.first][sid-1];
+		pos++; //current # of tuples
+	}
+ 
+    //clear the old map
+	for (auto &p : rowids) delete[] p.second;
+	rowids.clear();
+    
+    return new IntermediateRelation(size,new_rowids.size(),new_rowids);
 }
 
 IntermediateRelation *Relation::performCrossProductWith(QueryRelation &B) {
@@ -286,7 +378,7 @@ void Relation::performSelect(projection *projections, unsigned int nprojections)
     printf("\n");
     for (unsigned int i = 0 ; i < size ; i++){
         for (unsigned int j = 0 ; j < nprojections ; j++){
-            printf("%6lu", this->getValueAt(projections[i].col_id, i));
+            printf("%6llu", this->getValueAt(projections[i].col_id, i));
         }
         printf("\n");
     }
@@ -331,9 +423,8 @@ IntermediateRelation::~IntermediateRelation() {
 }
 
 
-JoinRelation *IntermediateRelation::extractJoinRelation(unsigned int number_of_relation, const Relation &R, unsigned int index_of_JoinField) {
-    // TODO
-    return nullptr;
+JoinRelation *IntermediateRelation::extractJoinRelation(const Relation &R, unsigned int index_of_JoinField) {
+    return R.extractJoinRelation(index_of_JoinField);
 }
 
 IntermediateRelation *IntermediateRelation::performFilter(unsigned int rel_id, unsigned int col_id, intField value, char cmp) {
@@ -394,24 +485,6 @@ IntermediateRelation *IntermediateRelation::performJoinWith(QueryRelation &B, un
     return (B.isIntermediate) ? performJoinWithIntermediate((IntermediateRelation &) B, rela_id, cola_id, relb_id, colb_id) : performJoinWithOriginal((Relation &) B, rela_id, cola_id, relb_id, colb_id);
 }
 
-IntermediateRelation *IntermediateRelation::performJoinWithOriginal(const Relation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) {
-    // TODO:
-    // extract join relation from this IntermediateRelation and Relation &B
-    // RHJ join relations
-    // change this IntermediateRelation to represent the join's result (do NOT create new IntermediateRelation)
-    // return the address of (now changed) this
-    return this;
-}
-
-IntermediateRelation *IntermediateRelation::performJoinWithIntermediate(IntermediateRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) {
-    // TODO:
-    // extract join relation from both IntermediateRelations (this and B)
-    // RHJ join relations
-    // change this IntermediateRelation to reporesent the join's result (do NOT create new IntermediateRelation)
-    // (!) do NOT delete other IntermediateRelation &B as joiner-main already does so
-    return this;
-}
-
 IntermediateRelation *IntermediateRelation::performCrossProductWith(QueryRelation &B) {
     if (size <= 0) return this;
     // TODO
@@ -436,7 +509,7 @@ void IntermediateRelation::performSelect(projection *projections, unsigned int n
             //DEBUG Note: R[rel_id] is NOT the correct relation as rel_ids are only for the 'FROM' tables. We have to calculate it by searching or keeping info on it (TODO?)
             int rel_pos_in_R = find_pos_in_R(projections[j].rel_id);
             if (rel_pos_in_R == -1) { cerr << "Warning: rel_id or Rlen invalid in performSelect for intermediate" << endl; }
-            else printf("%6lu", R[rel_pos_in_R]->getValueAt(projections[j].col_id, allrowids[projections[j].rel_id][i] - 1));   // (!) -1 because temporary_code_dump start from 1
+            else printf("%6llu", R[rel_pos_in_R]->getValueAt(projections[j].col_id, allrowids[projections[j].rel_id][i] - 1));   // (!) -1 because temporary_code_dump start from 1
         }
         printf("\n");
     }
