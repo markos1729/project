@@ -66,6 +66,11 @@ int main(){
 
             bool abort = false;
 
+            // reset all ids in R before every query (TODO: change if we do not use search to find pos in R for rel_id)
+            for (unsigned int i = 0 ; i < number_of_relations ; i++){
+                R[i]->setId(-1);   // -1 is 111...1 in unsigned int.
+            }
+
             // execute FROM: load original Relations to an array of pointers to such (which will only get "smaller" during the query)
             QueryRelation **QueryRelations = new QueryRelation*[p->nrelations]();
             for (int i = 0; i < p->nrelations ; i++){
