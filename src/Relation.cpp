@@ -222,10 +222,55 @@ IntermediateRelation *Relation::performEqColumns(unsigned int rel_id, unsigned i
     return nullptr;
 }
 
+
+/***
+
+0 1 2     3 4
+-----     ---
+0,2,1     0,0
+3,4,2  X  2,2
+1,7,3     1,3
+
+0,2 = 0,2,1-1,3
+0,1 = 0,2,1-2,2
+1,2 = 3,4,2-1,3
+2,0 = 1,7,3-0,0
+
+***/
+
+unsigned int find_relation(unsigned int rel_id) {} //TODO
+
 IntermediateRelation *Relation::performJoinWith(const QueryRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id,
                                                 unsigned int colb_id) {
-    // TODO
-    return nullptr;
+	//extract the correct join relations
+	relb=find_relation(relb_id);
+    JoinRelation R=extractJoinRelation(cola_id);
+    JoinRelation S=extractJoinRelation(relb_id,R[relb],colb_id);
+    
+    //run the algorithm
+    Result *RxS=radixHashJoin(R,S);
+    Iterator I(RxS);
+    unsigned int rid,sid,pos=0;
+    
+    //get # of join tuples
+    unsigned int new_size=RxS->getSize();
+    
+    //create the new map
+    unordered_map <unsigned int,unsigned int*> new_rowids;
+	for (auto &p : rowids) new_rowids[p.first]=new unsigned int[new_size];
+   	
+	while (I.getNext(rid,sid)) {
+		for (auto &p : rowids) new_rowids[p.first][pos]=rowids[p.first][rid-1];
+	    if (B.isIntermediate) for (auto &p : B.rowids) new_rowids[p.first][pos]=rowids[p.first][sid-1];
+	    else new_rowids[relb][pos]=sid;
+		pos++; //current # of tuples
+	}
+ 
+    //clear the old map
+	for (auto &p : B.rowids) delete[] p.second;
+	rowids.clear();
+    
+    return new IntermediateRelation(size,new_rowids.size(),new_rowids); //TODO: implement constructor
 }
 
 IntermediateRelation *Relation::performCrossProductWith(const QueryRelation &B) {
@@ -245,7 +290,7 @@ void Relation::performSelect(projection *projections, unsigned int nprojections)
         printf("\n");
     }
 }
-
+	
 
 /* IntermediateRelation Implementation */
 IntermediateRelation::IntermediateRelation(unsigned int rel_id, unsigned int *_rowids, unsigned int _size) : QueryRelation(true), numberOfRelations(1), size(_size) {
