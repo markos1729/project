@@ -6,6 +6,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include "../Headers/Relation.h"
+#include "../Headers/RadixHashJoin.h"
 
 
 using namespace std;
@@ -129,6 +130,16 @@ bool *QueryRelation::filterField(intField *field, unsigned int size, intField va
     return filter;
 }
 
+bool *QueryRelation::eqColumnsFields(intField *field1, intField *field2, unsigned int size, unsigned int &count) {
+    count = 0;
+    bool *eqColumns = new bool[size]();
+    for (unsigned int i = 0 ; i < size ; i++){
+        eqColumns[i] = (field1[i] == field2[i]);
+        if (eqColumns[i]) count++;
+    }
+    return eqColumns;
+}
+
 
 /* Relation Implementation */
 Relation::Relation(unsigned int _size, unsigned int _num_of_columns) : QueryRelation(false), allocatedWithMmap(false), id(-1), size(_size), num_of_columns(_num_of_columns) {
@@ -202,11 +213,11 @@ IntermediateRelation *Relation::performFilter(unsigned int rel_id, unsigned int 
         newrowids = new unsigned int[count];
         unsigned int j = 0;
         for (unsigned int i = 0; i < size; i++) {
-            if (j >= count) {
-                cerr << "Warning: miscounted passing rowids? : count  = " << count << endl;
-                break;
-            }
             if (passing_rowids[i]) {
+                if (j >= count) {
+                    cerr << "Warning: miscounted passing rowids? : count  = " << count << endl;
+                    break;
+                }
                 newrowids[j++] = i + 1;   // keep rowid for intermediate, not the intField columns[cold_id][i].
             }
         }
@@ -218,59 +229,74 @@ IntermediateRelation *Relation::performFilter(unsigned int rel_id, unsigned int 
 }
 
 IntermediateRelation *Relation::performEqColumns(unsigned int rel_id, unsigned int cola_id, unsigned int colb_id) {
-    // TODO
-    return nullptr;
+    // Note: rel_id is not needed here as there is only one relation to perform eq columns on
+    unsigned int count = 0;
+    bool *passing_rowids = QueryRelation::eqColumnsFields(columns[cola_id], columns[colb_id], size, count);   // count will change accordingly
+    unsigned int *newrowids = NULL;
+    if (count > 0) {
+        newrowids = new unsigned int[count];
+        unsigned int j = 0;
+        for (unsigned int i = 0; i < size; i++) {
+            if (passing_rowids[i]) {
+                if (j >= count) {
+                    cerr << "Warning: miscounted passing rowids? : count  = " << count << endl;
+                    break;
+                }
+                newrowids[j++] = i + 1;   // keep rowid for intermediate, not the intField columns[cold_id][i].
+            }
+        }
+    }
+    delete[] passing_rowids;
+    IntermediateRelation *result = new IntermediateRelation(this->id, newrowids, count);
+    delete[] newrowids;
+    return result;
 }
 
+IntermediateRelation *Relation::performJoinWith(const QueryRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) {
+    /***
+    0 1 2     3 4
+    -----     ---
+    0,2,1     0,0
+    3,4,2  X  2,2
+    1,7,3     1,3
+    0,2 = 0,2,1-1,3
+    0,1 = 0,2,1-2,2
+    1,2 = 3,4,2-1,3
+    2,0 = 1,7,3-0,0
+    ***/
+    /** This wont work, will fix later (TODO)
+    //extract the correct join relations
+    relb_id = find_relation(relb_id);
+    JoinRelation R = extractJoinRelation(cola_id);
+    JoinRelation S = extractJoinRelation(relb_id,R[relb_id],colb_id);
 
-/***
-
-0 1 2     3 4
------     ---
-0,2,1     0,0
-3,4,2  X  2,2
-1,7,3     1,3
-
-0,2 = 0,2,1-1,3
-0,1 = 0,2,1-2,2
-1,2 = 3,4,2-1,3
-2,0 = 1,7,3-0,0
-
-***/
-
-unsigned int find_relation(unsigned int rel_id) {} //TODO
-
-IntermediateRelation *Relation::performJoinWith(const QueryRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id,
-                                                unsigned int colb_id) {
-	//extract the correct join relations
-	relb=find_relation(relb_id);
-    JoinRelation R=extractJoinRelation(cola_id);
-    JoinRelation S=extractJoinRelation(relb_id,R[relb],colb_id);
-    
     //run the algorithm
-    Result *RxS=radixHashJoin(R,S);
+    Result *RxS = radixHashJoin(R,S);
     Iterator I(RxS);
     unsigned int rid,sid,pos=0;
-    
+
     //get # of join tuples
-    unsigned int new_size=RxS->getSize();
-    
+    unsigned int new_size = RxS->getSize();
+
     //create the new map
     unordered_map <unsigned int,unsigned int*> new_rowids;
-	for (auto &p : rowids) new_rowids[p.first]=new unsigned int[new_size];
-   	
-	while (I.getNext(rid,sid)) {
-		for (auto &p : rowids) new_rowids[p.first][pos]=rowids[p.first][rid-1];
-	    if (B.isIntermediate) for (auto &p : B.rowids) new_rowids[p.first][pos]=rowids[p.first][sid-1];
-	    else new_rowids[relb][pos]=sid;
-		pos++; //current # of tuples
-	}
- 
+    for (auto &p : rowids) new_rowids[p.first] = new unsigned int[new_size];
+
+    while (I.getNext(rid,sid)) {
+        for (auto &p : rowids) new_rowids[p.first][pos] = rowids[p.first][rid-1];
+        if (B.isIntermediate) for (auto &p : B.rowids) new_rowids[p.first][pos] = rowids[p.first][sid-1];
+        else new_rowids[relb][pos] = sid;
+        pos++; //current # of tuples
+    }
+
     //clear the old map
-	for (auto &p : B.rowids) delete[] p.second;
-	rowids.clear();
-    
-    return new IntermediateRelation(size,new_rowids.size(),new_rowids); //TODO: implement constructor
+    for (auto &p : B.rowids) delete[] p.second;
+    rowids.clear();
+
+    return new IntermediateRelation(size, new_rowids.size(), new_rowids);    //TODO: implement constructor
+    */
+    // TODO
+    return nullptr;
 }
 
 IntermediateRelation *Relation::performCrossProductWith(const QueryRelation &B) {
@@ -290,7 +316,7 @@ void Relation::performSelect(projection *projections, unsigned int nprojections)
         printf("\n");
     }
 }
-	
+
 
 /* IntermediateRelation Implementation */
 IntermediateRelation::IntermediateRelation(unsigned int rel_id, unsigned int *_rowids, unsigned int _size) : QueryRelation(true), numberOfRelations(1), size(_size) {
@@ -345,14 +371,8 @@ IntermediateRelation *IntermediateRelation::performFilter(unsigned int rel_id, u
     const unsigned int *fieldrowids = rowids[rel_id];
     intField *field = new intField[size];
     for (int i = 0 ; i < size ; i++){
-        // TODO: R[rel_id] is NOT the correct relation as rel_ids are only for the 'FROM' tables. Find a better solution that searching like below:
-        int rel_pos_in_R = -1;
-        for (int i = 0 ; i < Rlen ; i++){
-            if (R[i]->getId() == rel_id){
-                rel_pos_in_R = i;
-                break;
-            }
-        }
+        //DEBUG Note: R[rel_id] is NOT the correct relation as rel_ids are only for the 'FROM' tables. We have to calculate it by searching or keeping info on it (TODO?)
+        int rel_pos_in_R = find_pos_in_R(rel_id);
         if (rel_pos_in_R == -1) { cerr << "Warning: rel_id or Rlen invalid in performFilter for intermediate" << endl; delete[] field; return NULL; }
         field[i] = R[rel_pos_in_R]->getValueAt(col_id, fieldrowids[i] - 1);   // (!) -1 because rowids start at 1
     }
@@ -361,39 +381,37 @@ IntermediateRelation *IntermediateRelation::performFilter(unsigned int rel_id, u
     bool *passing_rowids = QueryRelation::filterField(field, size, value, cmp, count);   // count will change accordingly
     delete[] field;
     // keep only passing rowids for all relations
-    if (count > 0) {
-        for (auto iter = rowids.begin(); iter != rowids.end(); iter++) {
-            unsigned int *rids = iter->second;
-            unsigned int *newrowids = new unsigned int[count];
-            unsigned int j = 0;
-            for (unsigned int i = 0; i < size; i++) {
-                if (j >= count) {
-                    cerr << "Warning: miscounted passing rowids in intermediate? count = " << count << endl;
-                    break;
-                }
-                if (passing_rowids[i]) {
-                    newrowids[j++] = rids[i];
-                }
-            }
-            delete[] rids;
-            iter->second = newrowids;
-        }
-        size = count;                      // (!) size must now change to count
-    } else {
-        for (auto iter = rowids.begin(); iter != rowids.end(); iter++) {
-            delete[] iter->second;
-            iter->second = NULL;
-        }
-        size = 0;
-    }
+    keepOnlyMarkedRows(passing_rowids, count);
     delete[] passing_rowids;
     return this;
 }
 
 IntermediateRelation *IntermediateRelation::performEqColumns(unsigned int rel_id, unsigned int cola_id, unsigned int colb_id) {
     if (size <= 0) return this;
-    // TODO
-    return nullptr;
+    if ( rowids.find(rel_id) == rowids.end() ){   // non existant relation in intermediate
+        cerr << "Fatal error: filter requested on intermediate for non existing relation" << endl;
+        return NULL;
+    }
+    // recreate intFields to be checked for equal values from rowids
+    const unsigned int *fieldrowids = rowids[rel_id];
+    intField *field1 = new intField[size];
+    intField *field2 = new intField[size];
+    for (int i = 0 ; i < size ; i++){
+        //DEBUG Note: R[rel_id] is NOT the correct relation as rel_ids are only for the 'FROM' tables. We have to calculate it by searching or keeping info on it (TODO?)
+        int rel_pos_in_R = find_pos_in_R(rel_id);
+        if (rel_pos_in_R == -1) { cerr << "Warning: rel_id or Rlen invalid in performFilter for intermediate" << endl; delete[] field1; delete[] field2; return NULL; }
+        field1[i] = R[rel_pos_in_R]->getValueAt(cola_id, fieldrowids[i] - 1);   // (!) -1 because rowids start at 1
+        field2[i] = R[rel_pos_in_R]->getValueAt(colb_id, fieldrowids[i] - 1);   // ^^
+    }
+    // mark equal columns
+    unsigned int count = 0;
+    bool *passing_rowids = QueryRelation::eqColumnsFields(field1, field2, size, count);   // count will change accordingly
+    delete[] field1;
+    delete[] field2;
+    // keep only passing rowids for all relations
+    keepOnlyMarkedRows(passing_rowids, count);
+    delete[] passing_rowids;
+    return this;
 }
 
 IntermediateRelation *IntermediateRelation::performJoinWith(const QueryRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) {
@@ -423,18 +441,52 @@ void IntermediateRelation::performSelect(projection *projections, unsigned int n
     printf("\n");
     for (unsigned int i = 0 ; i < size ; i++){
         for (unsigned int j = 0 ; j < nprojections ; j++){
-            // TODO: R[rel_id] is NOT the correct relation as rel_ids are only for the 'FROM' tables. Find a better solution that searching like below:
-            int rel_pos_in_R = -1;
-            for (int k = 0 ; k < Rlen ; k++){
-                if (R[k]->getId() == projections[j].rel_id){
-                    rel_pos_in_R = k;
-                    break;
-                }
-            }
+            //DEBUG Note: R[rel_id] is NOT the correct relation as rel_ids are only for the 'FROM' tables. We have to calculate it by searching or keeping info on it (TODO?)
+            int rel_pos_in_R = find_pos_in_R(projections[j].rel_id);
             if (rel_pos_in_R == -1) { cerr << "Warning: rel_id or Rlen invalid in performSelect for intermediate" << endl; }
             else printf("%6lu", R[rel_pos_in_R]->getValueAt(projections[j].col_id, allrowids[projections[j].rel_id][i] - 1));   // (!) -1 because rowids start from 1
         }
         printf("\n");
     }
     delete[] allrowids;
+}
+
+int IntermediateRelation::find_pos_in_R(unsigned int rel_id) const {
+    //TODO: Change this so it's not a linear search? Maybe keep track of each rel_id->pos_in_R during the query?
+    int rel_pos_in_R = -1;
+    for (int i = 0 ; i < Rlen ; i++){
+        if (R[i]->getId() == rel_id){
+            rel_pos_in_R = i;
+            break;
+        }
+    }
+    return rel_pos_in_R;
+}
+
+void IntermediateRelation::keepOnlyMarkedRows(const bool *passing_rowids, unsigned int count) {
+    if (count > 0) {
+        for (auto iter = rowids.begin(); iter != rowids.end(); iter++) {
+            unsigned int *rids = iter->second;
+            unsigned int *newrowids = new unsigned int[count];
+            unsigned int j = 0;
+            for (unsigned int i = 0; i < size; i++) {
+                if (passing_rowids[i]) {
+                    if (j >= count) {
+                        cerr << "Warning: miscounted passing rowids in intermediate? count = " << count << endl;
+                        break;
+                    }
+                    newrowids[j++] = rids[i];
+                }
+            }
+            delete[] rids;
+            iter->second = newrowids;
+        }
+        size = count;                      // (!) size must now change to count
+    } else {
+        for (auto iter = rowids.begin(); iter != rowids.end(); iter++) {
+            delete[] iter->second;
+            iter->second = NULL;
+        }
+        size = 0;
+    }
 }

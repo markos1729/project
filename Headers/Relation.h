@@ -57,6 +57,7 @@ public:
     virtual void performSelect(projection *projections, unsigned int nprojections) = 0;          // write select to stdout
 protected:
 	bool *filterField(intField *field, unsigned int size, intField value, char cmp, unsigned int &count);
+    bool *eqColumnsFields(intField *field1, intField *field2, unsigned int size, unsigned int &count);
 };
 
 
@@ -104,6 +105,9 @@ public:
     IntermediateRelation *performJoinWith(const QueryRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) override;
     IntermediateRelation *performCrossProductWith(const QueryRelation &B) override;
     void performSelect(projection *projections, unsigned int nprojections) override;
+private:
+    int find_pos_in_R(unsigned int rel_id) const;
+    void keepOnlyMarkedRows(const bool *passing_rowids, unsigned int count);
 };
 
 #endif

@@ -55,7 +55,7 @@ int main(){
     sleep(1);
     // then start parsing 'sql' statements
     string currStatement;
-    while ( getline(cin, currStatement) ){
+    while ( getline(cin, currStatement) && !cin.eof() && !cin.fail() ){
         cout << "Query Batch Starting" << endl;    // DEBUG
         CHECK( currStatement != "F" , "Warning: Received an empty batch of statements.", continue; )
         do {
@@ -151,7 +151,8 @@ int main(){
             delete p;
 
             getline(cin, currStatement);
-        } while (currStatement != "F");
+        } while (!cin.eof() && !cin.fail() && currStatement != "F");
+        if (cin.eof() || cin.fail()) break;
         cout << endl;
         cout << "Query Batch Finished" << endl;    // DEBUG
     }
