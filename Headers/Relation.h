@@ -19,7 +19,7 @@ class IntermediateRelation;
 unsigned int H1(intField, unsigned int N);
 
 
-class JoinRelation {     // Relation struct used for RadixHashJoin, only stores Join Field and temporary_code_dump
+class JoinRelation {     // Relation struct used for RadixHashJoin, only stores Join Field and rowids
 private:
     unsigned int size;   // number of tuples
     intField *joinField;
@@ -78,6 +78,8 @@ public:
     intField getValueAt(unsigned int columnNum, unsigned int rowId) const;
     bool addColumn(unsigned int col_num, const intField *values);
     JoinRelation *extractJoinRelation(unsigned int index_of_JoinField) const;
+    IntermediateRelation *performJoinWithOriginal(const Relation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id);
+    IntermediateRelation *performJoinWithIntermediate(IntermediateRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id);
     /* @Override */
     bool containsRelation(unsigned int rel_id) override { return rel_id == id; }
     IntermediateRelation *performFilter(unsigned int rel_id, unsigned int col_id, intField value, char cmp) override;
@@ -85,23 +87,20 @@ public:
     IntermediateRelation *performJoinWith(QueryRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) override;
     IntermediateRelation *performCrossProductWith(QueryRelation &B) override;
     void performSelect(projection *projections, unsigned int nprojections) override;
-private:
-    IntermediateRelation *performJoinWithOriginal(const Relation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id);
-    IntermediateRelation *performJoinWithIntermediate(IntermediateRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id);
 };
 
 
-class IntermediateRelation : public QueryRelation {       // Intermediate Relations need only store the temporary_code_dump of tuples from their original Relations
-    unsigned int size;                                    // size of temporary_code_dump array for EVERY relation_id in 'temporary_code_dump' hashmap
+class IntermediateRelation : public QueryRelation {       // Intermediate Relations need only store the rowids of tuples from their original Relations
+    unsigned int size;                                    // size of rowids array for EVERY relation_id in 'rowids' hashmap
     unsigned int numberOfRelations;                       // number of original Relations represented by this Intermediate Relation
-public:
     unordered_map<unsigned int, unsigned int *> rowids;   // a hash table map for: <key=relation_id, value=rowids_of_that_relation>
+public:
     IntermediateRelation(unsigned int rel_id, unsigned int *_rowids, unsigned int _size);
     IntermediateRelation(unsigned int rela_id, unsigned int relb_id, unsigned int *_rowids_a, unsigned int *_rowids_b, unsigned int _size);
-    IntermediateRelation(unsigned int _size,unsigned int _numberOfRelations,unordered_map<unsigned int,unsigned int*> _rowids) :
-					QueryRelation(true), size(_size), numberOfRelations(_numberOfRelations), rowids(_rowids) {}
     ~IntermediateRelation();
-    JoinRelation *extractJoinRelation(const Relation &R, unsigned int index_of_JoinField);
+    JoinRelation *extractJoinRelation(unsigned int rel_id, unsigned int col_id);
+    IntermediateRelation *performJoinWithOriginal(const Relation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id);
+    IntermediateRelation *performJoinWithIntermediate(IntermediateRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id);
     /* @Override */
     bool containsRelation(unsigned int rel_id) override { return rowids.find(rel_id) != rowids.end(); }
     IntermediateRelation *performFilter(unsigned int rel_id, unsigned int col_id, intField value, char cmp) override;
@@ -110,8 +109,6 @@ public:
     IntermediateRelation *performCrossProductWith(QueryRelation &B) override;
     void performSelect(projection *projections, unsigned int nprojections) override;
 private:
-    IntermediateRelation *performJoinWithOriginal(const Relation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id);
-    IntermediateRelation *performJoinWithIntermediate(IntermediateRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id);
     int find_pos_in_R(unsigned int rel_id) const;
     void keepOnlyMarkedRows(const bool *passing_rowids, unsigned int count);
 };

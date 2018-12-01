@@ -63,7 +63,7 @@ bool JoinRelation::partitionRelation(unsigned int H1_N) {
     }
     Psum = Hist;
     numberOfBuckets = num_of_buckets;
-    // 3) create new re-ordered versions for joinField and temporary_code_dump based on their bucket_nums - O(n)
+    // 3) create new re-ordered versions for joinField and rowids based on their bucket_nums - O(n)
     intField *newJoinField = new intField[size]();
     unsigned int *newRowids = new unsigned int[size]();
     unsigned int *nextBucketPos = new unsigned int[num_of_buckets]();
@@ -76,7 +76,7 @@ bool JoinRelation::partitionRelation(unsigned int H1_N) {
     }
     delete[] nextBucketPos;
     delete[] bucket_nums;
-    // 4) overwrite joinField and temporary_code_dump with new re-ordered versions of it
+    // 4) overwrite joinField and rowids with new re-ordered versions of it
     delete[] joinField;
     joinField = newJoinField;
     delete[] rowids;
@@ -92,9 +92,9 @@ void JoinRelation::printDebugInfo() {
             printf("Psum[%u] = %u\n", i, Psum[i]);
         }
     }
-    printf(" joinField | temporary_code_dump\n");
+    printf(" joinField | rowids\n");
     for (unsigned int i = 0 ; i < size ; i++){
-        printf("%10u | %u\n", (unsigned int) joinField[i], temporary_code_dump[i]);
+        printf("%10u | %u\n", (unsigned int) joinField[i], rowids[i]);
     }
 }
 #endif
@@ -215,7 +215,7 @@ IntermediateRelation *Relation::performFilter(unsigned int rel_id, unsigned int 
         for (unsigned int i = 0; i < size; i++) {
             if (passing_rowids[i]) {
                 if (j >= count) {
-                    cerr << "Warning: miscounted passing temporary_code_dump? : count  = " << count << endl;
+                    cerr << "Warning: miscounted passing rowids? : count  = " << count << endl;
                     break;
                 }
                 newrowids[j++] = i + 1;   // keep rowid for intermediate, not the intField columns[cold_id][i].
@@ -239,7 +239,7 @@ IntermediateRelation *Relation::performEqColumns(unsigned int rel_id, unsigned i
         for (unsigned int i = 0; i < size; i++) {
             if (passing_rowids[i]) {
                 if (j >= count) {
-                    cerr << "Warning: miscounted passing temporary_code_dump? : count  = " << count << endl;
+                    cerr << "Warning: miscounted passing rowids? : count  = " << count << endl;
                     break;
                 }
                 newrowids[j++] = i + 1;   // keep rowid for intermediate, not the intField columns[cold_id][i].
@@ -257,113 +257,43 @@ IntermediateRelation *Relation::performJoinWith(QueryRelation &B, unsigned int r
 }
 
 IntermediateRelation *Relation::performJoinWithOriginal(const Relation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) {
-    //extract the correct join relations
-    JoinRelation T=*extractJoinRelation(cola_id);
-    JoinRelation S=*B.extractJoinRelation(colb_id);
-    
-    //run the algorithm
-    Result *TxS=radixHashJoin(T,S);
-    Iterator I(TxS);
-    unsigned int tid,sid,pos=0;
-    
-    //get # of join tuples
-    unsigned int new_size=TxS->getSize();
-    
-    //create the new map
-    unordered_map <unsigned int,unsigned int*> new_rowids;
-   	
-	while (I.getNext(tid,sid)) {
-		new_rowids[rela_id][pos]=tid; //relation
-	    new_rowids[relb_id][pos]=sid;
-		pos++; //current # of tuples
-	}
- 
-    return new IntermediateRelation(size,new_rowids.size(),new_rowids);
+    // extract the correct join relations
+    JoinRelation &JA = *extractJoinRelation(cola_id);
+    JoinRelation &JB = *(B.extractJoinRelation(colb_id));
+
+    // run RadixHashJoin
+    Result *AxB = radixHashJoin(JA, JB);
+
+    // get # of join tuples
+    unsigned long long int number_of_tuples = AxB->getSize();
+
+    IntermediateRelation *result = NULL;
+    if (number_of_tuples > 0) {
+        // create the new map
+        unsigned int *rowids_a = new unsigned int[number_of_tuples];
+        unsigned int *rowids_b = new unsigned int[number_of_tuples];
+
+        // iterate over results to create IntermediateRelation
+        Iterator I(AxB);
+        unsigned int aid, bid, pos = 0;
+        while (I.getNext(aid, bid)) {
+            rowids_b[pos] = aid; //relation
+            rowids_a[pos] = bid;
+            pos++;
+        }
+
+        result = new IntermediateRelation(rela_id, relb_id, rowids_b, rowids_a, number_of_tuples);
+        delete[] rowids_b;
+        delete[] rowids_a;
+    } else {
+        result = new IntermediateRelation(rela_id, relb_id, (unsigned int *) NULL, (unsigned int *) NULL, 0);
+    }
+    delete AxB;
+    return result;
 }
 
 IntermediateRelation *Relation::performJoinWithIntermediate(IntermediateRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) {
-	//extract the correct join relations
-    JoinRelation T=*extractJoinRelation(cola_id);
-    JoinRelation S=*B.extractJoinRelation(*R[relb_id],colb_id);
-    
-    //run the algorithm
-    Result *TxS=radixHashJoin(T,S);
-    Iterator I(TxS);
-    unsigned int tid,sid,pos=0;
-    
-    //get # of join tuples
-    unsigned int new_size=TxS->getSize();
-    
-    //create the new map
-    unordered_map <unsigned int,unsigned int*> new_rowids;
-   	
-	while (I.getNext(tid,sid)) {
-		new_rowids[rela_id][pos]=tid; //relation
-	    for (auto &p : B.rowids) new_rowids[p.first][pos]=B.rowids[p.first][sid-1];
-		pos++; //current # of tuples
-	}
- 
-    return new IntermediateRelation(size,new_rowids.size(),new_rowids);
-}
-
-IntermediateRelation *IntermediateRelation::performJoinWithOriginal(const Relation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) {
-	//extract the correct join relations
-	JoinRelation T=*extractJoinRelation(*R[rela_id],cola_id);
-	JoinRelation S=*B.extractJoinRelation(colb_id);
-
-    //run the algorithm
-    Result *TxS=radixHashJoin(T,S);
-    Iterator I(TxS);
-    unsigned int tid,sid,pos=0;
-    
-    //get # of join tuples
-    unsigned int new_size=TxS->getSize();
-    
-    //create the new map
-    unordered_map <unsigned int,unsigned int*> new_rowids;
-	for (auto &p : rowids) new_rowids[p.first]=new unsigned int[new_size];
-   	
-	while (I.getNext(tid,sid)) {
-		for (auto &p : rowids) new_rowids[p.first][pos]=rowids[p.first][tid-1]; //intermediate
-	   	new_rowids[relb_id][pos]=sid;
-		pos++; //current # of tuples
-	}
- 
-    //clear the old map
-	for (auto &p : rowids) delete[] p.second;
-	rowids.clear();
-    
-    return new IntermediateRelation(size,new_rowids.size(),new_rowids);
-}
-
-IntermediateRelation *IntermediateRelation::performJoinWithIntermediate(IntermediateRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) {
-	//extract the correct join relations
-	JoinRelation T=*extractJoinRelation(*R[rela_id],cola_id);
-	JoinRelation S=*B.extractJoinRelation(*R[relb_id],colb_id);
-
-    //run the algorithm
-    Result *TxS=radixHashJoin(T,S);
-    Iterator I(TxS);
-    unsigned int tid,sid,pos=0;
-    
-    //get # of join tuples
-    unsigned int new_size=TxS->getSize();
-    
-    //create the new map
-    unordered_map <unsigned int,unsigned int*> new_rowids;
-	for (auto &p : rowids) new_rowids[p.first]=new unsigned int[new_size];
-   	
-	while (I.getNext(tid,sid)) {
-		for (auto &p : rowids) new_rowids[p.first][pos]=rowids[p.first][tid-1]; //intermediate
-	    for (auto &p : B.rowids) new_rowids[p.first][pos]=B.rowids[p.first][sid-1];
-		pos++; //current # of tuples
-	}
- 
-    //clear the old map
-	for (auto &p : rowids) delete[] p.second;
-	rowids.clear();
-    
-    return new IntermediateRelation(size,new_rowids.size(),new_rowids);
+    return B.performJoinWithOriginal(*this, relb_id, colb_id, rela_id, cola_id);   // symetric
 }
 
 IntermediateRelation *Relation::performCrossProductWith(QueryRelation &B) {
@@ -423,8 +353,9 @@ IntermediateRelation::~IntermediateRelation() {
 }
 
 
-JoinRelation *IntermediateRelation::extractJoinRelation(const Relation &R, unsigned int index_of_JoinField) {
-    return R.extractJoinRelation(index_of_JoinField);
+JoinRelation *IntermediateRelation::extractJoinRelation(unsigned int rel_id, unsigned int col_id) {
+    //TODO: Must be the JoinRelation for rows that exist in this IntermediateRelation!
+    return nullptr;
 }
 
 IntermediateRelation *IntermediateRelation::performFilter(unsigned int rel_id, unsigned int col_id, intField value, char cmp) {
@@ -433,20 +364,20 @@ IntermediateRelation *IntermediateRelation::performFilter(unsigned int rel_id, u
         cerr << "Fatal error: filter requested on intermediate for non existing relation" << endl;
         return NULL;
     }
-    // recreate intField to be filtered from temporary_code_dump
+    // recreate intField to be filtered from rowids
     const unsigned int *fieldrowids = rowids[rel_id];
     intField *field = new intField[size];
     for (int i = 0 ; i < size ; i++){
         //DEBUG Note: R[rel_id] is NOT the correct relation as rel_ids are only for the 'FROM' tables. We have to calculate it by searching or keeping info on it (TODO?)
         int rel_pos_in_R = find_pos_in_R(rel_id);
         if (rel_pos_in_R == -1) { cerr << "Warning: rel_id or Rlen invalid in performFilter for intermediate" << endl; delete[] field; return NULL; }
-        field[i] = R[rel_pos_in_R]->getValueAt(col_id, fieldrowids[i] - 1);   // (!) -1 because temporary_code_dump start at 1
+        field[i] = R[rel_pos_in_R]->getValueAt(col_id, fieldrowids[i] - 1);   // (!) -1 because rowids start at 1
     }
     // filter field
     unsigned int count = 0;
     bool *passing_rowids = QueryRelation::filterField(field, size, value, cmp, count);   // count will change accordingly
     delete[] field;
-    // keep only passing temporary_code_dump for all relations
+    // keep only passing rowids for all relations
     keepOnlyMarkedRows(passing_rowids, count);
     delete[] passing_rowids;
     return this;
@@ -458,7 +389,7 @@ IntermediateRelation *IntermediateRelation::performEqColumns(unsigned int rel_id
         cerr << "Fatal error: filter requested on intermediate for non existing relation" << endl;
         return NULL;
     }
-    // recreate intFields to be checked for equal values from temporary_code_dump
+    // recreate intFields to be checked for equal values from rowids
     const unsigned int *fieldrowids = rowids[rel_id];
     intField *field1 = new intField[size];
     intField *field2 = new intField[size];
@@ -466,7 +397,7 @@ IntermediateRelation *IntermediateRelation::performEqColumns(unsigned int rel_id
         //DEBUG Note: R[rel_id] is NOT the correct relation as rel_ids are only for the 'FROM' tables. We have to calculate it by searching or keeping info on it (TODO?)
         int rel_pos_in_R = find_pos_in_R(rel_id);
         if (rel_pos_in_R == -1) { cerr << "Warning: rel_id or Rlen invalid in performFilter for intermediate" << endl; delete[] field1; delete[] field2; return NULL; }
-        field1[i] = R[rel_pos_in_R]->getValueAt(cola_id, fieldrowids[i] - 1);   // (!) -1 because temporary_code_dump start at 1
+        field1[i] = R[rel_pos_in_R]->getValueAt(cola_id, fieldrowids[i] - 1);   // (!) -1 because rowids start at 1
         field2[i] = R[rel_pos_in_R]->getValueAt(colb_id, fieldrowids[i] - 1);   // ^^
     }
     // mark equal columns
@@ -474,7 +405,7 @@ IntermediateRelation *IntermediateRelation::performEqColumns(unsigned int rel_id
     bool *passing_rowids = QueryRelation::eqColumnsFields(field1, field2, size, count);   // count will change accordingly
     delete[] field1;
     delete[] field2;
-    // keep only passing temporary_code_dump for all relations
+    // keep only passing rowids for all relations
     keepOnlyMarkedRows(passing_rowids, count);
     delete[] passing_rowids;
     return this;
@@ -483,6 +414,100 @@ IntermediateRelation *IntermediateRelation::performEqColumns(unsigned int rel_id
 IntermediateRelation *IntermediateRelation::performJoinWith(QueryRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) {
     if (size <= 0) return this;
     return (B.isIntermediate) ? performJoinWithIntermediate((IntermediateRelation &) B, rela_id, cola_id, relb_id, colb_id) : performJoinWithOriginal((Relation &) B, rela_id, cola_id, relb_id, colb_id);
+}
+
+IntermediateRelation *IntermediateRelation::performJoinWithOriginal(const Relation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) {
+    // extract the correct join relations
+    JoinRelation &JA = *extractJoinRelation(rela_id, cola_id);
+    JoinRelation &JB = *(B.extractJoinRelation(colb_id));
+
+    // run RadixHashJoin
+    Result *AxB = radixHashJoin(JA, JB);
+
+    // get # of join tuples
+    unsigned long long int number_of_tuples = AxB->getSize();
+
+    if (number_of_tuples > 0) {
+        // create new rowids map
+        unordered_map<unsigned int, unsigned int *> new_rowids;
+        for (auto &p : rowids) {
+            new_rowids[p.first] = new unsigned int[number_of_tuples];
+        }
+        new_rowids[relb_id] = new unsigned int[number_of_tuples];
+
+        // based on previous and RHJ's results
+        Iterator I(AxB);
+        unsigned int aid, bid, pos = 0;
+        while (I.getNext(aid, bid)) {
+            for (auto &p : rowids) new_rowids[p.first][pos] = rowids[p.first][aid - 1];
+            new_rowids[relb_id][pos] = bid;
+            pos++; //current # of tuples
+        }
+
+        // clear the old map
+        for (auto &p : rowids) delete[] p.second;
+        rowids.clear();
+
+        // and replace it with the new
+        rowids = new_rowids;  // slow copy of the whole struct. TODO: make rowids a pointer to heap? (is it worth it?)
+
+        // change size accordingly
+        size = number_of_tuples;    // TODO: change size to unsigned long long int?
+    } else {
+        // clear the old map
+        for (auto &p : rowids) { delete[] p.second; p.second = NULL; }
+        rowids.clear();
+
+        // change size accordingly
+        size = 0;
+    }
+    return this;
+}
+
+IntermediateRelation *IntermediateRelation::performJoinWithIntermediate(IntermediateRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) {
+    // extract the correct join relations
+    JoinRelation JA = *extractJoinRelation(rela_id, cola_id);
+    JoinRelation JB = *(B.extractJoinRelation(relb_id, colb_id));
+
+    // run RadixHashJoin
+    Result *AxB = radixHashJoin(JA, JB);
+
+    // get # of join tuples
+    unsigned long long int number_of_tuples = AxB->getSize();
+
+    if (number_of_tuples > 0) {
+        //create new rowids map
+        unordered_map<unsigned int, unsigned int *> new_rowids;
+        for (auto &p : rowids) new_rowids[p.first] = new unsigned int[number_of_tuples];
+        for (auto &p : B.rowids) new_rowids[p.first] = new unsigned int[number_of_tuples];
+
+        // based on previous and RHJ's results
+        Iterator I(AxB);
+        unsigned int aid, bid, pos = 0;
+        while (I.getNext(aid, bid)) {
+            for (auto &p : rowids) new_rowids[p.first][pos] = rowids[p.first][aid - 1];
+            for (auto &p : B.rowids) new_rowids[p.first][pos] = B.rowids[p.first][bid - 1];
+            pos++; //current # of tuples
+        }
+
+        // clear the old map
+        for (auto &p : rowids) delete[] p.second;
+        rowids.clear();
+
+        // and replace it with the new
+        rowids = new_rowids;  // slow copy of the whole struct. TODO: make rowids a pointer to heap? (is it worth it?)
+
+        // change size accordingly
+        size = number_of_tuples;    // TODO: change size to unsigned long long int?
+    } else {
+        // clear the old map
+        for (auto &p : rowids) { delete[] p.second; p.second = NULL; }
+        rowids.clear();
+
+        // change size accordingly
+        size = 0;
+    }
+    return this;
 }
 
 IntermediateRelation *IntermediateRelation::performCrossProductWith(QueryRelation &B) {
@@ -509,7 +534,7 @@ void IntermediateRelation::performSelect(projection *projections, unsigned int n
             //DEBUG Note: R[rel_id] is NOT the correct relation as rel_ids are only for the 'FROM' tables. We have to calculate it by searching or keeping info on it (TODO?)
             int rel_pos_in_R = find_pos_in_R(projections[j].rel_id);
             if (rel_pos_in_R == -1) { cerr << "Warning: rel_id or Rlen invalid in performSelect for intermediate" << endl; }
-            else printf("%6llu", R[rel_pos_in_R]->getValueAt(projections[j].col_id, allrowids[projections[j].rel_id][i] - 1));   // (!) -1 because temporary_code_dump start from 1
+            else printf("%6lu", R[rel_pos_in_R]->getValueAt(projections[j].col_id, allrowids[projections[j].rel_id][i] - 1));   // (!) -1 because rowids start from 1
         }
         printf("\n");
     }
@@ -537,7 +562,7 @@ void IntermediateRelation::keepOnlyMarkedRows(const bool *passing_rowids, unsign
             for (unsigned int i = 0; i < size; i++) {
                 if (passing_rowids[i]) {
                     if (j >= count) {
-                        cerr << "Warning: miscounted passing temporary_code_dump in intermediate? count = " << count << endl;
+                        cerr << "Warning: miscounted passing rowids in intermediate? count = " << count << endl;
                         break;
                     }
                     newrowids[j++] = rids[i];

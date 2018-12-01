@@ -9,20 +9,7 @@
 using namespace std;
 
 
-/* *** Hash Functions Example ***
-
-...0000000001111 (take last 4 bits for H1) = value & ((1<<H1_N)-1)
-...0000000110000 (take the next 4/2=2 bits for H2) = value & (((1<<H2_N)-1)^((1<<H1_N)-1))
-        
-...0000000111111 \
-		^		  -> ......0000000110000 !!!
-...0000000001111 /
-
-   ****************************** */
-
-
 unsigned int H1_N, H2_N;
-//TODO: remove this? -> unsigned int H2_OLD_MAY_REPLACE_H1_SEE_EXPLANATION(intField value) { return value & ((1 << H2_N) - 1); }
 unsigned int H2(intField value) { return ( value & ( ((1 << (H1_N + H2_N)) - 1) ^ ( (1 << H1_N) - 1) ) ) >> H1_N; }
 
 
