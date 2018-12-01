@@ -62,7 +62,7 @@ void parse_bindings(char *s, unsigned int &npredicates, predicate* &predicates, 
 			npredicates++;
 		}
 		else {
-			sscanf(token, "%u.%u%c%llu", &filters[nfilters].rel_id,&filters[nfilters].col_id, &filters[nfilters].cmp,&filters[nfilters].value);
+			sscanf(token, "%u.%u%c%lu", &filters[nfilters].rel_id,&filters[nfilters].col_id, &filters[nfilters].cmp,&filters[nfilters].value);
 			nfilters++;
 		}
 		token = strtok(NULL, "&");
@@ -100,7 +100,7 @@ void SQLParser::show() {
 	
 	printf("%u filters:\n",nfilters);
 	for (int i=0; i<nfilters; ++i)
-		printf("  %u(%u) %c %llu\n",filters[i].rel_id,filters[i].col_id,filters[i].cmp,filters[i].value);
+		printf("  %u(%u) %c %lu\n",filters[i].rel_id,filters[i].col_id,filters[i].cmp,filters[i].value);
 
 	printf("%u projections:\n",nprojections);
 	for (int i=0; i<nprojections; ++i)

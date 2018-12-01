@@ -86,7 +86,7 @@ int main(){
                 //FILTER
                 const filter &filter = p->filters[i];
                 CHECK( (filter.rel_id < p->nrelations), "SQL Error: SQL filter contains a relation that does not exist in \'FROM\'. Aborting query...",
-                       for (int i = 0 ; i < p->nrelations; i++) { if ( QueryRelations[i]->isIntermediate ) delete QueryRelations[i]; } delete[] QueryRelations; delete p; abort = true; break; )
+                       for (int i = 0 ; i < p->nrelations; i++) { if ( QueryRelations[i] != NULL && QueryRelations[i]->isIntermediate ) delete QueryRelations[i]; } delete[] QueryRelations; delete p; abort = true; break; )
                 QueryRelations[filter.rel_id] = QueryRelations[filter.rel_id]->performFilter(filter.rel_id, filter.col_id, filter.value, filter.cmp);
             }
             if (abort) continue;
@@ -96,7 +96,7 @@ int main(){
                     // EQUAL COLUMNS UNARY OPERATION
                     const predicate &predicate = p->predicates[i];
                     CHECK( (predicate.rela_id < p->nrelations), "SQL Error: SQL equal columns predicate on one relation that does not exist in \'FROM\'. Aborting query...",
-                           for (int i = 0 ; i < p->nrelations; i++) { if ( QueryRelations[i]->isIntermediate ) delete QueryRelations[i]; } delete[] QueryRelations; delete p; abort = true; break;)
+                           for (int i = 0 ; i < p->nrelations; i++) { if ( QueryRelations[i] != NULL && QueryRelations[i]->isIntermediate ) delete QueryRelations[i]; } delete[] QueryRelations; delete p; abort = true; break;)
                     QueryRelations[predicate.rela_id] = QueryRelations[predicate.rela_id]->performEqColumns(predicate.rela_id, predicate.cola_id, predicate.colb_id);
                 }
                 // else if (  p->predicates[i].rela_id == p->predicates[i].relb_id  ) -> ignore predicate
@@ -106,7 +106,7 @@ int main(){
             for (int i = 0 ; i < p->npredicates ; i++){
                 const predicate &predicate = p->predicates[i];
                 CHECK( (predicate.rela_id < p->nrelations && predicate.relb_id < p->nrelations), "SQL Error: SQL join predicate contains a relation that does not exist in \'FROM\'. Aborting query...",
-                       for (int i = 0 ; i < p->nrelations; i++) { if ( QueryRelations[i]->isIntermediate ) delete QueryRelations[i]; } delete[] QueryRelations; delete p; abort = true; break; )
+                       for (int i = 0 ; i < p->nrelations; i++) { if ( QueryRelations[i] != NULL && QueryRelations[i]->isIntermediate ) delete QueryRelations[i]; } delete[] QueryRelations; delete p; abort = true; break; )
                 unsigned int rela_pos = find_rel_pos(QueryRelations, p->nrelations, predicate.rela_id);
                 unsigned int relb_pos = find_rel_pos(QueryRelations, p->nrelations, predicate.relb_id);
                 CHECK( rela_pos != -1 && relb_pos != -1, "Warning: Something went wrong joining relations, cannot find intermediate for one. Please debug.", continue; )
@@ -128,7 +128,7 @@ int main(){
             }
             if (abort) continue;
             CHECK( QueryRelations[0] != NULL, "Warning: Something not supposed to happen happened. Please debug...",
-                   for (int i = 0 ; i < p->nrelations; i++) { if ( QueryRelations[i]->isIntermediate ) delete QueryRelations[i]; } delete[] QueryRelations; delete p; break; )
+                   for (int i = 0 ; i < p->nrelations; i++) { if ( QueryRelations[i] != NULL && QueryRelations[i]->isIntermediate ) delete QueryRelations[i]; } delete[] QueryRelations; delete p; break; )
             // Last but not least any cross-products left to do
             while ( count_not_null((void **) QueryRelations, p->nrelations) > 1 ){
                 // CROSS PRODUCT: perform cross product between remaining Relations uniting them into one in the leftest position until only one QueryRelation remains
@@ -150,7 +150,7 @@ int main(){
 
             // cleanup
             for (int i = 0 ; i < p->nrelations; i++){
-                if ( QueryRelations[i]->isIntermediate ) delete QueryRelations[i];
+                if ( QueryRelations[i] != NULL && QueryRelations[i]->isIntermediate ) delete QueryRelations[i];
             }
             delete[] QueryRelations;
             delete p;

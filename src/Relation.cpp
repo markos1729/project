@@ -258,11 +258,13 @@ IntermediateRelation *Relation::performJoinWith(QueryRelation &B, unsigned int r
 
 IntermediateRelation *Relation::performJoinWithOriginal(const Relation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) {
     // extract the correct join relations
-    JoinRelation &JA = *extractJoinRelation(cola_id);
-    JoinRelation &JB = *(B.extractJoinRelation(colb_id));
+    JoinRelation *JA = extractJoinRelation(cola_id);
+    JoinRelation *JB = B.extractJoinRelation(colb_id);
 
     // run RadixHashJoin
-    Result *AxB = radixHashJoin(JA, JB);
+    Result *AxB = radixHashJoin(*JA, *JB);
+    delete JA;
+    delete JB;
 
     // get # of join tuples
     unsigned long long int number_of_tuples = AxB->getSize();
@@ -277,12 +279,12 @@ IntermediateRelation *Relation::performJoinWithOriginal(const Relation &B, unsig
         Iterator I(AxB);
         unsigned int aid, bid, pos = 0;
         while (I.getNext(aid, bid)) {
-            rowids_b[pos] = aid; //relation
+            rowids_b[pos] = aid;
             rowids_a[pos] = bid;
             pos++;
         }
 
-        result = new IntermediateRelation(rela_id, relb_id, rowids_b, rowids_a, number_of_tuples);
+        result = new IntermediateRelation(rela_id, relb_id, rowids_a, rowids_b, number_of_tuples);
         delete[] rowids_b;
         delete[] rowids_a;
     } else {
@@ -308,7 +310,7 @@ void Relation::performSelect(projection *projections, unsigned int nprojections)
     printf("\n");
     for (unsigned int i = 0 ; i < size ; i++){
         for (unsigned int j = 0 ; j < nprojections ; j++){
-            printf("%6llu", this->getValueAt(projections[i].col_id, i));
+            printf("%6lu", this->getValueAt(projections[i].col_id, i));
         }
         printf("\n");
     }
@@ -352,10 +354,19 @@ IntermediateRelation::~IntermediateRelation() {
     }
 }
 
-
 JoinRelation *IntermediateRelation::extractJoinRelation(unsigned int rel_id, unsigned int col_id) {
-    //TODO: Must be the JoinRelation for rows that exist in this IntermediateRelation!
-    return nullptr;
+    // find rel_id's original Relation in R
+    int rel_pos_in_R = find_pos_in_R(rel_id);
+    if (rel_pos_in_R == -1) { cerr << "Warning: rel_id or Rlen invalid in performFilter for intermediate" << endl; return NULL; }
+    // create intField for col_id
+    intField *joinField = new intField[size];
+    for(unsigned int i = 0 ; i < size ; i++){
+        joinField[i] = R[rel_pos_in_R]->getValueAt(col_id, rowids[rel_id][i] - 1);
+    }
+    // create JoinRelation
+    JoinRelation *result = new JoinRelation(size, joinField, rowids[rel_id]);
+    delete[] joinField;
+    return result;
 }
 
 IntermediateRelation *IntermediateRelation::performFilter(unsigned int rel_id, unsigned int col_id, intField value, char cmp) {
@@ -418,11 +429,13 @@ IntermediateRelation *IntermediateRelation::performJoinWith(QueryRelation &B, un
 
 IntermediateRelation *IntermediateRelation::performJoinWithOriginal(const Relation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) {
     // extract the correct join relations
-    JoinRelation &JA = *extractJoinRelation(rela_id, cola_id);
-    JoinRelation &JB = *(B.extractJoinRelation(colb_id));
+    JoinRelation *JA = extractJoinRelation(rela_id, cola_id);
+    JoinRelation *JB = B.extractJoinRelation(colb_id);
 
     // run RadixHashJoin
-    Result *AxB = radixHashJoin(JA, JB);
+    Result *AxB = radixHashJoin(*JA, *JB);
+    delete JA;
+    delete JB;
 
     // get # of join tuples
     unsigned long long int number_of_tuples = AxB->getSize();
@@ -451,26 +464,31 @@ IntermediateRelation *IntermediateRelation::performJoinWithOriginal(const Relati
         // and replace it with the new
         rowids = new_rowids;  // slow copy of the whole struct. TODO: make rowids a pointer to heap? (is it worth it?)
 
-        // change size accordingly
+        // change size and numberOfRelations accordingly
         size = number_of_tuples;    // TODO: change size to unsigned long long int?
+        numberOfRelations++;
     } else {
         // clear the old map
         for (auto &p : rowids) { delete[] p.second; p.second = NULL; }
         rowids.clear();
 
-        // change size accordingly
+        // change size and numberOfRelations accordingly
         size = 0;
+        numberOfRelations++;
     }
+    delete AxB;
     return this;
 }
 
 IntermediateRelation *IntermediateRelation::performJoinWithIntermediate(IntermediateRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) {
     // extract the correct join relations
-    JoinRelation JA = *extractJoinRelation(rela_id, cola_id);
-    JoinRelation JB = *(B.extractJoinRelation(relb_id, colb_id));
+    JoinRelation *JA = extractJoinRelation(rela_id, cola_id);
+    JoinRelation *JB = B.extractJoinRelation(relb_id, colb_id);
 
     // run RadixHashJoin
-    Result *AxB = radixHashJoin(JA, JB);
+    Result *AxB = radixHashJoin(*JA, *JB);
+    delete JA;
+    delete JB;
 
     // get # of join tuples
     unsigned long long int number_of_tuples = AxB->getSize();
@@ -497,16 +515,19 @@ IntermediateRelation *IntermediateRelation::performJoinWithIntermediate(Intermed
         // and replace it with the new
         rowids = new_rowids;  // slow copy of the whole struct. TODO: make rowids a pointer to heap? (is it worth it?)
 
-        // change size accordingly
+        // change size and numberOfRelations accordingly
         size = number_of_tuples;    // TODO: change size to unsigned long long int?
+        numberOfRelations += B.numberOfRelations;
     } else {
         // clear the old map
         for (auto &p : rowids) { delete[] p.second; p.second = NULL; }
         rowids.clear();
 
-        // change size accordingly
-        size = 0;
+        // change size and numberOfRelations accordingly
+        size = 0;    // TODO: change size to unsigned long long int?
+        numberOfRelations += B.numberOfRelations;
     }
+    delete AxB;
     return this;
 }
 
