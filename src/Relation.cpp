@@ -296,12 +296,43 @@ IntermediateRelation *Relation::performJoinWithOriginal(const Relation &B, unsig
 }
 
 IntermediateRelation *Relation::performJoinWithIntermediate(IntermediateRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) {
-    return B.performJoinWithOriginal(*this, relb_id, colb_id, rela_id, cola_id);   // symetric
+    return B.performJoinWithOriginal(*this, relb_id, colb_id, rela_id, cola_id);   // symmetric
 }
 
 IntermediateRelation *Relation::performCrossProductWith(QueryRelation &B) {
-    // TODO
-    return nullptr;
+    return (B.isIntermediate) ? performCrossProductWithIntermediate((IntermediateRelation &) B) : performCrossProductWithOriginal((Relation &) B);
+}
+
+IntermediateRelation *Relation::performCrossProductWithOriginal(const Relation &B) {
+    unsigned int sizeB = B.getSize();
+    unsigned long long number_of_tuples = size * sizeB;
+
+    IntermediateRelation *result = NULL;
+    if (number_of_tuples > 0) {
+        // create the new map
+        unsigned int *rowids_a = new unsigned int[number_of_tuples];
+        unsigned int *rowids_b = new unsigned int[number_of_tuples];
+
+        unsigned int pos = 0;
+        // every row from A (this) is matched with every row from B
+        for (unsigned int bi = 1; bi <= sizeB; bi++) {
+            for (unsigned int ai = 1; ai <= size; ai++, pos++) {
+                rowids_a[pos] = ai;
+                rowids_b[pos] = bi;
+            }
+        }
+
+        result = new IntermediateRelation(id, B.getId(), rowids_a, rowids_b, number_of_tuples);
+        delete[] rowids_b;
+        delete[] rowids_a;
+    } else {
+        result = new IntermediateRelation(id, B.getId(), (unsigned int *) NULL, (unsigned int *) NULL, 0);
+    }
+    return result;
+}
+
+IntermediateRelation *Relation::performCrossProductWithIntermediate(IntermediateRelation &B) {
+    return B.performCrossProductWithOriginal(*this);   // symmetric
 }
 
 void Relation::performSelect(projection *projections, unsigned int nprojections) {
@@ -558,9 +589,101 @@ IntermediateRelation *IntermediateRelation::performJoinWithIntermediate(Intermed
 }
 
 IntermediateRelation *IntermediateRelation::performCrossProductWith(QueryRelation &B) {
-    if (size <= 0) return this;
-    // TODO
-    return nullptr;
+    return (B.isIntermediate) ? performCrossProductWithIntermediate((IntermediateRelation &) B) : performCrossProductWithOriginal((Relation &) B);
+}
+
+IntermediateRelation *IntermediateRelation::performCrossProductWithOriginal(const Relation &B) {
+    unsigned int sizeB = B.getSize();
+    unsigned long long number_of_tuples = size * sizeB;
+
+    if (number_of_tuples > 0) {
+        // create new rowids map
+        unordered_map<unsigned int, unsigned int *> new_rowids;
+        for (auto &p : rowids) {
+            new_rowids[p.first] = new unsigned int[number_of_tuples];
+        }
+        new_rowids[B.getId()] = new unsigned int[number_of_tuples];
+
+//        // DEBUG
+//        cout << "Before:" << endl;
+//        for (auto iter = rowids.begin(); iter != rowids.end(); iter++) {
+//            cout << iter->first << " : [";
+//            for (unsigned int ui = 0; ui < size; ui++) cout << iter->second[ui] << ", ";
+//            cout << "]" << endl;
+//        }
+
+        unsigned int pos = 0;
+        // every row from A (this) is matched with every row from B
+        for (unsigned int bi = 1; bi <= sizeB; bi++) {
+            for (unsigned int ai = 0; ai < size; ai++, pos++) {
+                for (auto &p : rowids) new_rowids[p.first][pos] = rowids[p.first][ai];
+                new_rowids[B.getId()][pos] = bi;
+            }
+        }
+
+//        // DEBUG
+//        cout << "After:" << endl;
+//        for (auto iter = new_rowids.begin(); iter != new_rowids.end(); iter++) {
+//            cout << iter->first << " : [";
+//            for (unsigned int ui = 0; ui < number_of_tuples; ui++) cout << iter->second[ui] << ", ";
+//            cout << "]" << endl;
+//        }
+
+        // clear the old map
+        for (auto &p : rowids) delete[] p.second;
+        rowids.clear();
+
+        // and replace it with the new
+        rowids = new_rowids;  // slow copy of the whole struct.
+
+        // change size and numberOfRelations accordingly
+        size = number_of_tuples;
+    } else {
+        // clear the old map
+        for (auto &p : rowids) { delete[] p.second; p.second = NULL; }
+        rowids.clear();
+        size = 0;
+    }
+    numberOfRelations++;
+    return this;
+}
+
+IntermediateRelation *IntermediateRelation::performCrossProductWithIntermediate(IntermediateRelation &B) {
+    unsigned int sizeB = B.getSize();
+    unsigned long long number_of_tuples = size * sizeB;
+
+    if (number_of_tuples > 0) {
+        // create new rowids map
+        unordered_map<unsigned int, unsigned int *> new_rowids;
+        for (auto &p : rowids) new_rowids[p.first] = new unsigned int[number_of_tuples];
+        for (auto &p : B.rowids) new_rowids[p.first] = new unsigned int[number_of_tuples];
+
+        unsigned int pos = 0;
+        // every row from A (this) is matched with every row from B
+        for (unsigned int bi = 0; bi < sizeB; bi++) {
+            for (unsigned int ai = 0; ai < size; ai++, pos++) {
+                for (auto &p : rowids) new_rowids[p.first][pos] = rowids[p.first][ai];
+                for (auto &p : B.rowids) new_rowids[p.first][pos] = B.rowids[p.first][bi];
+            }
+        }
+
+        // clear the old map
+        for (auto &p : rowids) delete[] p.second;
+        rowids.clear();
+
+        // and replace it with the new
+        rowids = new_rowids;  // slow copy of the whole struct.
+
+        // change size and numberOfRelations accordingly
+        size = number_of_tuples;
+    } else {
+        // clear the old map
+        for (auto &p : rowids) { delete[] p.second; p.second = NULL; }
+        rowids.clear();
+        size = 0;
+    }
+    numberOfRelations += B.numberOfRelations;
+    return this;
 }
 
 void IntermediateRelation::performSelect(projection *projections, unsigned int nprojections) {

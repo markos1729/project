@@ -81,6 +81,8 @@ public:
     JoinRelation *extractJoinRelation(unsigned int index_of_JoinField) const;
     IntermediateRelation *performJoinWithOriginal(const Relation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id);
     IntermediateRelation *performJoinWithIntermediate(IntermediateRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id);
+    IntermediateRelation *performCrossProductWithOriginal(const Relation &B);
+    IntermediateRelation *performCrossProductWithIntermediate(IntermediateRelation &B);
     /* @Override */
     bool containsRelation(unsigned int rel_id) override { return rel_id == id; }
     IntermediateRelation *performFilter(unsigned int rel_id, unsigned int col_id, intField value, char cmp) override;
@@ -105,6 +107,8 @@ public:
     JoinRelation *extractJoinRelation(unsigned int rel_id, unsigned int col_id);
     IntermediateRelation *performJoinWithOriginal(const Relation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id);
     IntermediateRelation *performJoinWithIntermediate(IntermediateRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id);
+    IntermediateRelation *performCrossProductWithOriginal(const Relation &B);
+    IntermediateRelation *performCrossProductWithIntermediate(IntermediateRelation &B);
     /* @Override */
     bool containsRelation(unsigned int rel_id) override { return rowids.find(rel_id) != rowids.end(); }
     IntermediateRelation *performFilter(unsigned int rel_id, unsigned int col_id, intField value, char cmp) override;
