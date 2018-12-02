@@ -75,17 +75,31 @@ SQLParser::SQLParser(const char *query) {
 	char *first,*second,*third;
 	char *queryCopy = new char[strlen(query) + 1];
 	strcpy(queryCopy, query);
+	
+	//check for empty where clause
+	int no_where=0;
+	for (int i=0; i<strlen(queryCopy)-1; ++i)
+		if (queryCopy[i]=='|' && queryCopy[i+1]=='|') no_where=1;
 	split3(queryCopy, first, second, third);
-	parse_relations(first, nrelations, relations);
-	parse_bindings(second, npredicates, predicates, nfilters, filters);
-	parse_projections(third, nprojections, projections);
+
+	if (no_where) {
+		npredicates=nfilters=0;
+		predicates=NULL,filters=NULL;
+		parse_relations(first, nrelations, relations);
+		parse_projections(second, nprojections, projections);
+		}
+	else {
+		parse_relations(first, nrelations, relations);
+		parse_bindings(second, npredicates, predicates, nfilters, filters);
+		parse_projections(third, nprojections, projections);
+	}
 	delete[] queryCopy;
 }
 
 SQLParser::~SQLParser() {
 	delete[] relations;
-	delete[] predicates;
-	delete[] filters;
+	if (predicates!=NULL) delete[] predicates;
+	if (filters!=NULL) delete[] filters;
 	delete[] projections;
 }
 

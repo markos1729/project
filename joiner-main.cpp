@@ -146,8 +146,11 @@ int main(){
 
             cout << "Output:" << endl;    // DEBUG
 
+			//change to select to see everything
+			QueryRelations[0]->performSum(p->projections,p->nprojections);
+			
             // execute SELECT : not SUM yet -> TODO change later after it's working
-            QueryRelations[0]->performSelect(p->projections, p->nprojections);
+            //QueryRelations[0]->performSelect(p->projections, p->nprojections);
             // cout << SUM << " " << endl;
 
             cout << "Query finished!" << endl;    // DEBUG
