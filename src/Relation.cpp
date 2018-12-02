@@ -627,22 +627,18 @@ void IntermediateRelation::performSum(projection *projections, unsigned int npro
         return;
     }
 
-    unsigned int i=0;
-    unsigned int **allrowids=new unsigned int*[numberOfRelations];
-    for (auto p : rowids) allrowids[i++]=p.second;
-
     intField *sum=new intField[nprojections];
     memset(sum,0,sizeof sum);
 
     for (unsigned int i=0; i<size; ++i)
         for (unsigned int j=0; j<nprojections; ++j) {
             int rel_pos_in_R = find_pos_in_R(projections[j].rel_id);
-            sum[j]+=R[rel_pos_in_R]->getValueAt(projections[j].col_id,allrowids[projections[j].rel_id][i]-1);
+            sum[j]+=R[rel_pos_in_R]->getValueAt(projections[j].col_id,rowids[projections[j].rel_id][i]-1);
         }
 
     for (unsigned int k=0; k<nprojections-1; ++k) printf("%lu ",sum[k]);
     printf("%lu\n",sum[nprojections-1]);
 
-    delete[] allrowids;
     delete[] sum;
 }
+
