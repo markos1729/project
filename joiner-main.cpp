@@ -32,7 +32,7 @@ int main(){
     while ( getline(cin, currName) && currName != "Done" ) {
         fileList->push_back(currName);
     }
-    CHECK( !cin.eof() && !cin.fail() , "Error: reading filenames from cin failed", return -1; )
+    CHECK( !cin.eof() && !cin.fail() , "Error: reading filenames from cin failed", delete fileList; return -1; )
     CHECK( !fileList->empty() , "Warning: No filenames were given", ; )
     // and load all files into memory
     const unsigned int number_of_relations = (int) fileList->size();
@@ -46,6 +46,10 @@ int main(){
             }
         } catch (...) {
             cerr << "Error: At least one of the files wasn't found or was inaccessible." << endl;
+            for (vector<string>::const_iterator iter = fileList->begin(); iter != fileList->end(); iter++, i++){
+                delete R[i];
+            }
+            delete fileList;
             return -1;
         }
     }
@@ -114,11 +118,11 @@ int main(){
                     // JOIN
                     if (rela_pos < relb_pos){
                         QueryRelations[rela_pos] = QueryRelations[rela_pos]->performJoinWith(*QueryRelations[relb_pos], predicate.rela_id, predicate.cola_id, predicate.relb_id, predicate.colb_id);
-                        if ( QueryRelations[relb_pos]->isIntermediate ) delete QueryRelations[relb_pos];
+                        if ( QueryRelations[rela_pos]->isIntermediate && QueryRelations[relb_pos]->isIntermediate ) delete QueryRelations[relb_pos];   // if only QueryRelations[relb_pos] is Intermediate then we do not want to delete it (!)
                         QueryRelations[relb_pos] = NULL;
                     } else {
                         QueryRelations[relb_pos] = QueryRelations[relb_pos]->performJoinWith(*QueryRelations[rela_pos], predicate.relb_id, predicate.colb_id, predicate.rela_id, predicate.cola_id);
-                        if ( QueryRelations[rela_pos]->isIntermediate ) delete QueryRelations[rela_pos];
+                        if ( QueryRelations[relb_pos]->isIntermediate && QueryRelations[rela_pos]->isIntermediate ) delete QueryRelations[rela_pos];
                         QueryRelations[rela_pos] = NULL;
                     }
                 } else {   // (!) if two tables are joined two times then the first it will be join whilst the second time it will be an equal columns operation!
