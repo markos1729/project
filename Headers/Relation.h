@@ -70,7 +70,7 @@ class Relation : public QueryRelation {        // Relation struct storing all fi
     intField **columns; // each column saved as a sequential array of intFields
 public:
     Relation(unsigned int _size, unsigned int _num_of_columns);
-    Relation(const char* file);
+    explicit Relation(const char* file);
     ~Relation() override;
     unsigned int getSize() const { return size; }
     unsigned int getNumOfColumns() const { return num_of_columns; }
@@ -101,7 +101,7 @@ class IntermediateRelation : public QueryRelation {       // Intermediate Relati
 public:
     IntermediateRelation(unsigned int rel_id, unsigned int *_rowids, unsigned int _size);
     IntermediateRelation(unsigned int rela_id, unsigned int relb_id, unsigned int *_rowids_a, unsigned int *_rowids_b, unsigned int _size);
-    ~IntermediateRelation();
+    ~IntermediateRelation() override;
     unsigned int getSize() const { return size; }
     unsigned int *getRowIdsFor(unsigned int rel_id) { if ( containsRelation(rel_id) ) return rowids[rel_id]; else return NULL; }
     JoinRelation *extractJoinRelation(unsigned int rel_id, unsigned int col_id);

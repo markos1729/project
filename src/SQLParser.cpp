@@ -93,16 +93,20 @@ SQLParser::SQLParser(const char *query) {
 		parse_bindings(second, npredicates, predicates, nfilters, filters);
 		parse_projections(third, nprojections, projections);
 	}
+#ifdef DDEBUG
+    show();
+#endif
 	delete[] queryCopy;
 }
 
 SQLParser::~SQLParser() {
 	delete[] relations;
-	if (predicates!=NULL) delete[] predicates;
-	if (filters!=NULL) delete[] filters;
+	delete[] predicates;
+	delete[] filters;
 	delete[] projections;
 }
 
+#ifdef DDEBUG
 void SQLParser::show() {
 	printf("%u relations:\n",nrelations);
 	for (int i=0; i<nrelations; ++i)
@@ -120,3 +124,4 @@ void SQLParser::show() {
 	for (int i=0; i<nprojections; ++i)
 		printf("  σ %u(%u)\n",projections[i].rel_id,projections[i].col_id);
 }
+#endif

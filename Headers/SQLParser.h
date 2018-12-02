@@ -34,10 +34,12 @@ struct SQLParser {
 	predicate* predicates;
 	filter* filters;	
 	projection* projections;
-	
-	void show();
+
 	explicit SQLParser(const char *query);
 	~SQLParser();
+#ifdef DDEBUG
+    void show();
+#endif
 };
 
 #endif
