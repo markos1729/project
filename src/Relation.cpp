@@ -304,20 +304,20 @@ IntermediateRelation *Relation::performCrossProductWith(QueryRelation &B) {
     return nullptr;
 }
 
-void Relation::performSelect(projection *projections,unsigned int nprojections) {
+void Relation::performSelect(projection *projections, unsigned int nprojections) {
     for (unsigned int j = 0 ; j < nprojections ; j++){
         printf("%3d.%2d", projections[j].rel_id, projections[j].col_id);
     }
     printf("\n");
     for (unsigned int i = 0 ; i < size ; i++){
         for (unsigned int j = 0 ; j < nprojections ; j++){
-            printf("%6lu", this->getValueAt(projections[i].col_id, i)); //TODO: projections[j] ???
+            printf("%6lu", this->getValueAt(projections[j].col_id, i));
         }
         printf("\n");
     }
 }
 
-void Relation::performSum(projection *projections,unsigned int nprojections) {
+void Relation::performSum(projection *projections, unsigned int nprojections) {
     if (size==0) {
     	for (unsigned int k=0; k<nprojections-1; ++k) printf("NULL ");
     	printf("NULL\n");
@@ -331,38 +331,12 @@ void Relation::performSum(projection *projections,unsigned int nprojections) {
     for (unsigned int j=0; j<nprojections; ++j)
         sum[j]+=this->getValueAt(projections[j].col_id,i);
     
-    for (unsigned int k=0; k<nprojections-1; ++k) printf("%llu ",sum[k]);
-	printf("%llu\n",sum[nprojections-1]);
+    for (unsigned int k=0; k<nprojections-1; ++k) printf("%lu ",sum[k]);
+	printf("%lu\n",sum[nprojections-1]);
 
     delete[] sum;
 }
 
-void IntermediateRelation::performSum(projection *projections, unsigned int nprojections) {
-    if (size==0) {
-    	for (unsigned int k=0; k<nprojections-1; ++k) printf("NULL ");
-    	printf("NULL\n");
-    	return;
-	}
-    
-	unsigned int i=0;
-    unsigned int **allrowids=new unsigned int*[numberOfRelations];
-	for (auto p : rowids) allrowids[i++]=p.second;
-
-    intField *sum=new intField[nprojections];
-    memset(sum,0,sizeof sum);
-
-    for (unsigned int i=0; i<size; ++i)
-    for (unsigned int j=0; j<nprojections; ++j) {
-		int rel_pos_in_R = find_pos_in_R(projections[j].rel_id);
-		sum[j]+=R[rel_pos_in_R]->getValueAt(projections[j].col_id,allrowids[projections[j].rel_id][i]-1);
-	}
-    
-    for (unsigned int k=0; k<nprojections-1; ++k) printf("%llu ",sum[k]);
-	printf("%llu\n",sum[nprojections-1]);
-
-    delete[] allrowids;
-    delete[] sum;
-}
 
 /* IntermediateRelation Implementation */
 IntermediateRelation::IntermediateRelation(unsigned int rel_id, unsigned int *_rowids, unsigned int _size) : QueryRelation(true), numberOfRelations(1), size(_size) {
@@ -407,12 +381,15 @@ JoinRelation *IntermediateRelation::extractJoinRelation(unsigned int rel_id, uns
     if (rel_pos_in_R == -1) { cerr << "Warning: rel_id or Rlen invalid in performFilter for intermediate" << endl; return NULL; }
     // create intField for col_id
     intField *joinField = new intField[size];
+    unsigned int *rowIds = new unsigned int[size];   // (!) rowids must be those of Intermediate rows!!!
     for(unsigned int i = 0 ; i < size ; i++){
         joinField[i] = R[rel_pos_in_R]->getValueAt(col_id, rowids[rel_id][i] - 1);
+        rowIds[i] = i + 1;
     }
     // create JoinRelation
-    JoinRelation *result = new JoinRelation(size, joinField, rowids[rel_id]);
+    JoinRelation *result = new JoinRelation(size, joinField, rowIds);
     delete[] joinField;
+    delete[] rowIds;
     return result;
 }
 
@@ -499,7 +476,9 @@ IntermediateRelation *IntermediateRelation::performJoinWithOriginal(const Relati
         Iterator I(AxB);
         unsigned int aid, bid, pos = 0;
         while (I.getNext(aid, bid)) {
-            for (auto &p : rowids) new_rowids[p.first][pos] = rowids[p.first][aid - 1];
+            for (auto &p : rowids) {
+                new_rowids[p.first][pos] = p.second[aid - 1];
+            }
             new_rowids[relb_id][pos] = bid;
             pos++; //current # of tuples
         }
@@ -647,4 +626,31 @@ void IntermediateRelation::keepOnlyMarkedRows(const bool *passing_rowids, unsign
         }
         size = 0;
     }
+}
+
+void IntermediateRelation::performSum(projection *projections, unsigned int nprojections) {
+    if (size==0) {
+        for (unsigned int k=0; k<nprojections-1; ++k) printf("NULL ");
+        printf("NULL\n");
+        return;
+    }
+
+    unsigned int i=0;
+    unsigned int **allrowids=new unsigned int*[numberOfRelations];
+    for (auto p : rowids) allrowids[i++]=p.second;
+
+    intField *sum=new intField[nprojections];
+    memset(sum,0,sizeof sum);
+
+    for (unsigned int i=0; i<size; ++i)
+        for (unsigned int j=0; j<nprojections; ++j) {
+            int rel_pos_in_R = find_pos_in_R(projections[j].rel_id);
+            sum[j]+=R[rel_pos_in_R]->getValueAt(projections[j].col_id,allrowids[projections[j].rel_id][i]-1);
+        }
+
+    for (unsigned int k=0; k<nprojections-1; ++k) printf("%lu ",sum[k]);
+    printf("%lu\n",sum[nprojections-1]);
+
+    delete[] allrowids;
+    delete[] sum;
 }
