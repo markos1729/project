@@ -100,6 +100,8 @@ public:
     IntermediateRelation(unsigned int rel_id, unsigned int *_rowids, unsigned int _size);
     IntermediateRelation(unsigned int rela_id, unsigned int relb_id, unsigned int *_rowids_a, unsigned int *_rowids_b, unsigned int _size);
     ~IntermediateRelation();
+    unsigned int getSize() const { return size; }
+    unsigned int *getRowIdsFor(unsigned int rel_id) { if ( containsRelation(rel_id) ) return rowids[rel_id]; else return NULL; }
     JoinRelation *extractJoinRelation(unsigned int rel_id, unsigned int col_id);
     IntermediateRelation *performJoinWithOriginal(const Relation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id);
     IntermediateRelation *performJoinWithIntermediate(IntermediateRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id);

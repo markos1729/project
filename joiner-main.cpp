@@ -168,7 +168,7 @@ int main(){
         cout << endl;
         cout << "Query Batch Finished" << endl;    // DEBUG
     }
-    CHECK( cin.eof() && !cin.fail(), "Error: reading statements from cin failed", ; )
+    //CHECK( cin.eof() && !cin.fail(), "Error: reading statements from cin failed", ; )
     // cleanup
     for (unsigned int i = 0 ; i < number_of_relations ; i++ ) {
         //DEBUG: cout << R[i]->getNumOfColumns() << endl;

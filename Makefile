@@ -4,7 +4,7 @@ COMMON_OBJ  = objects/Relation.o objects/RadixHashJoin.o objects/JoinResults.o
 COMMON_HEAD = Headers/*.h
 
 
-all: project test joiner
+all: project test test-joiner joiner
 
 
 project: assert_objects_dir objects/project-main.o $(COMMON_OBJ)
@@ -25,6 +25,7 @@ objects/RadixHashJoin.o: src/RadixHashJoin.cpp $(COMMON_HEAD)
 objects/JoinResults.o: src/JoinResults.cpp $(COMMON_HEAD)
 	$(CXX) -c $(CXXFLAGS) src/JoinResults.cpp
 	mv JoinResults.o objects/JoinResults.o
+
 
 test: assert_objects_dir objects/test-main.o objects/test.o $(COMMON_OBJ)
 	$(CXX) $(CXXFLAGS) objects/test-main.o objects/test.o $(COMMON_OBJ) -o test
@@ -57,5 +58,13 @@ assert_objects_dir:
 	mkdir -p objects
 
 
+test-joiner: assert_objects_dir objects/test-main.o objects/test-joiner.o $(COMMON_OBJ)
+	$(CXX) $(CXXFLAGS) objects/test-main.o objects/test-joiner.o $(COMMON_OBJ) -o test-joiner
+
+objects/test-joiner.o: unit_testing/test-joiner.cpp $(COMMON_HEAD) unit_testing/catch.hpp
+	$(CXX) -c $(CXXFLAGS) unit_testing/test-joiner.cpp
+	mv test-joiner.o objects/test-joiner.o
+
+
 clean:
-	rm -f $(COMMON_OBJ) objects/util.o objects/project-main.o objects/test-main.o objects/joiner-main.o objects/SQLParser.o project test joiner
+	rm -f $(COMMON_OBJ) objects/util.o objects/project-main.o objects/test-main.o objects/joiner-main.o objects/test-joiner.o objects/test.o objects/SQLParser.o project test test-joiner joiner

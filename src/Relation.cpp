@@ -280,8 +280,8 @@ IntermediateRelation *Relation::performJoinWithOriginal(const Relation &B, unsig
         Iterator I(AxB);
         unsigned int aid, bid, pos = 0;
         while (I.getNext(aid, bid)) {
-            rowids_b[pos] = aid;
-            rowids_a[pos] = bid;
+            rowids_a[pos] = aid;
+            rowids_b[pos] = bid;
             pos++;
         }
 
@@ -565,13 +565,6 @@ IntermediateRelation *IntermediateRelation::performCrossProductWith(QueryRelatio
 
 void IntermediateRelation::performSelect(projection *projections, unsigned int nprojections) {
     if (size <= 0) return;
-    unsigned int **allrowids = new unsigned int*[numberOfRelations];
-    {   int i = 0;
-        for (auto iter = rowids.begin() ; iter != rowids.end() ; iter++) {
-            if ( i >= numberOfRelations ) { cerr << "Warning: Miscalculated numberOfRelations?" << endl; break; }
-            allrowids[i++] = iter->second;
-        }
-    }
     for (unsigned int j = 0 ; j < nprojections ; j++){
         printf("%3d.%2d", projections[j].rel_id, projections[j].col_id);
     }
@@ -581,11 +574,10 @@ void IntermediateRelation::performSelect(projection *projections, unsigned int n
             //DEBUG Note: R[rel_id] is NOT the correct relation as rel_ids are only for the 'FROM' tables. We have to calculate it by searching or keeping info on it (TODO?)
             int rel_pos_in_R = find_pos_in_R(projections[j].rel_id);
             if (rel_pos_in_R == -1) { cerr << "Warning: rel_id or Rlen invalid in performSelect for intermediate" << endl; }
-            else printf("%6lu", R[rel_pos_in_R]->getValueAt(projections[j].col_id, allrowids[projections[j].rel_id][i] - 1));   // (!) -1 because rowids start from 1
+            else printf("%6lu", R[rel_pos_in_R]->getValueAt(projections[j].col_id, rowids[projections[j].rel_id][i] - 1));   // (!) -1 because rowids start from 1
         }
         printf("\n");
     }
-    delete[] allrowids;
 }
 
 int IntermediateRelation::find_pos_in_R(unsigned int rel_id) const {
