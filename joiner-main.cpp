@@ -71,11 +71,22 @@ int main(){
 
             // execute FROM: load original Relations to an array of pointers to such (which will only get "smaller" during the query)
             QueryRelation **QueryRelations = new QueryRelation*[p->nrelations]();
+            int *seen_at = new int[Rlen]();
+            for (int i = 0 ; i < Rlen ; i++) seen_at[i] = -1;       // init to -1
             for (unsigned int i = 0; i < p->nrelations ; i++){
                 CHECK( p->relations[i] < Rlen, "SQL Error: SQL query contains non-existant Relation in \'FROM\'. Aborting query...", delete[] QueryRelations; delete p; abort = true; break; )
-                QueryRelations[i] = R[p->relations[i]];
-                R[p->relations[i]]->setId(i);   // id of relations are in accending order in 'FROM'
+                if ( seen_at[p->relations[i]] == -1 ) {
+                    QueryRelations[i] = R[p->relations[i]];
+                    R[p->relations[i]]->setId(i);                  // id of relations are in ascending order in 'FROM'
+                    seen_at[p->relations[i]] = true;
+                } else {
+                    unsigned int *temprowids = new unsigned int[R[p->relations[i]]->getSize()];
+                    for (unsigned int j = 0 ; j < R[p->relations[i]]->getSize() ; j++){ temprowids[j] = j + 1; }
+                    QueryRelations[i] = new IntermediateRelation(i, temprowids, R[p->relations[i]]->getSize(), seen_at[p->relations[i]]);
+                    delete[] temprowids;
+                }
             }
+            delete[] seen_at;
             if (abort) continue;
 
             // execute WHERE
@@ -134,13 +145,13 @@ int main(){
                 while ( i < p->nrelations && QueryRelations[i] == NULL ) i++;
                 if ( i == p->nrelations) { cerr << "Warning: should not happen" << endl; break; }
                 QueryRelations[0] = QueryRelations[0]->performCrossProductWith(*QueryRelations[i]);
-                if (QueryRelations[i]->isIntermediate) delete QueryRelations[i];
+                if (QueryRelations[0]->isIntermediate && QueryRelations[i]->isIntermediate) delete QueryRelations[i];
                 QueryRelations[i] = NULL;
             }
 
 			// Choose one:
-			QueryRelations[0]->performSum(p->projections,p->nprojections);
-//            QueryRelations[0]->performSelect(p->projections, p->nprojections);
+            //QueryRelations[0]->performSum(p->projections,p->nprojections);
+            QueryRelations[0]->performSelect(p->projections, p->nprojections);
 
             // cleanup
             for (int i = 0 ; i < p->nrelations; i++){

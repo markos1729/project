@@ -370,7 +370,7 @@ void Relation::performSum(projection *projections, unsigned int nprojections) {
 
 
 /* IntermediateRelation Implementation */
-IntermediateRelation::IntermediateRelation(unsigned int rel_id, unsigned int *_rowids, unsigned int _size) : QueryRelation(true), numberOfRelations(1), size(_size) {
+IntermediateRelation::IntermediateRelation(unsigned int rel_id, unsigned int *_rowids, unsigned int _size, int pos_in_R) : QueryRelation(true), numberOfRelations(1), size(_size), Rpos(pos_in_R) {
     if (size > 0) {
         unsigned int *column = new unsigned int[size];
         for (unsigned int i = 0; i < size; i++) {
@@ -409,7 +409,7 @@ IntermediateRelation::~IntermediateRelation() {
 JoinRelation *IntermediateRelation::extractJoinRelation(unsigned int rel_id, unsigned int col_id) {
     // find rel_id's original Relation in R
     int rel_pos_in_R = find_pos_in_R(rel_id);
-    if (rel_pos_in_R == -1) { cerr << "Warning: rel_id or Rlen invalid in performFilter for intermediate" << endl; return NULL; }
+    if (rel_pos_in_R == -1) { cerr << "Warning: rel_id or Rlen invalid in extractJoinRelation for intermediate" << endl; return NULL; }
     // create intField for col_id
     intField *joinField = new intField[size];
     unsigned int *rowIds = new unsigned int[size];   // (!) rowids must be those of Intermediate rows!!!
@@ -690,11 +690,15 @@ void IntermediateRelation::performSelect(projection *projections, unsigned int n
 int IntermediateRelation::find_pos_in_R(unsigned int rel_id) const {
     //TODO: Change this so it's not a linear search? Maybe keep track of each rel_id->pos_in_R during the query?
     int rel_pos_in_R = -1;
-    for (int i = 0 ; i < Rlen ; i++){
-        if (R[i]->getId() == rel_id){
+    for (int i = 0; i < Rlen; i++) {
+        if (R[i]->getId() == rel_id) {
             rel_pos_in_R = i;
             break;
         }
+    }
+    if (rel_pos_in_R == -1 && Rpos >= 0){   // if rel_id was not found in R table then that id was of a duplicate Relation in FROM
+        rel_pos_in_R = Rpos;                // for which Rpos should have the index of the original's Relation's pos in R
+        //TODO: PROBLEM: What if two Intermediates with Rpos>=0 are joined/crossProducted? One of them loses its original position!
     }
     return rel_pos_in_R;
 }
