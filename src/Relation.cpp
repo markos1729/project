@@ -604,14 +604,6 @@ IntermediateRelation *IntermediateRelation::performCrossProductWithOriginal(cons
         }
         new_rowids[B.getId()] = new unsigned int[number_of_tuples];
 
-//        // DEBUG
-//        cout << "Before:" << endl;
-//        for (auto iter = rowids.begin(); iter != rowids.end(); iter++) {
-//            cout << iter->first << " : [";
-//            for (unsigned int ui = 0; ui < size; ui++) cout << iter->second[ui] << ", ";
-//            cout << "]" << endl;
-//        }
-
         unsigned int pos = 0;
         // every row from A (this) is matched with every row from B
         for (unsigned int bi = 1; bi <= sizeB; bi++) {
@@ -620,14 +612,6 @@ IntermediateRelation *IntermediateRelation::performCrossProductWithOriginal(cons
                 new_rowids[B.getId()][pos] = bi;
             }
         }
-
-//        // DEBUG
-//        cout << "After:" << endl;
-//        for (auto iter = new_rowids.begin(); iter != new_rowids.end(); iter++) {
-//            cout << iter->first << " : [";
-//            for (unsigned int ui = 0; ui < number_of_tuples; ui++) cout << iter->second[ui] << ", ";
-//            cout << "]" << endl;
-//        }
 
         // clear the old map
         for (auto &p : rowids) delete[] p.second;

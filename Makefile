@@ -34,7 +34,7 @@ objects/test-main.o: unit_testing/test-main.cpp $(COMMON_HEAD) unit_testing/catc
 	$(CXX) -c $(CXXFLAGS) unit_testing/test-main.cpp
 	mv test-main.o objects/test-main.o
 
-objects/test.o: unit_testing/test.cpp $(COMMON_HEAD) unit_testing/catch.hpp
+objects/test.o: unit_testing/test_rhj.cpp $(COMMON_HEAD) unit_testing/catch.hpp
 	$(CXX) -c $(CXXFLAGS) unit_testing/test.cpp
 	mv test.o objects/test.o
 
