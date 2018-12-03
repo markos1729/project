@@ -16,10 +16,6 @@
 using namespace std;
 
 
-/* Global Variables */
-Relation **R = NULL;
-int Rlen = -1;
-
 /* Local Functions */
 unsigned int find_rel_pos(QueryRelation **QueryRelations, unsigned int size, unsigned int rel_id);
 
@@ -36,8 +32,8 @@ int main(){
     CHECK( !cin.eof() && !cin.fail() , "Error: reading filenames from cin failed", delete fileList; return -1; )
     CHECK( !fileList->empty() , "Warning: No filenames were given", ; )
     // and load all files into memory
-    Rlen = (int) fileList->size();
-    R = new Relation *[Rlen]();
+    const int Rlen = (int) fileList->size();
+    Relation **R = new Relation *[Rlen]();
     {
         unsigned int i = 0;
         try {
@@ -82,7 +78,7 @@ int main(){
                 } else {
                     unsigned int *temprowids = new unsigned int[R[p->relations[i]]->getSize()];
                     for (unsigned int j = 0 ; j < R[p->relations[i]]->getSize() ; j++){ temprowids[j] = j + 1; }
-                    QueryRelations[i] = new IntermediateRelation(i, temprowids, R[p->relations[i]]->getSize(), seen_at[p->relations[i]]);
+                    QueryRelations[i] = new IntermediateRelation(i, temprowids, R[p->relations[i]]->getSize(), R[seen_at[p->relations[i]]]);
                     delete[] temprowids;
                 }
             }

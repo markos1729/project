@@ -13,10 +13,6 @@
 using namespace std;
 
 
-extern Relation **R;
-extern int Rlen;
-
-
 /* H1 Function used in partitioning*/
 unsigned int H1(intField value, unsigned int n){
     intField mask = 0;
@@ -224,7 +220,7 @@ IntermediateRelation *Relation::performFilter(unsigned int rel_id, unsigned int 
         }
     }
     delete[] passing_rowids;
-    IntermediateRelation *result = new IntermediateRelation(this->id, newrowids, count);
+    IntermediateRelation *result = new IntermediateRelation(this->id, newrowids, count, this);
     delete[] newrowids;
     return result;
 }
@@ -248,7 +244,7 @@ IntermediateRelation *Relation::performEqColumns(unsigned int rel_id, unsigned i
         }
     }
     delete[] passing_rowids;
-    IntermediateRelation *result = new IntermediateRelation(this->id, newrowids, count);
+    IntermediateRelation *result = new IntermediateRelation(this->id, newrowids, count, this);
     delete[] newrowids;
     return result;
 }
@@ -285,11 +281,11 @@ IntermediateRelation *Relation::performJoinWithOriginal(const Relation &B, unsig
             pos++;
         }
 
-        result = new IntermediateRelation(rela_id, relb_id, rowids_a, rowids_b, number_of_tuples);
+        result = new IntermediateRelation(rela_id, relb_id, rowids_a, rowids_b, number_of_tuples, this, &B);
         delete[] rowids_b;
         delete[] rowids_a;
     } else {
-        result = new IntermediateRelation(rela_id, relb_id, (unsigned int *) NULL, (unsigned int *) NULL, 0);
+        result = new IntermediateRelation(rela_id, relb_id, (unsigned int *) NULL, (unsigned int *) NULL, 0, this, &B);
     }
     delete AxB;
     return result;
@@ -322,11 +318,11 @@ IntermediateRelation *Relation::performCrossProductWithOriginal(const Relation &
             }
         }
 
-        result = new IntermediateRelation(id, B.getId(), rowids_a, rowids_b, number_of_tuples);
+        result = new IntermediateRelation(id, B.getId(), rowids_a, rowids_b, number_of_tuples, this, &B);
         delete[] rowids_b;
         delete[] rowids_a;
     } else {
-        result = new IntermediateRelation(id, B.getId(), (unsigned int *) NULL, (unsigned int *) NULL, 0);
+        result = new IntermediateRelation(id, B.getId(), (unsigned int *) NULL, (unsigned int *) NULL, 0, this, &B);
     }
     return result;
 }
@@ -370,7 +366,7 @@ void Relation::performSum(projection *projections, unsigned int nprojections) {
 
 
 /* IntermediateRelation Implementation */
-IntermediateRelation::IntermediateRelation(unsigned int rel_id, unsigned int *_rowids, unsigned int _size, int pos_in_R) : QueryRelation(true), numberOfRelations(1), size(_size), Rpos(pos_in_R) {
+IntermediateRelation::IntermediateRelation(unsigned int rel_id, unsigned int *_rowids, unsigned int _size, const Relation *original_rel) : QueryRelation(true), numberOfRelations(1), size(_size){
     if (size > 0) {
         unsigned int *column = new unsigned int[size];
         for (unsigned int i = 0; i < size; i++) {
@@ -380,9 +376,10 @@ IntermediateRelation::IntermediateRelation(unsigned int rel_id, unsigned int *_r
     } else {
         rowids.insert(make_pair(rel_id, (unsigned int *) NULL));
     }
+    originalRelations.insert(make_pair(rel_id, original_rel));
 }
 
-IntermediateRelation::IntermediateRelation(unsigned int rela_id, unsigned int relb_id, unsigned int *_rowids_a, unsigned int *_rowids_b, unsigned int _size) : QueryRelation(true), numberOfRelations(2), size(_size) {
+IntermediateRelation::IntermediateRelation(unsigned int rela_id, unsigned int relb_id, unsigned int *_rowids_a, unsigned int *_rowids_b, unsigned int _size, const Relation *original_rel_a, const Relation *original_rel_b) : QueryRelation(true), numberOfRelations(2), size(_size) {
     if (size > 0) {
         unsigned int *column_a = new unsigned int[size];
         unsigned int *column_b = new unsigned int[size];
@@ -396,6 +393,8 @@ IntermediateRelation::IntermediateRelation(unsigned int rela_id, unsigned int re
         rowids.insert(make_pair(rela_id, (unsigned int *) NULL));
         rowids.insert(make_pair(relb_id, (unsigned int *) NULL));
     }
+    originalRelations.insert(make_pair(rela_id, original_rel_a));
+    originalRelations.insert(make_pair(relb_id, original_rel_b));
 }
 
 IntermediateRelation::~IntermediateRelation() {
@@ -408,13 +407,13 @@ IntermediateRelation::~IntermediateRelation() {
 
 JoinRelation *IntermediateRelation::extractJoinRelation(unsigned int rel_id, unsigned int col_id) {
     // find rel_id's original Relation in R
-    int rel_pos_in_R = find_pos_in_R(rel_id);
-    if (rel_pos_in_R == -1) { cerr << "Warning: rel_id or Rlen invalid in extractJoinRelation for intermediate" << endl; return NULL; }
+    const Relation *OriginalR = getOriginalRelationFor(rel_id);
+    if (OriginalR == NULL) { cerr << "Warning: rel_id invalid or originalRelations map corrupted in extractJoinRelation for intermediate" << endl; return NULL; }
     // create intField for col_id
     intField *joinField = new intField[size];
     unsigned int *rowIds = new unsigned int[size];   // (!) rowids must be those of Intermediate rows!!!
     for(unsigned int i = 0 ; i < size ; i++){
-        joinField[i] = R[rel_pos_in_R]->getValueAt(col_id, rowids[rel_id][i] - 1);
+        joinField[i] = OriginalR->getValueAt(col_id, rowids[rel_id][i] - 1);
         rowIds[i] = i + 1;
     }
     // create JoinRelation
@@ -435,9 +434,9 @@ IntermediateRelation *IntermediateRelation::performFilter(unsigned int rel_id, u
     intField *field = new intField[size];
     for (int i = 0 ; i < size ; i++){
         //DEBUG Note: R[rel_id] is NOT the correct relation as rel_ids are only for the 'FROM' tables. We have to calculate it by searching or keeping info on it (TODO?)
-        int rel_pos_in_R = find_pos_in_R(rel_id);
-        if (rel_pos_in_R == -1) { cerr << "Warning: rel_id or Rlen invalid in performFilter for intermediate" << endl; delete[] field; return NULL; }
-        field[i] = R[rel_pos_in_R]->getValueAt(col_id, fieldrowids[i] - 1);   // (!) -1 because rowids start at 1
+        const Relation *OriginalR = getOriginalRelationFor(rel_id);
+        if (OriginalR == NULL) { cerr << "Warning: rel_id invalid or originalRelations map corrupted in performFilter for intermediate" << endl; delete[] field; return NULL; }
+        field[i] = OriginalR->getValueAt(col_id, fieldrowids[i] - 1);   // (!) -1 because rowids start at 1
     }
     // filter field
     unsigned int count = 0;
@@ -461,10 +460,10 @@ IntermediateRelation *IntermediateRelation::performEqColumns(unsigned int rel_id
     intField *field2 = new intField[size];
     for (int i = 0 ; i < size ; i++){
         //DEBUG Note: R[rel_id] is NOT the correct relation as rel_ids are only for the 'FROM' tables. We have to calculate it by searching or keeping info on it (TODO?)
-        int rel_pos_in_R = find_pos_in_R(rel_id);
-        if (rel_pos_in_R == -1) { cerr << "Warning: rel_id or Rlen invalid in performFilter for intermediate" << endl; delete[] field1; delete[] field2; return NULL; }
-        field1[i] = R[rel_pos_in_R]->getValueAt(cola_id, fieldrowids[i] - 1);   // (!) -1 because rowids start at 1
-        field2[i] = R[rel_pos_in_R]->getValueAt(colb_id, fieldrowids[i] - 1);   // ^^
+        const Relation *OriginalR = getOriginalRelationFor(rel_id);
+        if (OriginalR == NULL) { cerr << "Warning: rel_id invalid or originalRelations map corrupted in performFilter for intermediate" << endl; delete[] field1; delete[] field2; return NULL; }
+        field1[i] = OriginalR->getValueAt(cola_id, fieldrowids[i] - 1);   // (!) -1 because rowids start at 1
+        field2[i] = OriginalR->getValueAt(colb_id, fieldrowids[i] - 1);   // ^^
     }
     // mark equal columns
     unsigned int count = 0;
@@ -521,18 +520,19 @@ IntermediateRelation *IntermediateRelation::performJoinWithOriginal(const Relati
         // and replace it with the new
         rowids = new_rowids;  // slow copy of the whole struct. TODO: make rowids a pointer to heap? (is it worth it?)
 
-        // change size and numberOfRelations accordingly
+        // change size accordingly
         size = number_of_tuples;    // TODO: change size to unsigned long long int?
-        numberOfRelations++;
+
     } else {
         // clear the old map
         for (auto &p : rowids) { delete[] p.second; p.second = NULL; }
         rowids.clear();
 
-        // change size and numberOfRelations accordingly
+        // change size accordingly
         size = 0;
-        numberOfRelations++;
     }
+    numberOfRelations++;
+    originalRelations[relb_id] = &B;   // insert new original relation's address
     delete AxB;
     return this;
 }
@@ -572,17 +572,19 @@ IntermediateRelation *IntermediateRelation::performJoinWithIntermediate(Intermed
         // and replace it with the new
         rowids = new_rowids;  // slow copy of the whole struct. TODO: make rowids a pointer to heap? (is it worth it?)
 
-        // change size and numberOfRelations accordingly
+        // change size accordingly
         size = number_of_tuples;    // TODO: change size to unsigned long long int?
-        numberOfRelations += B.numberOfRelations;
     } else {
         // clear the old map
         for (auto &p : rowids) { delete[] p.second; p.second = NULL; }
         rowids.clear();
 
-        // change size and numberOfRelations accordingly
+        // change size accordingly
         size = 0;    // TODO: change size to unsigned long long int?
-        numberOfRelations += B.numberOfRelations;
+    }
+    numberOfRelations += B.numberOfRelations;
+    for (auto &p: B.originalRelations){          // for every original relation in B
+        originalRelations[p.first] = p.second;   // insert new original relation's address to this
     }
     delete AxB;
     return this;
@@ -620,7 +622,7 @@ IntermediateRelation *IntermediateRelation::performCrossProductWithOriginal(cons
         // and replace it with the new
         rowids = new_rowids;  // slow copy of the whole struct.
 
-        // change size and numberOfRelations accordingly
+        // change size accordingly
         size = number_of_tuples;
     } else {
         // clear the old map
@@ -629,6 +631,7 @@ IntermediateRelation *IntermediateRelation::performCrossProductWithOriginal(cons
         size = 0;
     }
     numberOfRelations++;
+    originalRelations[B.getId()] = &B;
     return this;
 }
 
@@ -667,6 +670,9 @@ IntermediateRelation *IntermediateRelation::performCrossProductWithIntermediate(
         size = 0;
     }
     numberOfRelations += B.numberOfRelations;
+    for (auto &p : B.originalRelations){
+        originalRelations[p.first] = p.second;
+    }
     return this;
 }
 
@@ -679,28 +685,16 @@ void IntermediateRelation::performSelect(projection *projections, unsigned int n
     for (unsigned int i = 0 ; i < size ; i++){
         for (unsigned int j = 0 ; j < nprojections ; j++){
             //DEBUG Note: R[rel_id] is NOT the correct relation as rel_ids are only for the 'FROM' tables. We have to calculate it by searching or keeping info on it (TODO?)
-            int rel_pos_in_R = find_pos_in_R(projections[j].rel_id);
-            if (rel_pos_in_R == -1) { cerr << "Warning: rel_id or Rlen invalid in performSelect for intermediate" << endl; }
-            else printf("%6lu", R[rel_pos_in_R]->getValueAt(projections[j].col_id, rowids[projections[j].rel_id][i] - 1));   // (!) -1 because rowids start from 1
+            const Relation *OriginalR = getOriginalRelationFor(projections[j].rel_id);
+            if (OriginalR == NULL) { cerr << "Warning: rel_id invalid or originalRelations map corrupted in performSelect for intermediate" << endl; }
+            else printf("%6lu", OriginalR->getValueAt(projections[j].col_id, rowids[projections[j].rel_id][i] - 1));   // (!) -1 because rowids start from 1
         }
         printf("\n");
     }
 }
 
-int IntermediateRelation::find_pos_in_R(unsigned int rel_id) const {
-    //TODO: Change this so it's not a linear search? Maybe keep track of each rel_id->pos_in_R during the query?
-    int rel_pos_in_R = -1;
-    for (int i = 0; i < Rlen; i++) {
-        if (R[i]->getId() == rel_id) {
-            rel_pos_in_R = i;
-            break;
-        }
-    }
-    if (rel_pos_in_R == -1 && Rpos >= 0){   // if rel_id was not found in R table then that id was of a duplicate Relation in FROM
-        rel_pos_in_R = Rpos;                // for which Rpos should have the index of the original's Relation's pos in R
-        //TODO: PROBLEM: What if two Intermediates with Rpos>=0 are joined/crossProducted? One of them loses its original position!
-    }
-    return rel_pos_in_R;
+const Relation *IntermediateRelation::getOriginalRelationFor(unsigned int rel_id) {
+    return ( originalRelations.find(rel_id) != originalRelations.end() ) ? originalRelations[rel_id] : NULL;
 }
 
 void IntermediateRelation::keepOnlyMarkedRows(const bool *passing_rowids, unsigned int count) {
@@ -738,13 +732,13 @@ void IntermediateRelation::performSum(projection *projections, unsigned int npro
         return;
     }
 
-    intField *sum=new intField[nprojections];
+    intField *sum = new intField[nprojections];
     memset(sum,0,sizeof sum);
 
     for (unsigned int i=0; i<size; ++i)
         for (unsigned int j=0; j<nprojections; ++j) {
-            int rel_pos_in_R = find_pos_in_R(projections[j].rel_id);
-            sum[j]+=R[rel_pos_in_R]->getValueAt(projections[j].col_id,rowids[projections[j].rel_id][i]-1);
+            const Relation *OriginalR = getOriginalRelationFor(projections[j].rel_id);
+            sum[j] += OriginalR->getValueAt(projections[j].col_id, rowids[projections[j].rel_id][i] - 1);
         }
 
     for (unsigned int k=0; k<nprojections-1; ++k) printf("%lu ",sum[k]);

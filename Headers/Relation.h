@@ -95,13 +95,13 @@ public:
 
 
 class IntermediateRelation : public QueryRelation {       // Intermediate Relations need only store the rowids of tuples from their original Relations
-    int Rpos;                                             // the position in R table where the original Relation for an Intermediate with numberOfRelations == 1 is (used to allow for multiple same relations in 'FROM')
     unsigned int size;                                    // size of rowids array for EVERY relation_id in 'rowids' hashmap
     unsigned int numberOfRelations;                       // number of original Relations represented by this Intermediate Relation
     unordered_map<unsigned int, unsigned int *> rowids;   // a hash table map for: <key=relation_id, value=rowids_of_that_relation>
+    unordered_map<unsigned int, const Relation *> originalRelations;  // a hash table map for: <key=relation_id, value=pointer to the original Relation for this relation_id>
 public:
-    IntermediateRelation(unsigned int rel_id, unsigned int *_rowids, unsigned int _size, int pos_in_R = -1);
-    IntermediateRelation(unsigned int rela_id, unsigned int relb_id, unsigned int *_rowids_a, unsigned int *_rowids_b, unsigned int _size);
+    IntermediateRelation(unsigned int rel_id, unsigned int *_rowids, unsigned int _size, const Relation *original_rel);
+    IntermediateRelation(unsigned int rela_id, unsigned int relb_id, unsigned int *_rowids_a, unsigned int *_rowids_b, unsigned int _size, const Relation *original_rel_a, const Relation *original_rel_b);
     ~IntermediateRelation() override;
     unsigned int getSize() const { return size; }
     unsigned int *getRowIdsFor(unsigned int rel_id) { if ( containsRelation(rel_id) ) return rowids[rel_id]; else return NULL; }
@@ -119,7 +119,7 @@ public:
     void performSelect(projection *projections, unsigned int nprojections) override;
     void performSum(projection *projections, unsigned int nprojections) override;
 private:
-    int find_pos_in_R(unsigned int rel_id) const;
+    const Relation *getOriginalRelationFor(unsigned int rel_id);
     void keepOnlyMarkedRows(const bool *passing_rowids, unsigned int count);
 };
 
