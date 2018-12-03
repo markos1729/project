@@ -351,8 +351,7 @@ void Relation::performSum(projection *projections, unsigned int nprojections) {
     	return;
 	}
 
-    intField *sum=new intField[nprojections];
-    memset(sum,0,sizeof sum);
+    intField *sum=new intField[nprojections]();
     
     for (unsigned int i=0; i<size; ++i)
     for (unsigned int j=0; j<nprojections; ++j)
@@ -732,8 +731,7 @@ void IntermediateRelation::performSum(projection *projections, unsigned int npro
         return;
     }
 
-    intField *sum = new intField[nprojections];
-    memset(sum,0,sizeof sum);
+    intField *sum = new intField[nprojections]();
 
     for (unsigned int i=0; i<size; ++i)
         for (unsigned int j=0; j<nprojections; ++j) {
