@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include "../Headers/Relation.h"
 #include "../Headers/RadixHashJoin.h"
+#include "../Headers/util.h"
 
 
 using namespace std;
@@ -211,10 +212,7 @@ IntermediateRelation *Relation::performFilter(unsigned int rel_id, unsigned int 
         unsigned int j = 0;
         for (unsigned int i = 0; i < size; i++) {
             if (passing_rowids[i]) {
-                if (j >= count) {
-                    cerr << "Warning: miscounted passing rowids? : count  = " << count << endl;
-                    break;
-                }
+                CHECK( j < count, "Warning: miscounted passing rowids in Relation::performFilter()", break; )
                 newrowids[j++] = i + 1;   // keep rowid for intermediate, not the intField columns[cold_id][i].
             }
         }
@@ -235,10 +233,7 @@ IntermediateRelation *Relation::performEqColumns(unsigned int rel_id, unsigned i
         unsigned int j = 0;
         for (unsigned int i = 0; i < size; i++) {
             if (passing_rowids[i]) {
-                if (j >= count) {
-                    cerr << "Warning: miscounted passing rowids? : count  = " << count << endl;
-                    break;
-                }
+                CHECK( j < count, "Warning: miscounted passing rowids in Relation::performEqColumns()", break; )
                 newrowids[j++] = i + 1;   // keep rowid for intermediate, not the intField columns[cold_id][i].
             }
         }
@@ -407,7 +402,7 @@ IntermediateRelation::~IntermediateRelation() {
 JoinRelation *IntermediateRelation::extractJoinRelation(unsigned int rel_id, unsigned int col_id) {
     // find rel_id's original Relation in R
     const Relation *OriginalR = getOriginalRelationFor(rel_id);
-    if (OriginalR == NULL) { cerr << "Warning: rel_id invalid or originalRelations map corrupted in extractJoinRelation for intermediate" << endl; return NULL; }
+    CHECK(OriginalR != NULL, "Warning: rel_id invalid or originalRelations map corrupted in IntermediateRelation::extractJoinRelation()", return NULL; )
     // create intField for col_id
     intField *joinField = new intField[size];
     unsigned int *rowIds = new unsigned int[size];   // (!) rowids must be those of Intermediate rows!!!
@@ -424,17 +419,15 @@ JoinRelation *IntermediateRelation::extractJoinRelation(unsigned int rel_id, uns
 
 IntermediateRelation *IntermediateRelation::performFilter(unsigned int rel_id, unsigned int col_id, intField value, char cmp) {
     if (size <= 0) return this;
-    if ( rowids.find(rel_id) == rowids.end() ){   // non existant relation in intermediate
-        cerr << "Fatal error: filter requested on intermediate for non existing relation" << endl;
-        return NULL;
-    }
+    CHECK( rowids.find(rel_id) != rowids.end(), "Error: filter requested on intermediate for non existing relation", return NULL; )
     // recreate intField to be filtered from rowids
     const unsigned int *fieldrowids = rowids[rel_id];
     intField *field = new intField[size];
     for (int i = 0 ; i < size ; i++){
         //DEBUG Note: R[rel_id] is NOT the correct relation as rel_ids are only for the 'FROM' tables. We have to calculate it by searching or keeping info on it (TODO?)
         const Relation *OriginalR = getOriginalRelationFor(rel_id);
-        if (OriginalR == NULL) { cerr << "Warning: rel_id invalid or originalRelations map corrupted in performFilter for intermediate" << endl; delete[] field; return NULL; }
+        CHECK(OriginalR != NULL, "Warning: rel_id invalid or originalRelations map corrupted in IntermediateRelation::performFilter()",
+              delete[] field; return NULL; )
         field[i] = OriginalR->getValueAt(col_id, fieldrowids[i] - 1);   // (!) -1 because rowids start at 1
     }
     // filter field
@@ -449,10 +442,7 @@ IntermediateRelation *IntermediateRelation::performFilter(unsigned int rel_id, u
 
 IntermediateRelation *IntermediateRelation::performEqColumns(unsigned int rel_id, unsigned int cola_id, unsigned int colb_id) {
     if (size <= 0) return this;
-    if ( rowids.find(rel_id) == rowids.end() ){   // non existant relation in intermediate
-        cerr << "Fatal error: filter requested on intermediate for non existing relation" << endl;
-        return NULL;
-    }
+    CHECK( rowids.find(rel_id) != rowids.end(), "Error: equal columns requested on intermediate for non existing relation", return NULL; )
     // recreate intFields to be checked for equal values from rowids
     const unsigned int *fieldrowids = rowids[rel_id];
     intField *field1 = new intField[size];
@@ -460,7 +450,8 @@ IntermediateRelation *IntermediateRelation::performEqColumns(unsigned int rel_id
     for (int i = 0 ; i < size ; i++){
         //DEBUG Note: R[rel_id] is NOT the correct relation as rel_ids are only for the 'FROM' tables. We have to calculate it by searching or keeping info on it (TODO?)
         const Relation *OriginalR = getOriginalRelationFor(rel_id);
-        if (OriginalR == NULL) { cerr << "Warning: rel_id invalid or originalRelations map corrupted in performFilter for intermediate" << endl; delete[] field1; delete[] field2; return NULL; }
+        CHECK(OriginalR != NULL, "Warning: rel_id invalid or originalRelations map corrupted in IntermediateRelation::performEqColumns()",
+              delete[] field1; delete[] field2; return NULL; )
         field1[i] = OriginalR->getValueAt(cola_id, fieldrowids[i] - 1);   // (!) -1 because rowids start at 1
         field2[i] = OriginalR->getValueAt(colb_id, fieldrowids[i] - 1);   // ^^
     }
@@ -685,8 +676,8 @@ void IntermediateRelation::performSelect(projection *projections, unsigned int n
         for (unsigned int j = 0 ; j < nprojections ; j++){
             //DEBUG Note: R[rel_id] is NOT the correct relation as rel_ids are only for the 'FROM' tables. We have to calculate it by searching or keeping info on it (TODO?)
             const Relation *OriginalR = getOriginalRelationFor(projections[j].rel_id);
-            if (OriginalR == NULL) { cerr << "Warning: rel_id invalid or originalRelations map corrupted in performSelect for intermediate" << endl; }
-            else printf("%6lu", OriginalR->getValueAt(projections[j].col_id, rowids[projections[j].rel_id][i] - 1));   // (!) -1 because rowids start from 1
+            CHECK(OriginalR != NULL, "Warning: rel_id invalid or originalRelations map corrupted in IntermediateRelation::performSelect() ", break; )
+            printf("%6lu", OriginalR->getValueAt(projections[j].col_id, rowids[projections[j].rel_id][i] - 1));   // (!) -1 because rowids start from 1
         }
         printf("\n");
     }
@@ -704,10 +695,7 @@ void IntermediateRelation::keepOnlyMarkedRows(const bool *passing_rowids, unsign
             unsigned int j = 0;
             for (unsigned int i = 0; i < size; i++) {
                 if (passing_rowids[i]) {
-                    if (j >= count) {
-                        cerr << "Warning: miscounted passing rowids in intermediate? count = " << count << endl;
-                        break;
-                    }
+                    CHECK( j < count, "Warning: miscounted passing rowids in IntermediateRelation::keepOnlyMarkedRows()", break; )
                     newrowids[j++] = rids[i];
                 }
             }

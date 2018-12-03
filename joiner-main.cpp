@@ -2,13 +2,9 @@
 #include <string.h>
 #include <unistd.h>
 #include <vector>
-
 #include "Headers/SQLParser.h"
 #include "Headers/Relation.h"
 #include "Headers/util.h"
-
-
-#define CHECK(call, msg, actions) { if ( !(call) ) { std::cerr << msg << std::endl; actions } }
 
 #define STARTING_VECTOR_SIZE 16
 
@@ -29,8 +25,8 @@ int main(){
     while ( getline(cin, currName) && currName != "Done" ) {
         fileList->push_back(currName);
     }
-    CHECK( !cin.eof() && !cin.fail() , "Error: reading filenames from cin failed", delete fileList; return -1; )
-    CHECK( !fileList->empty() , "Warning: No filenames were given", ; )
+    CHECK( !cin.eof() && !cin.fail() , "Error: reading file names from cin failed", delete fileList; return -1; )
+    CHECK( !fileList->empty() , "Warning: No file names were given", )
     // and load all files into memory
     const int Rlen = (int) fileList->size();
     Relation **R = new Relation *[Rlen]();
@@ -56,26 +52,21 @@ int main(){
     while ( getline(cin, currStatement) && !cin.eof() && !cin.fail() ){
         CHECK( currStatement != "F" , "Warning: Received an empty batch of statements.", continue; )
         do {
-            SQLParser *p = new SQLParser(currStatement.c_str());     // example: "0 2 4|0.1=1.2&1.0=2.1&0.1>3000|0.0 1.1";
+            SQLParser *p = new SQLParser(currStatement.c_str());   // example: "0 2 4|0.1=1.2&1.0=2.1&0.1>3000|0.0 1.1";
 
             bool abort = false;
 
-            // reset all ids in R before every query (TODO: change if we do not use search to find pos in R for rel_id)
-            for (unsigned int i = 0 ; i < Rlen ; i++){
-                R[i]->setId(-1);   // -1 is 111...1 in unsigned int.
-            }
-
-            // execute FROM: load original Relations to an array of pointers to such (which will only get "smaller" during the query)
+            // execute FROM: load original Relations to an array of pointers to such
             QueryRelation **QueryRelations = new QueryRelation*[p->nrelations]();
             int *seen_at = new int[Rlen]();
-            for (int i = 0 ; i < Rlen ; i++) seen_at[i] = -1;       // init to -1
+            for (int i = 0 ; i < Rlen ; i++) seen_at[i] = -1;      // init to -1
             for (unsigned int i = 0; i < p->nrelations ; i++){
-                CHECK( p->relations[i] < Rlen, "SQL Error: SQL query contains non-existant Relation in \'FROM\'. Aborting query...", delete[] QueryRelations; delete p; abort = true; break; )
+                CHECK( p->relations[i] < Rlen, "SQL Error: SQL query contains non-existent Relation in \'FROM\'. Aborting query...", delete[] QueryRelations; delete p; abort = true; break; )
                 if ( seen_at[p->relations[i]] == -1 ) {
                     QueryRelations[i] = R[p->relations[i]];
                     R[p->relations[i]]->setId(i);                  // id of relations are in ascending order in 'FROM'
                     seen_at[p->relations[i]] = true;
-                } else {
+                } else {                                           // the second+ time we meet the same relation we create an IntermediateRelation for it
                     unsigned int *temprowids = new unsigned int[R[p->relations[i]]->getSize()];
                     for (unsigned int j = 0 ; j < R[p->relations[i]]->getSize() ; j++){ temprowids[j] = j + 1; }
                     QueryRelations[i] = new IntermediateRelation(i, temprowids, R[p->relations[i]]->getSize(), R[seen_at[p->relations[i]]]);
@@ -85,14 +76,17 @@ int main(){
             delete[] seen_at;
             if (abort) continue;
 
-            // execute WHERE
+            // execute WHERE: filters > equal columns > joins (+ equal columns if they end up to be)
             // First, do filters
             for (int i = 0 ; i < p->nfilters ; i++){
                 //FILTER
                 const filter &filter = p->filters[i];
                 CHECK( (filter.rel_id < p->nrelations), "SQL Error: SQL filter contains a relation that does not exist in \'FROM\'. Aborting query...",
                        for (int ii = 0 ; ii < p->nrelations; ii++) { if ( QueryRelations[ii] != NULL && QueryRelations[ii]->isIntermediate ) delete QueryRelations[ii]; } delete[] QueryRelations; delete p; abort = true; break; )
+                QueryRelation *prev = QueryRelations[filter.rel_id];
                 QueryRelations[filter.rel_id] = QueryRelations[filter.rel_id]->performFilter(filter.rel_id, filter.col_id, filter.value, filter.cmp);
+                CHECK(QueryRelations[filter.rel_id] != NULL, "Error: Could not execute filter: " + to_string(filter.rel_id) + filter.cmp + to_string(filter.col_id),
+                      QueryRelations[filter.rel_id] = prev; )  // restore prev
             }
             if (abort) continue;
             // Then equal columns operations
@@ -102,7 +96,10 @@ int main(){
                     const predicate &predicate = p->predicates[i];
                     CHECK( (predicate.rela_id < p->nrelations), "SQL Error: SQL equal columns predicate on one relation that does not exist in \'FROM\'. Aborting query...",
                            for (int ii = 0 ; ii < p->nrelations; ii++) { if ( QueryRelations[ii] != NULL && QueryRelations[ii]->isIntermediate ) delete QueryRelations[ii]; } delete[] QueryRelations; delete p; abort = true; break;)
+                    QueryRelation *prev = QueryRelations[predicate.rela_id];
                     QueryRelations[predicate.rela_id] = QueryRelations[predicate.rela_id]->performEqColumns(predicate.rela_id, predicate.cola_id, predicate.colb_id);
+                    CHECK(QueryRelations[predicate.rela_id] != NULL, "Error: Could not execute equal columns: " + to_string(predicate.rela_id) + "." + to_string(predicate.cola_id) + "=" + to_string(predicate.relb_id) + "." + to_string(predicate.colb_id),
+                          QueryRelations[predicate.rela_id] = prev; )  // restore prev
                 }
                 // else if (  p->predicates[i].rela_id == p->predicates[i].relb_id  ) -> ignore predicate
             }
@@ -114,38 +111,57 @@ int main(){
                        for (int ii = 0 ; ii < p->nrelations; ii++) { if ( QueryRelations[ii] != NULL && QueryRelations[ii]->isIntermediate ) delete QueryRelations[ii]; } delete[] QueryRelations; delete p; abort = true; break; )
                 unsigned int rela_pos = find_rel_pos(QueryRelations, p->nrelations, predicate.rela_id);
                 unsigned int relb_pos = find_rel_pos(QueryRelations, p->nrelations, predicate.relb_id);
-                CHECK( rela_pos != -1 && relb_pos != -1, "Warning: Something went wrong joining relations, cannot find intermediate for one. Please debug.", continue; )
+                CHECK( rela_pos != -1 && relb_pos != -1, "Warning: searched for a rel_id that was not found in QueryRelations! Please debug...", continue; )
                 if ( rela_pos != relb_pos ){
                     // JOIN
+                    bool failed = false;
                     if (rela_pos < relb_pos){
+                        QueryRelation *prev = QueryRelations[rela_pos];
                         QueryRelations[rela_pos] = QueryRelations[rela_pos]->performJoinWith(*QueryRelations[relb_pos], predicate.rela_id, predicate.cola_id, predicate.relb_id, predicate.colb_id);
-                        if ( QueryRelations[rela_pos]->isIntermediate && QueryRelations[relb_pos]->isIntermediate ) delete QueryRelations[relb_pos];   // if only QueryRelations[relb_pos] is Intermediate then we do not want to delete it (!)
-                        QueryRelations[relb_pos] = NULL;
+                        CHECK( QueryRelations[rela_pos] != NULL, "Error: Could not execute join: " + to_string(predicate.rela_id) + "." + to_string(predicate.cola_id) + "=" + to_string(predicate.relb_id) + "." + to_string(predicate.colb_id),
+                               QueryRelations[rela_pos] = prev; failed = true; )
+                        if (!failed) {
+                            if (QueryRelations[rela_pos]->isIntermediate && QueryRelations[relb_pos]->isIntermediate) delete QueryRelations[relb_pos];   // if only QueryRelations[relb_pos] is Intermediate then we do not want to delete it (!)
+                            QueryRelations[relb_pos] = NULL;
+                        }
                     } else {
+                        QueryRelation *prev = QueryRelations[relb_pos];
                         QueryRelations[relb_pos] = QueryRelations[relb_pos]->performJoinWith(*QueryRelations[rela_pos], predicate.relb_id, predicate.colb_id, predicate.rela_id, predicate.cola_id);
-                        if ( QueryRelations[relb_pos]->isIntermediate && QueryRelations[rela_pos]->isIntermediate ) delete QueryRelations[rela_pos];
-                        QueryRelations[rela_pos] = NULL;
+                        CHECK( QueryRelations[relb_pos] != NULL, "Error: Could not execute join: " + to_string(predicate.rela_id) + "." + to_string(predicate.cola_id) + "=" + to_string(predicate.relb_id) + "." + to_string(predicate.colb_id),
+                               QueryRelations[relb_pos] = prev; failed = true; )
+                        if (!failed) {
+                            if (QueryRelations[relb_pos]->isIntermediate && QueryRelations[rela_pos]->isIntermediate) delete QueryRelations[rela_pos];
+                            QueryRelations[rela_pos] = NULL;
+                        }
                     }
                 } else {   // (!) if two tables are joined two times then the first it will be join whilst the second time it will be an equal columns operation!
-                    // EQUAL COLUMNS UNARY OPERATION
+                    // EQUAL COLUMNS UNARY OPERATION (self join)
+                    QueryRelation *prev = QueryRelations[rela_pos];   // (!) rela_id == relb_id
                     QueryRelations[rela_pos] = QueryRelations[rela_pos]->performEqColumns(predicate.rela_id, predicate.cola_id, predicate.colb_id);
+                    CHECK( QueryRelations[rela_pos] != NULL, "Error: Could not execute equal columns (self join): " + to_string(predicate.rela_id) + "." + to_string(predicate.cola_id) + "=" + to_string(predicate.relb_id) + "." + to_string(predicate.colb_id),
+                           QueryRelations[rela_pos] = prev; )
                 }
             }
             if (abort) continue;
-            CHECK( QueryRelations[0] != NULL, "Warning: Something not supposed to happen happened. Please debug...",
-                   for (int i = 0 ; i < p->nrelations; i++) { if ( QueryRelations[i] != NULL && QueryRelations[i]->isIntermediate ) delete QueryRelations[i]; } delete[] QueryRelations; delete p; break; )
+            CHECK( QueryRelations[0] != NULL, "Fatal error: Could not keep results to leftmost Intermediate QueryRelation (Should not happen). Please debug...",
+                   for (int i = 0 ; i < p->nrelations; i++) { if ( QueryRelations[i] != NULL && QueryRelations[i]->isIntermediate ) delete QueryRelations[i]; } delete[] QueryRelations; delete p;
+                   for (unsigned int i = 0 ; i < Rlen ; i++ ) { delete R[i]; } delete[] R; return -2; )
             // Last but not least any cross-products left to do
+            int lastpos = 0;
             while ( count_not_null((void **) QueryRelations, p->nrelations) > 1 ){
                 // CROSS PRODUCT: perform cross product between remaining Relations uniting them into one in the leftest position until only one QueryRelation remains
-                int i = 1;
+                int i = lastpos + 1;
                 while ( i < p->nrelations && QueryRelations[i] == NULL ) i++;
-                if ( i == p->nrelations) { cerr << "Warning: should not happen" << endl; break; }
+                CHECK( i < p->nrelations,  "Warning: count_not_null does not work properly? Please debug...", break; )
+                QueryRelation *prev = QueryRelations[0];
                 QueryRelations[0] = QueryRelations[0]->performCrossProductWith(*QueryRelations[i]);
+                CHECK( QueryRelations[0] != NULL, "Error: could not execute cross product", QueryRelations[0] = prev; continue; )
                 if (QueryRelations[0]->isIntermediate && QueryRelations[i]->isIntermediate) delete QueryRelations[i];
                 QueryRelations[i] = NULL;
+                lastpos = i;
             }
 
-			// Choose one:
+			// Choose one (sum or select):
             //QueryRelations[0]->performSum(p->projections,p->nprojections);
             QueryRelations[0]->performSelect(p->projections, p->nprojections);
 
