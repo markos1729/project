@@ -51,7 +51,7 @@ bool Result::addTuple(unsigned int rowid1, unsigned int rowid2) {
         if ( ! cur->isFull() ){
             if ( cur->addTuple(rowid1, rowid2) ){
             	size++;
-        		return true;
+        	return true;
             } else return false;
         } else {
             ResultNode *temp = cur;
@@ -59,7 +59,7 @@ bool Result::addTuple(unsigned int rowid1, unsigned int rowid2) {
             temp->next = cur;
             if ( cur->addTuple(rowid1, rowid2) ){
             	size++;
-        		return true;
+        	return true;
             } else return false;
         }
     }
@@ -77,10 +77,13 @@ void Result::printRowIds() {
 
 /* Iterator Implementation */
 bool Iterator::getNext(unsigned int &rid, unsigned int &sid) {
-	if (curr == NULL) return false;
+    if (curr == NULL) return false;
     rid = curr->buffer[pos];
     sid = curr->buffer[pos+1];
     pos += 2;
-	if (pos >= curr->nextpos) curr = curr->next;
+    if (pos >= curr->nextpos) { 
+	curr = curr->next;
+        pos = 0;  // reset pos to 0
+    }
     return true;
 }

@@ -32,7 +32,7 @@ struct ResultNode{
 class Result {
 	friend class Iterator;
 	private:
-    	unsigned long long int size;
+    		unsigned long long int size;
 		ResultNode *head;
 		ResultNode *cur;
 	public:
@@ -51,7 +51,7 @@ class Iterator {
 		ResultNode *curr;
 	public:
 		Iterator(Result *r) : pos(0), curr(r->head) {}
-	    bool getNext(unsigned int &rid, unsigned int &sid);
+		bool getNext(unsigned int &rid, unsigned int &sid);
 };
 
 #endif

@@ -26,7 +26,7 @@ int main(){
         fileList->push_back(currName);
     }
     CHECK( !cin.eof() && !cin.fail() , "Error: reading file names from cin failed", delete fileList; return -1; )
-    CHECK( !fileList->empty() , "Warning: No file names were given", )
+    CHECK( !fileList->empty() , "Warning: No file names were given", delete fileList; return -1; )
     // and load all files into memory
     const int Rlen = (int) fileList->size();
     Relation **R = new Relation *[Rlen]();
@@ -65,11 +65,12 @@ int main(){
                 if ( seen_at[p->relations[i]] == -1 ) {
                     QueryRelations[i] = R[p->relations[i]];
                     R[p->relations[i]]->setId(i);                  // id of relations are in ascending order in 'FROM'
-                    seen_at[p->relations[i]] = true;
+                    seen_at[p->relations[i]] = i;
                 } else {                                           // the second+ time we meet the same relation we create an IntermediateRelation for it
-                    unsigned int *temprowids = new unsigned int[R[p->relations[i]]->getSize()];
-                    for (unsigned int j = 0 ; j < R[p->relations[i]]->getSize() ; j++){ temprowids[j] = j + 1; }
-                    QueryRelations[i] = new IntermediateRelation(i, temprowids, R[p->relations[i]]->getSize(), R[seen_at[p->relations[i]]]);
+                    unsigned int tempsize = R[seen_at[p->relations[i]]]->getSize();
+                    unsigned int *temprowids = new unsigned int[tempsize];
+                    for (unsigned int j = 0 ; j < tempsize ; j++){ temprowids[j] = j + 1; }
+                    QueryRelations[i] = new IntermediateRelation(i, temprowids, tempsize, R[seen_at[p->relations[i]]]);
                     delete[] temprowids;
                 }
             }
@@ -121,7 +122,7 @@ int main(){
                         CHECK( QueryRelations[rela_pos] != NULL, "Error: Could not execute join: " + to_string(predicate.rela_id) + "." + to_string(predicate.cola_id) + "=" + to_string(predicate.relb_id) + "." + to_string(predicate.colb_id),
                                QueryRelations[rela_pos] = prev; failed = true; )
                         if (!failed) {
-                            if (QueryRelations[rela_pos]->isIntermediate && QueryRelations[relb_pos]->isIntermediate) delete QueryRelations[relb_pos];   // if only QueryRelations[relb_pos] is Intermediate then we do not want to delete it (!)
+                            if (prev->isIntermediate && QueryRelations[relb_pos]->isIntermediate) delete QueryRelations[relb_pos];   // if only QueryRelations[relb_pos] is Intermediate then we do not want to delete it (!)
                             QueryRelations[relb_pos] = NULL;
                         }
                     } else {
@@ -130,7 +131,7 @@ int main(){
                         CHECK( QueryRelations[relb_pos] != NULL, "Error: Could not execute join: " + to_string(predicate.rela_id) + "." + to_string(predicate.cola_id) + "=" + to_string(predicate.relb_id) + "." + to_string(predicate.colb_id),
                                QueryRelations[relb_pos] = prev; failed = true; )
                         if (!failed) {
-                            if (QueryRelations[relb_pos]->isIntermediate && QueryRelations[rela_pos]->isIntermediate) delete QueryRelations[rela_pos];
+                            if (prev->isIntermediate && QueryRelations[rela_pos]->isIntermediate) delete QueryRelations[rela_pos];
                             QueryRelations[rela_pos] = NULL;
                         }
                     }
@@ -162,8 +163,8 @@ int main(){
             }
 
             // Choose one (sum or select):
-            //QueryRelations[0]->performSum(p->projections,p->nprojections);
-            QueryRelations[0]->performSelect(p->projections, p->nprojections);
+            QueryRelations[0]->performSum(p->projections,p->nprojections);
+            //QueryRelations[0]->performSelect(p->projections, p->nprojections);
 
             // cleanup
             for (int i = 0 ; i < p->nrelations; i++){

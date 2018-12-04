@@ -271,6 +271,7 @@ IntermediateRelation *Relation::performJoinWithOriginal(const Relation &B, unsig
         Iterator I(AxB);
         unsigned int aid, bid, pos = 0;
         while (I.getNext(aid, bid)) {
+            CHECK( aid > 0 && bid > 0, "WARNING: row id is zero in Relation::performJoinWithOriginal()", )
             rowids_a[pos] = aid;
             rowids_b[pos] = bid;
             pos++;
@@ -497,6 +498,9 @@ IntermediateRelation *IntermediateRelation::performJoinWithOriginal(const Relati
         Iterator I(AxB);
         unsigned int aid, bid, pos = 0;
         while (I.getNext(aid, bid)) {
+            CHECK( aid > 0 && bid > 0, "WARNING: row id is zero in IntermediateRelation::performJoinWithOriginal()", )
+            CHECK(pos < number_of_tuples, "Error: pos >= number_of_tuples", break; )
+            CHECK(aid > 0 && aid <= size, "Error: aid out of bounds: aid = " + to_string(aid), break; )
             for (auto &p : rowids) {
                 new_rowids[p.first][pos] = p.second[aid - 1];
             }
@@ -551,6 +555,7 @@ IntermediateRelation *IntermediateRelation::performJoinWithIntermediate(Intermed
         Iterator I(AxB);
         unsigned int aid, bid, pos = 0;
         while (I.getNext(aid, bid)) {
+            CHECK( aid > 0 && bid > 0, "WARNING: row id is zero in IntermediateRelation::performJoinWithIntermediate()", )
             for (auto &p : rowids) new_rowids[p.first][pos] = rowids[p.first][aid - 1];
             for (auto &p : B.rowids) new_rowids[p.first][pos] = B.rowids[p.first][bid - 1];
             pos++; //current # of tuples
