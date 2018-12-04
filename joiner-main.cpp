@@ -65,7 +65,7 @@ int main(){
                 if ( seen_at[p->relations[i]] == -1 ) {
                     QueryRelations[i] = R[p->relations[i]];
                     R[p->relations[i]]->setId(i);                  // id of relations are in ascending order in 'FROM'
-                    seen_at[p->relations[i]] = i;
+                    seen_at[p->relations[i]] = p->relations[i];
                 } else {                                           // the second+ time we meet the same relation we create an IntermediateRelation for it
                     unsigned int tempsize = R[seen_at[p->relations[i]]]->getSize();
                     unsigned int *temprowids = new unsigned int[tempsize];
