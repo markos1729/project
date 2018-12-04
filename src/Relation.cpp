@@ -223,8 +223,8 @@ IntermediateRelation *Relation::performFilter(unsigned int rel_id, unsigned int 
     return result;
 }
 
-IntermediateRelation *Relation::performEqColumns(unsigned int rel_id, unsigned int cola_id, unsigned int colb_id) {
-    // Note: rel_id is not needed here as there is only one relation to perform eq columns on
+IntermediateRelation *Relation::performEqColumns(unsigned int rela_id, unsigned int relb_id, unsigned int cola_id, unsigned int colb_id) {
+    // Note: rela_id and relb_id are not needed here as there is only one relation to perform eq columns on
     unsigned int count = 0;
     bool *passing_rowids = QueryRelation::eqColumnsFields(columns[cola_id], columns[colb_id], size, count);   // count will change accordingly
     unsigned int *newrowids = NULL;
@@ -440,20 +440,21 @@ IntermediateRelation *IntermediateRelation::performFilter(unsigned int rel_id, u
     return this;
 }
 
-IntermediateRelation *IntermediateRelation::performEqColumns(unsigned int rel_id, unsigned int cola_id, unsigned int colb_id) {
+IntermediateRelation *IntermediateRelation::performEqColumns(unsigned int rela_id, unsigned int relb_id, unsigned int cola_id, unsigned int colb_id) {
     if (size <= 0) return this;
-    CHECK( rowids.find(rel_id) != rowids.end(), "Error: equal columns requested on intermediate for non existing relation", return NULL; )
+    CHECK( rowids.find(rela_id) != rowids.end() && rowids.find(relb_id) != rowids.end(), "Error: equal columns requested on intermediate for non existing relation", return NULL; )
     // recreate intFields to be checked for equal values from rowids
-    const unsigned int *fieldrowids = rowids[rel_id];
+    const unsigned int *fieldrowids_a = rowids[rela_id];
+    const unsigned int *fieldrowids_b = rowids[relb_id];
     intField *field1 = new intField[size];
     intField *field2 = new intField[size];
     for (int i = 0 ; i < size ; i++){
-        //DEBUG Note: R[rel_id] is NOT the correct relation as rel_ids are only for the 'FROM' tables. We have to calculate it by searching or keeping info on it (TODO?)
-        const Relation *OriginalR = getOriginalRelationFor(rel_id);
-        CHECK(OriginalR != NULL, "Warning: rel_id invalid or originalRelations map corrupted in IntermediateRelation::performEqColumns()",
+        const Relation *OriginalRa = getOriginalRelationFor(rela_id);
+	const Relation *OriginalRb = getOriginalRelationFor(relb_id);
+        CHECK(OriginalRa != NULL && OriginalRb != NULL, "Warning: rela_id or relb_id invalid or originalRelations map corrupted in IntermediateRelation::performEqColumns()",
               delete[] field1; delete[] field2; return NULL; )
-        field1[i] = OriginalR->getValueAt(cola_id, fieldrowids[i] - 1);   // (!) -1 because rowids start at 1
-        field2[i] = OriginalR->getValueAt(colb_id, fieldrowids[i] - 1);   // ^^
+        field1[i] = OriginalRa->getValueAt(cola_id, fieldrowids_a[i] - 1);   // (!) -1 because rowids start at 1
+        field2[i] = OriginalRb->getValueAt(colb_id, fieldrowids_b[i] - 1);   // ^^
     }
     // mark equal columns
     unsigned int count = 0;

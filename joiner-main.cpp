@@ -97,7 +97,7 @@ int main(){
                     CHECK( (predicate.rela_id < p->nrelations), "SQL Error: SQL equal columns predicate on one relation that does not exist in \'FROM\'. Aborting query...",
                            for (int ii = 0 ; ii < p->nrelations; ii++) { if ( QueryRelations[ii] != NULL && QueryRelations[ii]->isIntermediate ) delete QueryRelations[ii]; } delete[] QueryRelations; delete p; abort = true; break;)
                     QueryRelation *prev = QueryRelations[predicate.rela_id];
-                    QueryRelations[predicate.rela_id] = QueryRelations[predicate.rela_id]->performEqColumns(predicate.rela_id, predicate.cola_id, predicate.colb_id);
+                    QueryRelations[predicate.rela_id] = QueryRelations[predicate.rela_id]->performEqColumns(predicate.rela_id, predicate.relb_id, predicate.cola_id, predicate.colb_id);
                     CHECK(QueryRelations[predicate.rela_id] != NULL, "Error: Could not execute equal columns: " + to_string(predicate.rela_id) + "." + to_string(predicate.cola_id) + "=" + to_string(predicate.relb_id) + "." + to_string(predicate.colb_id),
                           QueryRelations[predicate.rela_id] = prev; )  // restore prev
                 }
@@ -137,7 +137,7 @@ int main(){
                 } else {   // (!) if two tables are joined two times then the first it will be join whilst the second time it will be an equal columns operation!
                     // EQUAL COLUMNS UNARY OPERATION (self join)
                     QueryRelation *prev = QueryRelations[rela_pos];   // (!) rela_id == relb_id
-                    QueryRelations[rela_pos] = QueryRelations[rela_pos]->performEqColumns(predicate.rela_id, predicate.cola_id, predicate.colb_id);
+                    QueryRelations[rela_pos] = QueryRelations[rela_pos]->performEqColumns(predicate.rela_id, predicate.relb_id, predicate.cola_id, predicate.colb_id);
                     CHECK( QueryRelations[rela_pos] != NULL, "Error: Could not execute equal columns (self join): " + to_string(predicate.rela_id) + "." + to_string(predicate.cola_id) + "=" + to_string(predicate.relb_id) + "." + to_string(predicate.colb_id),
                            QueryRelations[rela_pos] = prev; )
                 }
@@ -161,7 +161,7 @@ int main(){
                 lastpos = i;
             }
 
-			// Choose one (sum or select):
+            // Choose one (sum or select):
             //QueryRelations[0]->performSum(p->projections,p->nprojections);
             QueryRelations[0]->performSelect(p->projections, p->nprojections);
 

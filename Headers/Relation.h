@@ -51,7 +51,7 @@ public:
     explicit QueryRelation(bool _isIntermediate) : isIntermediate(_isIntermediate) {}
     virtual bool containsRelation(unsigned int rel_id) = 0;
     virtual IntermediateRelation *performFilter(unsigned int rel_id, unsigned int col_id, intField value, char cmp) = 0;    // create an Intermediate if isIntermediate == false but change yourself if isIntermediate == true
-    virtual IntermediateRelation *performEqColumns(unsigned int rel_id, unsigned int cola_id, unsigned int colb_id) = 0;    // ^^
+    virtual IntermediateRelation *performEqColumns(unsigned int rela_id, unsigned int relb_id, unsigned int cola_id, unsigned int colb_id) = 0;    // ^^
     virtual IntermediateRelation *performJoinWith(QueryRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) = 0;      // create a new Intermediate for the result and replace yourself with it
     virtual IntermediateRelation *performCrossProductWith(QueryRelation &B) = 0;                                      // ^^
     virtual void performSelect(projection *projections, unsigned int nprojections) = 0;          // write select to stdout
@@ -86,7 +86,7 @@ public:
     /* @Override */
     bool containsRelation(unsigned int rel_id) override { return rel_id == id; }
     IntermediateRelation *performFilter(unsigned int rel_id, unsigned int col_id, intField value, char cmp) override;
-    IntermediateRelation *performEqColumns(unsigned int rel_id, unsigned int cola_id, unsigned int colb_id) override;
+    IntermediateRelation *performEqColumns(unsigned int rela_id, unsigned int relb_id, unsigned int cola_id, unsigned int colb_id) override;
     IntermediateRelation *performJoinWith(QueryRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) override;
     IntermediateRelation *performCrossProductWith(QueryRelation &B) override;
     void performSelect(projection *projections, unsigned int nprojections) override;
@@ -113,7 +113,7 @@ public:
     /* @Override */
     bool containsRelation(unsigned int rel_id) override { return rowids.find(rel_id) != rowids.end(); }
     IntermediateRelation *performFilter(unsigned int rel_id, unsigned int col_id, intField value, char cmp) override;
-    IntermediateRelation *performEqColumns(unsigned int rel_id, unsigned int cola_id, unsigned int colb_id) override;
+    IntermediateRelation *performEqColumns(unsigned int rela_id, unsigned int relb_id, unsigned int cola_id, unsigned int colb_id) override;
     IntermediateRelation *performJoinWith(QueryRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) override;
     IntermediateRelation *performCrossProductWith(QueryRelation &B) override;
     void performSelect(projection *projections, unsigned int nprojections) override;
