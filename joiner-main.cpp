@@ -17,7 +17,7 @@ unsigned int find_rel_pos(QueryRelation **QueryRelations, unsigned int size, uns
 
 
 int main(){
-    cout << "Loading relations..." << endl;
+    //cout << "Loading relations..." << endl;
     // first read line-by-line for relations' file names until read "Done"
     vector<string> *fileList = new vector<string>();
     fileList->reserve(STARTING_VECTOR_SIZE);
@@ -45,7 +45,7 @@ int main(){
     }
     delete fileList;
     // wait for 1 second
-    cout << "Loading done! Accepting Queries..." << endl;
+    //cout << "Loading done! Accepting Queries..." << endl;
     sleep(1);
     // then start parsing 'sql' statements
     string currStatement;
@@ -176,7 +176,7 @@ int main(){
             getline(cin, currStatement);
         } while (!cin.eof() && !cin.fail() && currStatement != "F");
         if (cin.eof() || cin.fail()) break;
-        cout << endl;
+        //cout << endl;
     }
     //CHECK( cin.eof() && !cin.fail(), "Error: reading statements from cin failed", ; )
     // cleanup
