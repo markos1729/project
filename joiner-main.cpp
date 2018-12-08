@@ -6,7 +6,11 @@
 #include "Headers/Relation.h"
 #include "Headers/util.h"
 
+
 #define STARTING_VECTOR_SIZE 16
+
+
+//#define PRINT_SUM    // define this to print SUM of projected columns instead of their values
 
 
 using namespace std;
@@ -163,8 +167,11 @@ int main(){
             }
 
             // Choose one (sum or select):
+            #ifdef PRINT_SUM
             QueryRelations[0]->performSum(p->projections,p->nprojections);
-            //QueryRelations[0]->performSelect(p->projections, p->nprojections);
+            #else
+            QueryRelations[0]->performSelect(p->projections, p->nprojections);
+            #endif
 
             // cleanup
             for (int i = 0 ; i < p->nrelations; i++){

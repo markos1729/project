@@ -1,7 +1,7 @@
 #include <algorithm>
 #include <cstdio>
-#include <unordered_set>
 #include <utility>
+#include <set>
 
 #include "catch.hpp"
 #include "../Headers/Relation.h"
@@ -107,8 +107,7 @@ TEST_CASE("Relation::performJoinWithOriginal()", "[Relation]"){
     REQUIRE( result->getSize() == 9 );
     const unsigned int *actual0 = result->getRowIdsFor(0);
     const unsigned int *actual1 = result->getRowIdsFor(1);
-    /** The following doesnt compile for some reason --> pairs are not hashable in C++11
-    unordered_set<pair<unsigned int, unsigned int>> res();
+    set<pair<unsigned int, unsigned int>> res;
     for (int i = 0 ; i < 9 ; i++){
         res.insert(make_pair(actual0[i], actual1[i]));
     }
@@ -121,25 +120,20 @@ TEST_CASE("Relation::performJoinWithOriginal()", "[Relation]"){
     CHECK( res.find(make_pair(5, 5)) != res.end() );
     CHECK( res.find(make_pair(7, 6)) != res.end() );
     CHECK( res.find(make_pair(8, 6)) != res.end() );
-    */
-    //DEBUG PRINT instead
-    cout << "Relation Results:" << endl;
-    for (int i = 0 ; i < 9 ; i++){
-        cout << actual0[i] << " - " << actual1[i] << endl;
-    }
     delete result;
     R_destroy1();
 }
 
 TEST_CASE("IntermediateRelation::performJoinWithOriginal()", "[IntermediateRelation]"){
     /* Result should be:
+     * I(1) - R[0]
      * 1 - 1
      * 1 - 2
      * 1 - 3
      * 4 - 4
-     * 5 - 4
-     * 7 - 6
-     * 8 - 6
+     * 4 - 5
+     * 6 - 7
+     * 6 - 8
      */
     R_init1();
     R[0]->setId(0);
@@ -150,11 +144,17 @@ TEST_CASE("IntermediateRelation::performJoinWithOriginal()", "[IntermediateRelat
     REQUIRE( result->getSize() == 7 );
     const unsigned int *actual0 = result->getRowIdsFor(0);
     const unsigned int *actual1 = result->getRowIdsFor(1);
-    //DEBUG PRINT instead
-    cout << "Intermediate Results:" << endl;
+    set<pair<unsigned int, unsigned int>> res;
     for (int i = 0 ; i < 7 ; i++){
-        cout << actual0[i] << " - " << actual1[i] << endl;
+        res.insert(make_pair(actual1[i], actual0[i]));
     }
+    CHECK( res.find(make_pair(1, 1)) != res.end() );
+    CHECK( res.find(make_pair(1, 2)) != res.end() );
+    CHECK( res.find(make_pair(1, 3)) != res.end() );
+    CHECK( res.find(make_pair(4, 4)) != res.end() );
+    CHECK( res.find(make_pair(4, 5)) != res.end() );
+    CHECK( res.find(make_pair(6, 7)) != res.end() );
+    CHECK( res.find(make_pair(6, 8)) != res.end() );
     R_destroy1();
 }
 
@@ -176,12 +176,16 @@ TEST_CASE("Relation::performCrossProductWithOriginal()", "[Relation]"){
     REQUIRE( result->getSize() == resultSize );
     const unsigned int *actual0 = result->getRowIdsFor(0);
     const unsigned int *actual1 = result->getRowIdsFor(1);
-
-    //DEBUG PRINT instead
-    cout << "Relation Results:" << endl;
+    set<pair<unsigned int, unsigned int>> res;
     for (int i = 0 ; i < resultSize ; i++){
-        cout << actual0[i] << " - " << actual1[i] << endl;
+        res.insert(make_pair(actual0[i], actual1[i]));
     }
+    CHECK( res.find(make_pair(1, 1)) != res.end() );
+    CHECK( res.find(make_pair(2, 1)) != res.end() );
+    CHECK( res.find(make_pair(1, 2)) != res.end() );
+    CHECK( res.find(make_pair(2, 2)) != res.end() );
+    CHECK( res.find(make_pair(1, 3)) != res.end() );
+    CHECK( res.find(make_pair(2, 3)) != res.end() );
     delete result;
     R_destroy2();
 }
@@ -202,16 +206,21 @@ TEST_CASE("IntermediateRelation::performCrossProductWithOriginal()", "[Intermedi
     unsigned int rowids[] = {4, 6, 8, 9};
     IntermediateRelation I(1, rowids, 4, R[1]);
     IntermediateRelation *result = I.performCrossProductWithOriginal(*R[0]);
-    unsigned int resultSize = 8;
+    const unsigned int resultSize = 8;
     REQUIRE( result->getSize() == resultSize );
     const unsigned int *actual0 = result->getRowIdsFor(0);
     const unsigned int *actual1 = result->getRowIdsFor(1);
-
-    //DEBUG PRINT instead
-    cout << "Relation Results:" << endl;
+    set<pair<unsigned int, unsigned int>> res;
     for (int i = 0 ; i < resultSize ; i++){
-        cout << actual0[i] << " - " << actual1[i] << endl;
+        res.insert(make_pair(actual0[i], actual1[i]));
     }
-    delete result;
+    CHECK( res.find(make_pair(1, 4)) != res.end() );
+    CHECK( res.find(make_pair(1, 6)) != res.end() );
+    CHECK( res.find(make_pair(1, 8)) != res.end() );
+    CHECK( res.find(make_pair(1, 9)) != res.end() );
+    CHECK( res.find(make_pair(2, 4)) != res.end() );
+    CHECK( res.find(make_pair(2, 6)) != res.end() );
+    CHECK( res.find(make_pair(2, 8)) != res.end() );
+    CHECK( res.find(make_pair(2, 9)) != res.end() );
     R_destroy2();
 }
