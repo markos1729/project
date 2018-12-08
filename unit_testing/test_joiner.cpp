@@ -10,7 +10,7 @@
 using namespace std;
 
 // Global
-Relation **R = NULL;
+Relation **R = NULL;     // Relations to be used for testing as an example
 int Rlen = -1;
 
 void R_destroy1(){
@@ -87,19 +87,45 @@ void R_init2(){
 }
 
 
-TEST_CASE("Relation::performJoinWithOriginal()", "[Relation]"){
-    /* Result should be: (size = 9)
-     * R[0]     R[1]  --- in rowids -->
-     * 1, 5     1, 5                    1 - 1
-     * 2, 5     1, 5                    2 - 1
-     * 3, 5     1, 5                    3 - 1
-     * 4, 8     4, 8                    4 - 4
-     * 5, 8     4, 8                    5 - 4
-     * 4, 8     5, 8                    4 - 5
-     * 5, 8     5, 8                    5 - 5
-     * 7, 16    6, 16                   7 - 6
-     * 8, 16    6, 16                   8 - 6
-     */
+////////////////////////////////////////////
+///                FILTER                ///
+////////////////////////////////////////////
+
+//TODO
+
+////////////////////////////////////////////
+///            EQUAL COLUMNS             ///
+////////////////////////////////////////////
+
+//TODO
+
+////////////////////////////////////////////
+///                 JOIN                 ///
+////////////////////////////////////////////
+
+TEST_CASE("Relation::performJoinWithOriginal() - trivial case", "[JOIN]"){
+    R_init1();
+    R[0]->setId(0);
+    Relation Empty(0, 3);
+    Empty.setId(1);
+    IntermediateRelation *result = R[0]->performJoinWithOriginal(Empty, 0, 1, 1, 1);
+    REQUIRE( result != NULL  );
+    CHECK( result->getSize() == 0 );
+    delete result;
+    result = Empty.performJoinWithOriginal(*R[0], 1, 1, 0, 1);
+    REQUIRE( result != NULL  );
+    CHECK( result->getSize() == 0 );
+    delete result;
+    Relation Empty2(0, 5);
+    Empty2.setId(2);
+    result = Empty.performJoinWithOriginal(Empty2, 1, 2, 2, 1);
+    REQUIRE( result != NULL  );
+    CHECK( result->getSize() == 0 );
+    delete result;
+    R_destroy1();
+}
+
+TEST_CASE("Relation::performJoinWithOriginal()", "[JOIN]"){
     R_init1();
     R[0]->setId(0);
     R[1]->setId(1);
@@ -124,17 +150,25 @@ TEST_CASE("Relation::performJoinWithOriginal()", "[Relation]"){
     R_destroy1();
 }
 
-TEST_CASE("IntermediateRelation::performJoinWithOriginal()", "[IntermediateRelation]"){
-    /* Result should be:
-     * I(1) - R[0]
-     * 1 - 1
-     * 1 - 2
-     * 1 - 3
-     * 4 - 4
-     * 4 - 5
-     * 6 - 7
-     * 6 - 8
-     */
+TEST_CASE("IntermediateRelation::performJoinWithOriginal() - trivial case", "[JOIN]"){
+    R_init1();
+    R[0]->setId(0);
+    R[1]->setId(1);
+    Relation Empty(0, 3);
+    Empty.setId(2);
+    unsigned int rowids[] = {1, 3, 4, 6};
+    IntermediateRelation I(1, rowids, 4, R[1]);
+    IntermediateRelation *result = I.performJoinWithOriginal(Empty, 1, 1, 2, 1);
+    REQUIRE( result != NULL  );
+    CHECK( result->getSize() == 0 );
+    IntermediateRelation I_Empty(3, NULL, 0, R[1]);
+    result = I_Empty.performJoinWithOriginal(Empty, 3, 1, 2, 1);
+    REQUIRE( result != NULL  );
+    CHECK( result->getSize() == 0 );
+    R_destroy1();
+}
+
+TEST_CASE("IntermediateRelation::performJoinWithOriginal()", "[JOIN]"){
     R_init1();
     R[0]->setId(0);
     R[1]->setId(1);
@@ -146,28 +180,54 @@ TEST_CASE("IntermediateRelation::performJoinWithOriginal()", "[IntermediateRelat
     const unsigned int *actual1 = result->getRowIdsFor(1);
     set<pair<unsigned int, unsigned int>> res;
     for (int i = 0 ; i < 7 ; i++){
-        res.insert(make_pair(actual1[i], actual0[i]));
+        res.insert(make_pair(actual0[i], actual1[i]));
     }
     CHECK( res.find(make_pair(1, 1)) != res.end() );
-    CHECK( res.find(make_pair(1, 2)) != res.end() );
-    CHECK( res.find(make_pair(1, 3)) != res.end() );
+    CHECK( res.find(make_pair(2, 1)) != res.end() );
+    CHECK( res.find(make_pair(3, 1)) != res.end() );
     CHECK( res.find(make_pair(4, 4)) != res.end() );
-    CHECK( res.find(make_pair(4, 5)) != res.end() );
-    CHECK( res.find(make_pair(6, 7)) != res.end() );
-    CHECK( res.find(make_pair(6, 8)) != res.end() );
+    CHECK( res.find(make_pair(5, 4)) != res.end() );
+    CHECK( res.find(make_pair(7, 6)) != res.end() );
+    CHECK( res.find(make_pair(8, 6)) != res.end() );
     R_destroy1();
 }
 
+TEST_CASE("IntermediateRelation::performJoinWithIntermediate() - trivial case", "[JOIN]"){
+    //TODO
+}
 
-TEST_CASE("Relation::performCrossProductWithOriginal()", "[Relation]"){
-    /* Result should be: (size = 6)
-     * 1 - 1
-     * 2 - 1
-     * 1 - 2
-     * 2 - 2
-     * 1 - 3
-     * 2 - 3
-     */
+TEST_CASE("IntermediateRelation::performJoinWithIntermediate()", "[JOIN]"){
+    //TODO
+}
+
+
+////////////////////////////////////////////
+///             CROSS PRODUCT            ///
+////////////////////////////////////////////
+
+TEST_CASE("Relation::performCrossProductWithOriginal() - trivial case", "[CROSS PRODUCT]"){
+    R_init2();
+    R[0]->setId(0);
+    Relation Empty(0, 3);
+    Empty.setId(1);
+    IntermediateRelation *result = R[0]->performCrossProductWithOriginal(Empty);
+    REQUIRE( result != NULL  );
+    CHECK( result->getSize() == 0 );
+    delete result;
+    result = Empty.performCrossProductWithOriginal(*R[0]);
+    REQUIRE( result != NULL  );
+    CHECK( result->getSize() == 0 );
+    delete result;
+    Relation Empty2(0, 5);
+    Empty2.setId(2);
+    result = Empty.performCrossProductWithOriginal(Empty2);
+    REQUIRE( result != NULL  );
+    CHECK( result->getSize() == 0 );
+    delete result;
+    R_destroy2();
+}
+
+TEST_CASE("Relation::performCrossProductWithOriginal()", "[CROSS PRODUCT]"){
     R_init2();
     R[0]->setId(0);
     R[1]->setId(1);
@@ -190,17 +250,25 @@ TEST_CASE("Relation::performCrossProductWithOriginal()", "[Relation]"){
     R_destroy2();
 }
 
-TEST_CASE("IntermediateRelation::performCrossProductWithOriginal()", "[IntermediateRelation]"){
-    /* Result should be: (size = 8)
-     * 1 - 4
-     * 1 - 6
-     * 1 - 8
-     * 1 - 9
-     * 2 - 4
-     * 2 - 6
-     * 2 - 8
-     * 2 - 9
-     */
+TEST_CASE("IntermediateRelation::performCrossProductWithOriginal() - trivial case", "[CROSS PRODUCT]"){
+    R_init1();
+    R[0]->setId(0);
+    R[1]->setId(1);
+    Relation Empty(0, 3);
+    Empty.setId(2);
+    unsigned int rowids[] = {1, 3, 4, 6};
+    IntermediateRelation I(1, rowids, 4, R[1]);
+    IntermediateRelation *result = I.performCrossProductWithOriginal(Empty);
+    REQUIRE( result != NULL  );
+    CHECK( result->getSize() == 0 );
+    IntermediateRelation I_Empty(3, NULL, 0, R[1]);
+    result = I_Empty.performCrossProductWithOriginal(Empty);
+    REQUIRE( result != NULL  );
+    CHECK( result->getSize() == 0 );
+    R_destroy1();
+}
+
+TEST_CASE("IntermediateRelation::performCrossProductWithOriginal()", "[CROSS PRODUCT]"){
     R_init2();
     R[0]->setId(0);
     unsigned int rowids[] = {4, 6, 8, 9};
@@ -223,4 +291,12 @@ TEST_CASE("IntermediateRelation::performCrossProductWithOriginal()", "[Intermedi
     CHECK( res.find(make_pair(2, 8)) != res.end() );
     CHECK( res.find(make_pair(2, 9)) != res.end() );
     R_destroy2();
+}
+
+TEST_CASE("IntermediateRelation::performCrossProductWithIntermediate() - trivial case", "[CROSS PRODUCT]"){
+    //TODO
+}
+
+TEST_CASE("IntermediateRelation::performCrossProductWithIntermediate()", "[CROSS PRODUCT]") {
+    //TODO
 }

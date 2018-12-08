@@ -475,9 +475,17 @@ IntermediateRelation *IntermediateRelation::performJoinWith(QueryRelation &B, un
 IntermediateRelation *IntermediateRelation::performJoinWithOriginal(const Relation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) {
     if (size <= 0) {
         numberOfRelations++;
-	rowids[relb_id] = (unsigned int *) NULL;
+	    rowids[relb_id] = (unsigned int *) NULL;
         originalRelations[relb_id] = &B;   // insert new original relation's address
         return this;
+    } else if (B.getSize() <= 0){
+        // clear the old map
+        for (auto &p : rowids) { delete[] p.second; p.second = NULL; }
+        rowids.clear();
+        // change variables accordingly
+        size = 0;
+        numberOfRelations++;
+        originalRelations[relb_id] = &B;   // insert new original relation's address
     }
     // extract the correct join relations
     JoinRelation *JA = extractJoinRelation(rela_id, cola_id);
@@ -545,6 +553,17 @@ IntermediateRelation *IntermediateRelation::performJoinWithIntermediate(Intermed
              originalRelations[p.first] = p.second;   // insert new original relation's address to this
     	}
         return this;
+    } else if ( B.getSize() <= 0 ){
+        // clear the old map
+        for (auto &p : rowids) { delete[] p.second; p.second = NULL; }
+        rowids.clear();
+        // change variables accordingly
+        size = 0;
+        numberOfRelations += B.numberOfRelations;
+        for (auto &p: B.originalRelations){          // for every original relation in B
+            originalRelations[p.first] = p.second;   // insert new original relation's address to this
+        }
+        return this;
     }
     // extract the correct join relations
     JoinRelation *JA = extractJoinRelation(rela_id, cola_id);
@@ -606,8 +625,17 @@ IntermediateRelation *IntermediateRelation::performCrossProductWith(QueryRelatio
 IntermediateRelation *IntermediateRelation::performCrossProductWithOriginal(const Relation &B) {
     if (size <= 0) {
         numberOfRelations++;
-	rowids[B.getId()] = (unsigned int *) NULL;
+	    rowids[B.getId()] = (unsigned int *) NULL;
         originalRelations[B.getId()] = &B;   // insert new original relation's address
+        return this;
+    } else if (B.getSize() <= 0){
+        // clear the old map
+        for (auto &p : rowids) { delete[] p.second; p.second = NULL; }
+        rowids.clear();
+        // change variables accordingly
+        size = 0;
+        numberOfRelations++;
+        originalRelations[B.getId()] = &B;
         return this;
     }
 
@@ -658,6 +686,17 @@ IntermediateRelation *IntermediateRelation::performCrossProductWithIntermediate(
              rowids[p.first] = (unsigned int *) NULL;
              originalRelations[p.first] = p.second;   // insert new original relation's address to this
     	}
+        return this;
+    } else if ( B.getSize() <= 0 ){
+        // clear the old map
+        for (auto &p : rowids) { delete[] p.second; p.second = NULL; }
+        rowids.clear();
+        // change variables accordingly
+        size = 0;
+        numberOfRelations += B.numberOfRelations;
+        for (auto &p : B.originalRelations){
+            originalRelations[p.first] = p.second;
+        }
         return this;
     }
 
