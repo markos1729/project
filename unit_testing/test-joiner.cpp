@@ -91,13 +91,209 @@ void R_init2(){
 ///                FILTER                ///
 ////////////////////////////////////////////
 
-//TODO
+TEST_CASE("Relation::performFilter() - trivial case", "[FILTER]") {
+	R_init1();
+    R[0]->setId(0);
+    R[1]->setId(1);
+    R[2]->setId(2);
+
+    IntermediateRelation *result=R[0]->performFilter(0,1,10,'=');
+    REQUIRE(result!=NULL);
+    CHECK(result->getSize()==0);
+    delete result;
+    
+    result=R[1]->performFilter(1,0,1,'<');
+    REQUIRE(result!=NULL);
+    CHECK(result->getSize()==0);
+    delete result;
+
+	result=R[2]->performFilter(2,2,4096,'>');
+    REQUIRE(result!=NULL);
+    CHECK(result->getSize()==0);
+    delete result;
+
+    R_destroy1();
+}
+
+TEST_CASE("Relation::performFilter()", "[FILTER]") {
+    R_init1();
+    R[0]->setId(0);
+    R[1]->setId(1);
+    R[2]->setId(2);
+        
+    IntermediateRelation *result=R[0]->performFilter(0,1,5,'=');
+    REQUIRE(result->getSize()==3);
+    unsigned int *actual=result->getRowIdsFor(0);
+    CHECK(actual[0]==1);
+    CHECK(actual[1]==2);
+	CHECK(actual[2]==3);
+   	delete result;
+   	
+   	result=R[1]->performFilter(1,1,5,'>');
+    REQUIRE(result->getSize()==5);
+    actual=result->getRowIdsFor(1);
+    CHECK(actual[0]==2);
+    CHECK(actual[1]==3);
+	CHECK(actual[2]==4);
+	CHECK(actual[3]==5);
+	CHECK(actual[4]==6);
+   	delete result;
+   	
+   	result=R[2]->performFilter(2,2,30,'<');
+    REQUIRE(result->getSize()==4);
+    actual=result->getRowIdsFor(2);
+    CHECK(actual[0]==1);
+    CHECK(actual[1]==2);
+	CHECK(actual[2]==3);
+	CHECK(actual[3]==4);
+   	delete result;
+   	
+   	R_destroy1();
+}
+
+TEST_CASE("IntermediateRelation::performFilter() - trivial case", "[FILTER]") {
+	R_init1();
+    R[0]->setId(0);
+    R[1]->setId(1);
+    R[2]->setId(2);
+
+	unsigned int rowids0[]={1,3,4,6};
+    IntermediateRelation I0(0,rowids0,4,R[0]);
+    IntermediateRelation *result=I0.performFilter(0,1,16,'=');
+    REQUIRE(result!=NULL);
+    CHECK(result->getSize()==0);
+    
+	unsigned int rowids1[]={4,5,6};
+    IntermediateRelation I1(1,rowids1,3,R[1]);
+    result=I1.performFilter(1,0,2,'<');
+    REQUIRE(result!=NULL);
+    CHECK(result->getSize()==0);
+
+	unsigned int rowids2[]={2,4,6,7,8};
+    IntermediateRelation I2(2,rowids2,5,R[2]);
+	result=I2.performFilter(2,2,300,'>');
+    REQUIRE(result!=NULL);
+    CHECK(result->getSize()==0);
+}
+
+
+TEST_CASE("IntermediateRelation::performFilter()", "[FILTER]") {
+    R_init1();
+    R[0]->setId(0);
+    R[1]->setId(1);
+    R[2]->setId(2);
+        
+	unsigned int rowids0[]={1,3,4,5,6,7,8,9};
+    IntermediateRelation I0(0,rowids0,9,R[0]);
+    IntermediateRelation *result=I0.performFilter(0,1,5,'=');
+    REQUIRE(result->getSize()==2);
+    unsigned int *actual=result->getRowIdsFor(0);
+    CHECK(actual[0]==1);
+    CHECK(actual[1]==3);
+   	
+	unsigned int rowids1[]={1,4,6};
+    IntermediateRelation I1(1,rowids1,3,R[1]);
+    result=I1.performFilter(1,0,6,'<');
+    REQUIRE(result->getSize()==2);
+    actual=result->getRowIdsFor(1);
+    CHECK(actual[0]==1);
+    CHECK(actual[1]==4);
+   	
+	unsigned int rowids2[]={4,5,7,9,10,11,12};
+    IntermediateRelation I2(2,rowids2,7,R[2]);
+	result=I2.performFilter(2,2,127,'>');
+    REQUIRE(result->getSize()==5);
+    actual=result->getRowIdsFor(2);
+    CHECK(actual[0]==7);
+    CHECK(actual[1]==9);
+    CHECK(actual[2]==10);
+	CHECK(actual[3]==11);
+	CHECK(actual[4]==12);
+   	
+   	R_destroy1();
+}
+
 
 ////////////////////////////////////////////
 ///            EQUAL COLUMNS             ///
 ////////////////////////////////////////////
 
-//TODO
+TEST_CASE("Relation::performEqColumns() - trivial case", "[EQUAL COLUMNS]") {
+	R_init1();
+	R[0]->setId(0);
+
+	IntermediateRelation *result=R[0]->performEqColumns(0,0,0,1);
+	REQUIRE(result!=NULL);
+	CHECK(result->getSize()==0);
+	delete result;
+
+	R_destroy1();
+}
+
+TEST_CASE("Relation::performEqColumns()", "[EQUAL COLUMNS]") {
+	R_init1();
+	R[2]->setId(2);
+	
+	IntermediateRelation *result=R[2]->performEqColumns(2,2,0,1);
+	unsigned int *actual=result->getRowIdsFor(2);
+	REQUIRE(result!=NULL);
+	CHECK(result->getSize()==2);
+	CHECK(actual[0]==2);
+	CHECK(actual[1]==4);
+	delete result;
+
+	R_destroy1();
+}
+
+TEST_CASE("IntermediateRelation::performEqColumns() - trivial case", "[EQUAL COLUMNS]") {
+	R_init1();
+	R[0]->setId(0);
+	R[2]->setId(2);
+
+	unsigned int rowids0[]={1,2,4,5,6,7,9};
+	unsigned int rowids2[]={1,2,3,7,8,9,12};
+    IntermediateRelation I(0,2,rowids0,rowids2,7,R[0],R[2]);
+
+	IntermediateRelation *result=I.performEqColumns(0,2,1,1);
+	REQUIRE(result!=NULL);
+	CHECK(result->getSize()==0);
+
+	R_destroy1();
+}
+
+TEST_CASE("IntermediateRelation::performEqColumns()", "[EQUAL COLUMNS]") {
+	R_init1();
+	R[0]->setId(0);
+	R[2]->setId(2);
+
+	unsigned int rowids0[]={1,2,3,4,5,6,7,8,9,10};
+	unsigned int rowids2[]={1,2,3,4,5,6,7,8,9,10};
+    IntermediateRelation I(0,2,rowids0,rowids2,10,R[0],R[2]);
+
+	IntermediateRelation *result=I.performEqColumns(0,2,0,0);
+	REQUIRE(result!=NULL);
+	REQUIRE(result->getSize()==10);
+	unsigned int *actual=result->getRowIdsFor(0);
+	for (unsigned int i=0; i<10; ++i)
+		CHECK(actual[i]==i+1);
+
+	unsigned int rowids00[]={1,4,5,6,7,8,9,10};
+	unsigned int rowids22[]={3,5,6,12,7,8,9,10};
+    IntermediateRelation II(0,2,rowids00,rowids22,10,R[0],R[2]);
+
+	result=II.performEqColumns(0,2,1,1);
+	REQUIRE(result!=NULL);
+	REQUIRE(result->getSize()==6);
+	actual=result->getRowIdsFor(2);
+	CHECK(actual[0]==5);
+	CHECK(actual[1]==6);
+	CHECK(actual[2]==7);
+	CHECK(actual[3]==8);
+	CHECK(actual[4]==9);
+	CHECK(actual[5]==10);		
+
+	R_destroy1();
+}
 
 ////////////////////////////////////////////
 ///                 JOIN                 ///
