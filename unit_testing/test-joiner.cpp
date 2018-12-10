@@ -2,7 +2,6 @@
 #include <cstdio>
 #include <utility>
 #include <set>
-
 #include "catch.hpp"
 #include "../Headers/Relation.h"
 #include "../Headers/FieldTypes.h"
@@ -564,4 +563,85 @@ TEST_CASE("IntermediateRelation::performCrossProductWithIntermediate()", "[CROSS
     CHECK( res.find(make_pair(6, 5)) != res.end() );
     CHECK( res.find(make_pair(6, 7)) != res.end() );
     R_destroy1();
+}
+
+////////////////////////////////////////////
+///                JOINER                ///
+////////////////////////////////////////////
+#include <unistd.h>
+#include <wait.h>
+#include <cstring>
+
+#define CHECK_PERROR(call, msg, actions) { if ( (call) < 0 ) { perror(msg); actions } }
+
+#define MAX_RESULTS_SIZE 65536
+#define ESTIMATED_WAIT_TIME 8
+#define JOINER_EXE_PATH "./joiner"
+
+// (!) IMPORTANT: Make sure PRINT_FEEDBACK_MESSAGES is NOT defined in joiner-main.cpp and PRINT_SUM is!
+
+bool setUpJoiner(int &toJoiner_fd, int &fromJoiner_fd, pid_t &pid){
+    int toJoinerPipe[2];
+    int fromJoinerPipe[2];
+    CHECK_PERROR( pipe(toJoinerPipe), "pipe creation failed", return false; )
+    CHECK_PERROR( pipe(fromJoinerPipe), "pipe creation failed", return false; )
+    CHECK_PERROR( (pid = fork()), "fork failed", return false; )
+    if (pid == 0){   // child will become joiner
+        // redirect stdin and stdout
+        dup2(toJoinerPipe[1], STDIN_FILENO);
+        dup2(fromJoinerPipe[0], STDOUT_FILENO);
+        close(toJoinerPipe[0]);
+        close(toJoinerPipe[1]);
+        close(fromJoinerPipe[0]);
+        close(fromJoinerPipe[1]);
+        // and call exec
+        execl(JOINER_EXE_PATH, "joiner", NULL);
+        // if failed:
+        perror("exec failed: ");
+        exit(-404);
+    } else if (pid > 0){
+        toJoiner_fd = dup(toJoinerPipe[0]);
+        fromJoiner_fd = dup(fromJoinerPipe[1]);
+        close(toJoinerPipe[0]);
+        close(toJoinerPipe[1]);
+        close(fromJoinerPipe[0]);
+        close(fromJoinerPipe[1]);
+    }
+    return true;
+}
+
+
+
+TEST_CASE("Joiner for small input", "[JOINER]"){
+    int toJoiner_fd, fromJoiner_fd;
+    pid_t pid;
+    if ( !setUpJoiner(toJoiner_fd, fromJoiner_fd, pid) || pid < 0 ){
+        cerr << "Could not set up a test for joiner" << endl;
+        close(toJoiner_fd);
+        close(fromJoiner_fd);
+        return;
+    }
+    sleep(1);
+    char load_input[] = "Files/r0\nFiles/r1\nFiles/r2\nFiles/r3\nFiles/r4\nFiles/r5\nFiles/r6\nFiles/r7\nFiles/r8\nFiles/r9\nFiles/r10\nFiles/r11\nFiles/r12\nFiles/r13\nDone\n";
+    write(toJoiner_fd, load_input, strlen(load_input));
+    char workload[] = "3 0 1|0.2=1.0&0.1=2.0&0.2>3499|1.2 0.1\n5 0|0.2=1.0&0.3=9881|1.1 0.2 1.0\n9 0 2|0.1=1.0&1.0=2.2&0.0>12472|1.0 0.3 0.4\n9 0|0.1=1.0&0.1>1150|0.3 1.0\n6 1 12|0.1=1.0&1.0=2.2&0.0<62236|1.0\n11 0 5|0.2=1.0&1.0=2.2&0.1=5784|2.3 0.1 0.1\n4 1 2 11|0.1=1.0&1.0=2.1&1.0=3.1&0.1>2493|3.2 2.2 2.1\n10 0 13 1|0.2=1.0&1.0=2.2&0.1=3.0&0.1=209|0.2 2.5 2.2\n6 1 11 5|0.1=1.0&1.0=2.1&1.0=3.1&0.0>44809|2.0\n3 1|0.1=1.0&0.2<3071|0.2 0.2\nF\n3 1 12|0.1=1.0&1.0=2.1&0.0>26374|2.0 0.1 2.1\n7 0|0.1=1.0&0.4<9936|0.4 0.0 1.0\n2 1 9|0.1=1.0&1.0=2.2&0.1=10731|1.2 2.3\n5 1|0.1=1.0&0.2=4531|1.2\n3 0 13 13|0.2=1.0&1.0=2.1&2.1=3.2&0.2<74|1.2 2.5 3.5\n9 1|0.2=1.0&0.1=1574|0.1 0.3 0.0\n0 5|0.0=1.2&1.3=9855|1.1 0.1\n11 0 2|0.2=1.0&1.0=2.2&0.1<5283|0.0 0.2 2.3\n8 0 7|0.2=1.0&1.0=2.1&0.3>10502|1.1 1.2 2.5\n9 1 11|0.2=1.0&1.0=2.1&1.0=0.2&0.3>3991|1.0\n4 1|0.1=1.0&0.1<5730|1.1 0.1 0.1\n3 1 5 7|0.1=1.0&1.0=2.1&1.0=3.2&0.2=4273|2.2 3.2\nF\n9 1 12|0.2=1.0&1.0=2.1&2.2=1.0&0.2<2685|2.0\n1 12 2|0.0=1.2&0.0=2.1&1.1=0.0&1.0>25064|0.2 1.3\n2 0|0.2=1.0&0.2<787|0.0\n1 6|0.0=1.1&1.1>10707|1.0 1.1 0.2\n13 0 3|0.1=1.0&1.0=2.2&0.4=10571|2.3 0.0\n12 1 6 12|0.2=1.0&1.0=2.1&0.1=3.2&3.0<33199|2.1 0.1 0.2\n11 0 10 8|0.2=1.0&1.0=2.2&1.0=3.2&0.0<9872|3.3 2.2\n11 0 2|0.2=1.0&1.0=2.2&0.1<4217|1.0\n10 0|0.2=1.0&0.2>1791|1.0 1.2 0.2\n7 1 3|0.2=1.0&1.0=2.1&0.3<8722|1.0\n4 1 9|0.1=1.0&1.0=2.2&0.1>345|0.0 1.2\n11 1 12 10|0.1=1.0&1.0=2.1&1.0=3.1&0.2=598|3.2\n7 0 9|0.1=1.0&1.0=0.1&1.0=2.1&0.1>3791|1.2 1.2\nF\n8 0 11|0.2=1.0&1.0=2.2&0.3=9477|0.2\n0 13 7 10|0.0=1.2&0.0=2.1&0.0=3.2&1.2>295|3.2 0.0\n7 1 3|0.2=1.0&1.0=2.1&1.0=0.2&0.2>6082|2.3 2.1\n0 7 10 5|0.0=1.1&0.0=2.2&0.0=3.2&1.3=8728|2.0 3.1\n1 4 9 8|0.0=1.1&0.0=2.2&0.0=3.1&1.1>2936|1.0 1.0 3.0\n4 1|0.1=1.0&0.1<9795|1.2 0.1\n11 1|0.1=1.0&0.1<1688|0.1\n5 0|0.2=1.0&0.0<1171|1.0 0.3\n4 1 6|0.1=1.0&1.0=2.1&0.0<13500|2.1 0.1 0.0\n13 13|0.1=1.2&1.6=8220|1.5\nF\n11 0 8|0.2=1.0&1.0=2.2&0.2>4041|1.0 1.1 1.0\n8 0 10|0.2=1.0&1.0=2.2&0.3<9473|0.3 2.0\n5 1 8|0.1=1.0&1.0=2.1&0.1<3560|1.2\n13 0 2|0.2=1.0&1.0=0.1&1.0=2.2&0.1>4477|2.0 2.3 1.2\n8 0 13 13|0.2=1.0&1.0=2.2&2.1=3.2&0.1>7860|3.3 2.1 3.6\nF\n";
+    write(toJoiner_fd, workload, strlen(workload));
+    sleep(ESTIMATED_WAIT_TIME);
+    // results should be ready by now
+    char *results = new char[MAX_RESULTS_SIZE];
+    ssize_t nread = read(fromJoiner_fd, results, MAX_RESULTS_SIZE - 1);
+    if (nread < 0){
+        cerr << "Could not get an answer from joiner" << endl;
+        close(toJoiner_fd);
+        close(fromJoiner_fd);
+        return;
+    }
+    results[nread] = '\0';
+    cout << "nread = " << nread << endl;
+    char expectedresults[] = "26468015 32533054\n5446 1009 1009\n31831879 99876596 96864400\n27314139 10766320\n901496306\nNULL NULL NULL\n281654532 282357938 841559324\n187822 1036243 187822\n1771710026\n22766314 22766314\n4634779503 627329747 627329747\n41316024 267394881 9912745\nNULL NULL\n9283\n760151704 2430170493 2398594221\nNULL NULL NULL\nNULL NULL\n3537544236 319415951 334176745\n1645366150 1016283918 788397597\n106938127\n10014140 6526034 6526034\nNULL NULL\n81073\n265717 299090\n179170057\n65339549 18594932 12524601\n744497 7983214\n3377819501 3395449560 3377819501\n5032407477 1146864253\n255982520\n23837499 33633760 23837499\n1391837538\n42163975 42772523\n858534\n109050774 109050774\n444547\n20504095556 20504095556\n633080591 1050051803\n5304879 1634121\n259497861 259497861 1733901713\n28536640 19373870\n2135404\n943464 3320201\n178397045 178397045 213214740\n852794\n203444887 336237721 203444887\n230229977 440364776\n93772438\n840902 45292 63810\n103260116758 17416413522 59644305653\n";
+    CHECK( strcmp(results, expectedresults) == 0 );
+    cout << results << endl;
+    delete[] results;
+    int status;
+    waitpid(pid, &status, WNOHANG);
 }

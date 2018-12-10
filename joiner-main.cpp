@@ -11,7 +11,7 @@
 
 
 #define PRINT_SUM                // define this to print SUM of projected columns instead of their values
-#define PRINT_FEEDBACK_MESSAGES  // define this for extra feedback messages to be printed by joiner. Do not define this if the only stdout output you want is the results
+//#define PRINT_FEEDBACK_MESSAGES  // define this for extra feedback messages to be printed by joiner. Do not define this if the only stdout output you want is the results
 
 
 using namespace std;
