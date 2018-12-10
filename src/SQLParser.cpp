@@ -75,11 +75,31 @@ SQLParser::SQLParser(const char *query) {
 	char *first,*second,*third;
 	char *queryCopy = new char[strlen(query) + 1];
 	strcpy(queryCopy, query);
-	
-	//check for empty where clause
-	int no_where=0;
+
+	// check for invalid query
+	bool invalid = false;
+	int count_seperators = 0;
+	for (int i = 0; i < strlen(queryCopy); i++){
+		if (queryCopy[i] == '|'){ count_seperators++; }
+	}
+	invalid = strlen(queryCopy) <= 2 || (count_seperators != 2)
+			  || (queryCopy[0] == '|' && queryCopy[1] == '|')
+			  || (queryCopy[strlen(queryCopy) - 2] == '|' && queryCopy[strlen(queryCopy) - 1] == '|');
+	if (invalid){
+        nrelations = npredicates = nfilters = nprojections = 0;
+		predicates = NULL;
+		filters = NULL;
+		projections = NULL;
+		relations = NULL;
+		delete[] queryCopy;
+		return;
+	}
+
+	// check for empty where clause
+	bool no_where = false;
 	for (int i=0; i<strlen(queryCopy)-1; ++i)
-		if (queryCopy[i]=='|' && queryCopy[i+1]=='|') no_where=1;
+		if (queryCopy[i]=='|' && queryCopy[i+1]=='|') no_where = true;
+
 	split3(queryCopy, first, second, third);
 
 	if (no_where) {
@@ -87,15 +107,14 @@ SQLParser::SQLParser(const char *query) {
 		predicates=NULL,filters=NULL;
 		parse_relations(first, nrelations, relations);
 		parse_projections(second, nprojections, projections);
-		}
-	else {
+	} else {
 		parse_relations(first, nrelations, relations);
 		parse_bindings(second, npredicates, predicates, nfilters, filters);
 		parse_projections(third, nprojections, projections);
 	}
-#ifdef DDEBUG
+	#ifdef DDEBUG
     show();
-#endif
+	#endif
 	delete[] queryCopy;
 }
 

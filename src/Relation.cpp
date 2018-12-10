@@ -328,6 +328,13 @@ IntermediateRelation *Relation::performCrossProductWithIntermediate(Intermediate
 }
 
 void Relation::performSelect(projection *projections, unsigned int nprojections) {
+    if (size <= 0){
+        for (unsigned int j = 0 ; j < nprojections ; j++) {
+            printf("NULL ");
+        }
+        printf("\n\n");
+        return;
+    }
     for (unsigned int j = 0 ; j < nprojections ; j++){
         printf("%3d.%2d", projections[j].rel_id, projections[j].col_id);
     }
@@ -338,6 +345,7 @@ void Relation::performSelect(projection *projections, unsigned int nprojections)
         }
         printf("\n");
     }
+    printf("\n");
 }
 
 void Relation::performSum(projection *projections, unsigned int nprojections) {
@@ -741,7 +749,13 @@ IntermediateRelation *IntermediateRelation::performCrossProductWithIntermediate(
 }
 
 void IntermediateRelation::performSelect(projection *projections, unsigned int nprojections) {
-    if (size <= 0) return;
+    if (size <= 0) {
+        for (unsigned int j = 0 ; j < nprojections ; j++) {
+            printf("NULL ");
+        }
+        printf("\n\n");
+        return;
+    }
     for (unsigned int j = 0 ; j < nprojections ; j++){
         printf("%3d.%2d", projections[j].rel_id, projections[j].col_id);
     }
@@ -755,6 +769,7 @@ void IntermediateRelation::performSelect(projection *projections, unsigned int n
         }
         printf("\n");
     }
+    printf("\n");
 }
 
 const Relation *IntermediateRelation::getOriginalRelationFor(unsigned int rel_id) {

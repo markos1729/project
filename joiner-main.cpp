@@ -10,7 +10,8 @@
 #define STARTING_VECTOR_SIZE 16
 
 
-//#define PRINT_SUM    // define this to print SUM of projected columns instead of their values
+#define PRINT_SUM                // define this to print SUM of projected columns instead of their values
+#define PRINT_FEEDBACK_MESSAGES  // define this for extra feedback messages to be printed by joiner. Do not define this if the only stdout output you want is the results
 
 
 using namespace std;
@@ -21,7 +22,9 @@ unsigned int find_rel_pos(QueryRelation **QueryRelations, unsigned int size, uns
 
 
 int main(){
-    //cout << "Loading relations..." << endl;
+    #ifdef PRINT_FEEDBACK_MESSAGES
+    cout << "Loading relations..." << endl;
+    #endif
     // first read line-by-line for relations' file names until read "Done"
     vector<string> *fileList = new vector<string>();
     fileList->reserve(STARTING_VECTOR_SIZE);
@@ -48,15 +51,31 @@ int main(){
         }
     }
     delete fileList;
+    #ifdef PRINT_FEEDBACK_MESSAGES
+    cout << "Loading done! Ready to accept queries." << endl << endl;
+    #endif
     // wait for 1 second
-    //cout << "Loading done! Accepting Queries..." << endl;
     sleep(1);
     // then start parsing 'sql' statements
+    #ifdef PRINT_FEEDBACK_MESSAGES
+    unsigned int count = 0;
+    #endif
     string currStatement;
-    while ( getline(cin, currStatement) && !cin.eof() && !cin.fail() ){
-        CHECK( currStatement != "F" , "Warning: Received an empty batch of statements.", continue; )
-        do {
-            SQLParser *p = new SQLParser(currStatement.c_str());   // example: "0 2 4|0.1=1.2&1.0=2.1&0.1>3000|0.0 1.1";
+    do {
+        #ifdef PRINT_FEEDBACK_MESSAGES
+        bool first = true;
+        #endif
+        while (getline(cin, currStatement) && !cin.eof() && !cin.fail() && currStatement != "F") {
+            #ifdef PRINT_FEEDBACK_MESSAGES
+            if (first){
+                cout << "Running Batch #" << ++count << ":" << endl;
+                first = false;
+            }
+            #endif
+
+            // Parse line as an SQL-like statement
+            SQLParser *p = new SQLParser(currStatement.c_str());
+            CHECK( p->relations != NULL && p->projections != NULL , "Error: invalid query: \"" + currStatement + "\"", continue; )
 
             bool abort = false;
 
@@ -106,7 +125,7 @@ int main(){
                     CHECK(QueryRelations[predicate.rela_id] != NULL, "Error: Could not execute equal columns: " + to_string(predicate.rela_id) + "." + to_string(predicate.cola_id) + "=" + to_string(predicate.relb_id) + "." + to_string(predicate.colb_id),
                           QueryRelations[predicate.rela_id] = prev; )  // restore prev
                 }
-                // else if (  p->predicates[i].rela_id == p->predicates[i].relb_id  ) -> ignore predicate
+                // else if p->predicates[i].rela_id == p->predicates[i].relb_id -> ignore predicate
             }
             if (abort) continue;
             // And afterwards all the joins
@@ -151,6 +170,7 @@ int main(){
             CHECK( QueryRelations[0] != NULL, "Fatal error: Could not keep results to leftmost Intermediate QueryRelation (Should not happen). Please debug...",
                    for (int i = 0 ; i < p->nrelations; i++) { if ( QueryRelations[i] != NULL && QueryRelations[i]->isIntermediate ) delete QueryRelations[i]; } delete[] QueryRelations; delete p;
                    for (unsigned int i = 0 ; i < Rlen ; i++ ) { delete R[i]; } delete[] R; return -2; )
+
             // Last but not least any cross-products left to do
             int lastpos = 0;
             while ( count_not_null((void **) QueryRelations, p->nrelations) > 1 ){
@@ -179,13 +199,11 @@ int main(){
             }
             delete[] QueryRelations;
             delete p;
-
-            getline(cin, currStatement);
-        } while (!cin.eof() && !cin.fail() && currStatement != "F");
-        if (cin.eof() || cin.fail()) break;
-        //cout << endl;
-    }
-    //CHECK( cin.eof() && !cin.fail(), "Error: reading statements from cin failed", ; )
+        }
+        #ifdef PRINT_FEEDBACK_MESSAGES
+        cout << endl;
+        #endif
+    } while ( !cin.eof() && !cin.fail() );
     // cleanup
     for (unsigned int i = 0 ; i < Rlen ; i++ ) {
         delete R[i];

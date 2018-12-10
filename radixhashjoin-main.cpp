@@ -72,10 +72,10 @@ void printResults(Result *RxS, const Relation &R, const Relation &S) {
     unsigned int Rid, Sid;
     while (p.getNext(Rid, Sid)) {
         for (unsigned int i = 0 ; i < R.getNumOfColumns() ; i++){
-            printf(" %12llu |", R.getValueAt(i, Rid - 1) );
+            printf(" %12lu |", R.getValueAt(i, Rid - 1) );
         }
         for (unsigned int i = 0 ; i < S.getNumOfColumns() ; i++){
-            printf("| %12llu ", S.getValueAt(i, Sid - 1));
+            printf("| %12lu ", S.getValueAt(i, Sid - 1));
         }
         printf("\n");
     }
