@@ -2,9 +2,12 @@
 #include "Headers/Relation.h"
 #include "Headers/JoinResults.h"
 #include "Headers/RadixHashJoin.h"
-
+#include "Headers/JobScheduler.h"
 
 using namespace std;
+
+
+JobScheduler *scheduler = NULL;
 
 
 /* Local Functions */
@@ -35,13 +38,17 @@ int main(int argc, char *argv[]) {
             return -3;
         }
 
+        scheduler = new JobScheduler();
+
         JoinRelation *JRptr = R.extractJoinRelation(joinField1 - 1);
         JoinRelation *JSptr = S.extractJoinRelation(joinField2 - 1);
         JoinRelation &JR = *JRptr;
         JoinRelation &JS = *JSptr;
 
         Result *RxS = radixHashJoin(JR, JS);
-        
+
+        delete scheduler;
+
         if (RxS != NULL){
             printResults(RxS, R, S);      // print results to stdout. User can redirect this to a file
             delete RxS;

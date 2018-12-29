@@ -1,6 +1,6 @@
 CXX         = g++
 CXXFLAGS    = -O2 -g3 -pedantic -std=c++11 #-Wall -Wextra
-COMMON_OBJ  = objects/Relation.o objects/RadixHashJoin.o objects/JoinResults.o
+COMMON_OBJ  = objects/Relation.o objects/RadixHashJoin.o objects/JoinResults.o objects/JobScheduler.o
 JOINER_OBJ  = objects/joiner-main.o objects/SQLParser.o objects/util.o
 COMMON_HEAD = Headers/*.h
 
@@ -13,7 +13,7 @@ all: radixhashjoin joiner test-radixhashjoin test-joiner
 #################
 
 radixhashjoin: assert_objects_dir objects/radixhashjoin-main.o $(COMMON_OBJ)
-	$(CXX) $(CXXFLAGS) objects/radixhashjoin-main.o $(COMMON_OBJ) -o radixhashjoin
+	$(CXX) $(CXXFLAGS) objects/radixhashjoin-main.o $(COMMON_OBJ) -o radixhashjoin -pthread
 
 objects/radixhashjoin-main.o: radixhashjoin-main.cpp $(COMMON_HEAD)
 	$(CXX) -c $(CXXFLAGS) radixhashjoin-main.cpp
@@ -31,13 +31,17 @@ objects/JoinResults.o: src/JoinResults.cpp $(COMMON_HEAD)
 	$(CXX) -c $(CXXFLAGS) src/JoinResults.cpp
 	mv JoinResults.o objects/JoinResults.o
 
+objects/JobScheduler.o: src/JobScheduler.cpp Headers/JobScheduler.h
+	$(CXX) -c $(CXXFLAGS) src/JobScheduler.cpp
+	mv JobScheduler.o objects/JobScheduler.o
+
 
 ##########
 # joiner #
 ##########
 
 joiner: assert_objects_dir $(JOINER_OBJ) $(COMMON_OBJ)
-	$(CXX) $(CXXFLAGS) objects/joiner-main.o objects/util.o objects/SQLParser.o $(COMMON_OBJ) -o joiner
+	$(CXX) $(CXXFLAGS) objects/joiner-main.o objects/util.o objects/SQLParser.o $(COMMON_OBJ) -o joiner -pthread
 
 objects/joiner-main.o: joiner-main.cpp $(COMMON_HEAD)
 	$(CXX) -c $(CXXFLAGS) joiner-main.cpp
@@ -57,7 +61,7 @@ objects/util.o: src/util.cpp $(COMMON_HEAD)
 ################
 
 test-radixhashjoin: assert_objects_dir objects/test-main.o objects/test-radixhashjoin.o $(COMMON_OBJ)
-	$(CXX) $(CXXFLAGS) objects/test-main.o objects/test-radixhashjoin.o $(COMMON_OBJ) -o test-radixhashjoin
+	$(CXX) $(CXXFLAGS) objects/test-main.o objects/test-radixhashjoin.o $(COMMON_OBJ) -o test-radixhashjoin -pthread
 
 objects/test-radixhashjoin.o: unit_testing/test-radixhashjoin.cpp $(COMMON_HEAD) unit_testing/catch.hpp
 	$(CXX) -c $(CXXFLAGS) unit_testing/test-radixhashjoin.cpp
@@ -65,7 +69,7 @@ objects/test-radixhashjoin.o: unit_testing/test-radixhashjoin.cpp $(COMMON_HEAD)
 
 
 test-joiner: assert_objects_dir objects/test-main.o objects/test-joiner.o $(COMMON_OBJ)
-	$(CXX) $(CXXFLAGS) objects/test-main.o objects/test-joiner.o $(COMMON_OBJ) -o test-joiner
+	$(CXX) $(CXXFLAGS) objects/test-main.o objects/test-joiner.o $(COMMON_OBJ) -o test-joiner -pthread
 
 objects/test-joiner.o: unit_testing/test-joiner.cpp $(COMMON_HEAD) unit_testing/catch.hpp
 	$(CXX) -c $(CXXFLAGS) unit_testing/test-joiner.cpp

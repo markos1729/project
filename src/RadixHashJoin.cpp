@@ -9,6 +9,9 @@
 using namespace std;
 
 
+extern JobScheduler *scheduler;
+
+
 unsigned int H1_N, H2_N;
 unsigned int H2(intField value) { return ( value & ( ((1 << (H1_N + H2_N)) - 1) ^ ( (1 << H1_N) - 1) ) ) >> H1_N; }
 
@@ -18,6 +21,7 @@ void setH(unsigned int _H1_N, unsigned int _H2_N) { H1_N = _H1_N; H2_N = _H2_N; 
 
 
 Result* radixHashJoin(JoinRelation &R, JoinRelation &S) {
+    CHECK( scheduler != NULL, "JobScheduler is not initiated: cannot run parallel RHJ", return NULL; )
     // Partition R and S, whilst keeping a 'Psum' table for each bucket in R and S (phase 1)
     H1_N = (unsigned int) ( ceil( log2( MAX(R.getSize(), S.getSize()) / CACHE ))); // H1_N is the same for both Relations rounded up
     H2_N = H1_N/2;
@@ -39,12 +43,10 @@ Result* radixHashJoin(JoinRelation &R, JoinRelation &S) {
     }
     // Iteratively perform phases 2 and 3 for all buckets of both similarly partitioned Relations and add results bucket by bucket
 	for (unsigned int i = 0 ; i < I->getNumberOfBuckets() ; i++) {
-		unsigned int *chain = NULL, *table = NULL;
-		CHECK ( indexRelation(I->getJoinFieldBucket(i), I->getBucketSize(i), chain, table) , "indexing of a bucket failed", delete[] chain; delete[] table; delete result; return NULL; )
-		CHECK ( probeResults(L->getJoinFieldBucket(i), L->getRowIdsBucket(i), I->getJoinFieldBucket(i), I->getRowIdsBucket(i), chain, table, L->getBucketSize(i), result, saveLfirst) , "probing a bucket for results failed", delete[] chain; delete[] table; delete result; return NULL; )
-		delete[] table;
-		delete[] chain;
+		scheduler->schedule(new JoinJob(i, *I, *L, result, saveLfirst));    // (!) this will be virtually deleted by the JobScheduler
 	}
+	// wait for RHJ to finish (IMPORTANT)
+    scheduler->waitUntilAllJobsHaveFinished();
     return result;
 }
 
@@ -86,4 +88,18 @@ bool probeResults(const intField *LbucketJoinField, const unsigned int *LbucketR
 		}
 	}
 	return true;
+}
+
+/* Parallel Job Implementation */
+JoinJob::JoinJob(const unsigned int bucket, JoinRelation &_I, JoinRelation &_L, Result *_result, const bool _saveLfirst)
+        : Job(), bucket_num(bucket), I(_I), L(_L), result(_result), saveLfirst(_saveLfirst) { }
+
+bool JoinJob::run(){
+    unsigned int *chain = NULL, *table = NULL;
+    CHECK ( indexRelation(I.getJoinFieldBucket(bucket_num), I.getBucketSize(bucket_num), chain, table) , "indexing of a bucket failed", delete[] chain; delete[] table; return false; )
+    CHECK ( probeResults(L.getJoinFieldBucket(bucket_num), L.getRowIdsBucket(bucket_num), I.getJoinFieldBucket(bucket_num), I.getRowIdsBucket(bucket_num), chain, table, L.getBucketSize(bucket_num), result, saveLfirst),
+            "probing a bucket for results failed", delete[] chain; delete[] table; return false; )
+    delete[] table;
+    delete[] chain;
+    return true;
 }

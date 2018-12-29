@@ -2,6 +2,9 @@
 #include "../Headers/JoinResults.h"
 
 
+#define CHECK_PERROR(call, msg, actions) { if ( (call) < 0 ) { perror(msg); actions } }
+
+
 /* ResultNode Implementation */
 ResultNode::ResultNode() : nextpos(0), next(NULL) {}
 
@@ -28,7 +31,9 @@ void ResultNode::printRowIds() {
 #endif
 
 /* Result Implementation */
-Result::Result() : head(NULL), cur(NULL), size(0) {}
+Result::Result() : head(NULL), cur(NULL), size(0) {
+    CHECK_PERROR(pthread_mutex_init(&lock, NULL), "JoinResults::pthread_mutex_init failed", )
+}
 
 Result::~Result() {
     ResultNode *temp = head;
@@ -37,32 +42,37 @@ Result::~Result() {
         delete temp;
         temp = next;
     }
+    CHECK_PERROR(pthread_mutex_destroy(&lock), "JoinResults::pthread_mutex_destroy failed", )
 }
 
 bool Result::addTuple(unsigned int rowid1, unsigned int rowid2) {
+    CHECK_PERROR(pthread_mutex_lock(&lock), "JoinResults::pthread_mutex_lock failed", )
+    bool ret_val = false;
     if (head == NULL){
         head = new ResultNode;
         cur = head;
         if ( head->addTuple(rowid1, rowid2) ){
         	size++;
-        	return true;
-        } else return false;
+        	ret_val = true;
+        }
     } else {
         if ( ! cur->isFull() ){
             if ( cur->addTuple(rowid1, rowid2) ){
             	size++;
-        	return true;
-            } else return false;
+        	    ret_val = true;
+            }
         } else {
             ResultNode *temp = cur;
             cur = new ResultNode;
             temp->next = cur;
             if ( cur->addTuple(rowid1, rowid2) ){
             	size++;
-        	return true;
-            } else return false;
+                ret_val = true;
+            }
         }
     }
+    CHECK_PERROR(pthread_mutex_unlock(&lock), "JoinResults::pthread_mutex_unlock failed", )
+    return ret_val;
 }
 
 #ifdef DDEBUG
@@ -82,7 +92,7 @@ bool Iterator::getNext(unsigned int &rid, unsigned int &sid) {
     sid = curr->buffer[pos+1];
     pos += 2;
     if (pos >= curr->nextpos) { 
-	curr = curr->next;
+	    curr = curr->next;
         pos = 0;  // reset pos to 0
     }
     return true;

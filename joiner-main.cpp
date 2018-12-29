@@ -4,6 +4,7 @@
 #include <vector>
 #include "Headers/SQLParser.h"
 #include "Headers/Relation.h"
+#include "Headers/JobScheduler.h"
 #include "Headers/util.h"
 
 
@@ -15,6 +16,9 @@
 
 
 using namespace std;
+
+
+JobScheduler *scheduler = NULL;
 
 
 /* Local Functions */
@@ -54,6 +58,8 @@ int main(){
     #ifdef PRINT_FEEDBACK_MESSAGES
     cout << "Loading done! Ready to accept queries." << endl << endl;
     #endif
+    // initing JobScheduler
+    scheduler = new JobScheduler();
     // then start parsing 'sql' statements
     #ifdef PRINT_FEEDBACK_MESSAGES
     unsigned int count = 0;
@@ -167,7 +173,7 @@ int main(){
             if (abort) continue;
             CHECK( QueryRelations[0] != NULL, "Fatal error: Could not keep results to leftmost Intermediate QueryRelation (Should not happen). Please debug...",
                    for (int i = 0 ; i < p->nrelations; i++) { if ( QueryRelations[i] != NULL && QueryRelations[i]->isIntermediate ) delete QueryRelations[i]; } delete[] QueryRelations; delete p;
-                   for (unsigned int i = 0 ; i < Rlen ; i++ ) { delete R[i]; } delete[] R; return -2; )
+                   for (unsigned int i = 0 ; i < Rlen ; i++ ) { delete R[i]; } delete[] R; delete scheduler; return -2; )
 
             // Last but not least any cross-products left to do
             int lastpos = 0;
@@ -207,6 +213,7 @@ int main(){
         delete R[i];
     }
     delete[] R;
+    delete scheduler;
     return 0;
 }
 

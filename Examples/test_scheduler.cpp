@@ -9,22 +9,25 @@ using namespace std;
 class SayHi : public Job {
     int num;
 public:
-    void set_num(int _num) { num = _num; }
-    void run(){
-        cout << "Hi, I am thread with number " << num << endl;
+    SayHi(int _num) : num(_num) { }
+    bool run(){
+        for (int i = 0 ; i < 9999999 ; i++) { /* waste time */ }
+	cout << "Hi, I am thread with number " << num << endl;
+        return true;
     }
 };
 
 
-int main(){
-    SayHi jobs[NUM_OF_JOBS];
-    for (int i = 0 ; i < NUM_OF_JOBS ; i++){
-        jobs[i].set_num(i);
-    }
+int main() {
     JobScheduler scheduler;
     for (int i = 0 ; i < NUM_OF_JOBS ; i++) {
-        scheduler.schedule(&jobs[i]);
+        scheduler.schedule(new SayHi(i));
     }
-    // destructor called here
+    if (scheduler.allJobsHaveFinished()){
+	cout << "All jobs finished before check!" << endl;
+    } else {
+        scheduler.waitUntilAllJobsHaveFinished();
+	cout << "All jobs finished and had to wait for them" << endl;
+    }
     return 0;
 }
