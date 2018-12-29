@@ -6,6 +6,7 @@
 #define CHECK(call, msg, action) { if ( ! (call) ) { std::cerr << msg << std::endl; action } }
 #define MAX(A, B) ( (A) > (B) ? (A) : (B) )
 
+
 using namespace std;
 
 
@@ -23,7 +24,7 @@ void setH(unsigned int _H1_N, unsigned int _H2_N) { H1_N = _H1_N; H2_N = _H2_N; 
 Result* radixHashJoin(JoinRelation &R, JoinRelation &S) {
     CHECK( scheduler != NULL, "JobScheduler is not initiated: cannot run parallel RHJ", return NULL; )
     // Partition R and S, whilst keeping a 'Psum' table for each bucket in R and S (phase 1)
-    H1_N = (unsigned int) ( ceil( log2( MAX(R.getSize(), S.getSize()) / CACHE ))); // H1_N is the same for both Relations rounded up
+    H1_N = (unsigned int) ( ceil( log2( MAX(R.getSize(), S.getSize()) / CACHE ))); // H1_N is the same for both Relations rounded up  TODO: I think ceil() does not work properly!
     H2_N = H1_N/2;
     CHECK( R.partitionRelation(H1_N) , "partitioning R failed", return NULL; )
     CHECK( S.partitionRelation(H1_N) , "partitioning S failed", return NULL; )
@@ -60,7 +61,7 @@ Result* radixHashJoin(JoinRelation &R, JoinRelation &S) {
 /* Local Function Implementation */
 // phase 2: index I's given bucket by creating 'H2HashTable' and 'chain' structures
 bool indexRelation(intField *bucketJoinField, unsigned int bucketSize, unsigned int *&chain, unsigned int *&table){
-	unsigned int sz = 1 << H2_N;
+	unsigned int sz = (unsigned int) 0x01 << H2_N;  // = 2^H2_N
     table = new unsigned int[sz];
     chain = new unsigned int[bucketSize];
     unsigned int *last = new unsigned int[sz];
@@ -108,5 +109,18 @@ bool JoinJob::run(){
             "probing a bucket for results failed", delete[] chain; delete[] table; return false; )
     delete[] table;
     delete[] chain;
+    return true;
+}
+
+HistJob::HistJob(const intField *_joinField, unsigned int _start, unsigned int _end, unsigned int *_Hist, unsigned int *_bucket_nums, unsigned int _H1_N)
+        : Job(), joinField(_joinField), start(_start), end(_end), Hist(_Hist), bucket_nums(_bucket_nums), H1_N(_H1_N) { }
+
+bool HistJob::run() {
+    const unsigned int num_of_buckets = (unsigned int) 0x01 << H1_N;  // = 2^H1_N
+    for (unsigned int i = start ; i < end ; i++){
+        bucket_nums[i] = H1(joinField[i], H1_N);
+        if ( bucket_nums[i] >= num_of_buckets ){ cerr << "Error: H1() false?" << endl; delete[] Hist; delete[] bucket_nums; return false; }  // ERROR CHECK
+        Hist[bucket_nums[i]]++;
+    }
     return true;
 }

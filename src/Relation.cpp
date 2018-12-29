@@ -13,6 +13,11 @@
 
 using namespace std;
 
+#define MIN(A, B) ( (A) < (B) ? (A) : (B) )
+
+
+extern JobScheduler *scheduler;
+
 
 /* H1 Function used in partitioning*/
 unsigned int H1(intField value, unsigned int n){
@@ -43,15 +48,28 @@ JoinRelation::~JoinRelation() {
 // phase 1: partition in place JoinRelation R into buckets and fill Psum to distinguish them (|Psum| = num_of_buckets = 2^H1_N)
 bool JoinRelation::partitionRelation(unsigned int H1_N) {
     if (this->getSize() == 0 || rowids == NULL || joinField == NULL ) return true;     // nothing to partition
-    const unsigned int num_of_buckets = (unsigned int) pow(2, H1_N);
-    // 1) calculate Hist - O(n)
-    unsigned int *Hist = new unsigned int[num_of_buckets]();    // all Hist[i] are initialized to 0
+    const unsigned int num_of_buckets = (unsigned int) 0x01 << H1_N;  // = 2^H1_N
+    // 1) calculate Hist using available threads
+    unsigned int *Hist = new unsigned int[num_of_buckets]();          // all Hist[i] are initialized to 0
     unsigned int *bucket_nums = new unsigned int[size];
-    for (unsigned int i = 0 ; i < size ; i++){
-        bucket_nums[i] = H1(joinField[i], H1_N);
-        if ( bucket_nums[i] >= num_of_buckets ){ delete[] Hist; delete[] bucket_nums; return false; }  // ERROR CHECK
-        Hist[bucket_nums[i]]++;
+    unsigned int **tempHists = new unsigned int *[NUMBER_OF_THREADS];
+    unsigned int chunk_size = size / NUMBER_OF_THREADS + ((size % NUMBER_OF_THREADS > 0) ? 1 : 0);
+    for (int i = 0 ; i < NUMBER_OF_THREADS ; i++){
+        tempHists[i] = new unsigned int[num_of_buckets]();            // (!) init to 0
+        scheduler->schedule(new HistJob(joinField, i * chunk_size, MIN((i+1) * chunk_size, size), tempHists[i], bucket_nums, H1_N));
     }
+    scheduler->waitUntilAllJobsHaveFinished();
+    // and then sum them up to create one Hist
+    bool failed = false;
+    for (unsigned int j = 0 ; j < NUMBER_OF_THREADS ; j++){
+        if (tempHists[j] == NULL) { failed = true; continue; }
+        for (unsigned int i = 0 ; i < num_of_buckets ; i++){
+            Hist[i] += tempHists[j][i];
+        }
+        delete[] tempHists[j];
+    }
+    delete[] tempHists;
+    if (failed) { cerr << "Error: HistJob failed!" << endl; delete[] Hist; delete[] bucket_nums; return false; }   // should not happen
     // 2) convert Hist table to Psum table
     unsigned int sum = 0;
     for (unsigned int i = 0 ; i < num_of_buckets ; i++){
