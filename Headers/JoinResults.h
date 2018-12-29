@@ -9,7 +9,7 @@
 
 //#define DDEBUG                     // define this if functions used for debugging such as printing info should be compiled
 
-#define BUFFER_SIZE (1024*1024)    // buffer size for each ResultNode
+#define BUFFER_SIZE 128000           // 128KB buffer size for each ResultNode
 
 
 using namespace std;
@@ -34,7 +34,6 @@ public:
 class Result {
 	friend class Iterator;
 private:
-	pthread_mutex_t lock;     // (!) only used in addTuple for concurrent adding. Iterating the list is not to be protected by this.
 	unsigned long long int size;
 	ResultNode *head;
 	ResultNode *cur;
@@ -43,6 +42,7 @@ public:
 	~Result();
 	unsigned long long int getSize() const { return size; }
 	bool addTuple(unsigned int rowid1, unsigned int rowid2);
+	void addList(Result *r2);
 	#ifdef DDEBUG
 	void printRowIds();
 	#endif

@@ -9,7 +9,7 @@
 
 //#define DDEBUG         // define this if functions used for debugging such as printing info should be compiled
 
-#define CACHE 4096       // 32KB
+#define CACHE 512        // smaller CACHE SIZE means more parallel stuff
 
 // Forward delcarations:
 class Relation;

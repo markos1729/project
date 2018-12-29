@@ -27,8 +27,6 @@ Result* radixHashJoin(JoinRelation &R, JoinRelation &S) {
     H2_N = H1_N/2;
     CHECK( R.partitionRelation(H1_N) , "partitioning R failed", return NULL; )
     CHECK( S.partitionRelation(H1_N) , "partitioning S failed", return NULL; )
-    // Define a Result object to fill
-    Result *result = new Result;
     // Choose one of them for indexing, lets say I, and keep the other for scanning, lets say L
     bool saveLfirst;
     JoinRelation *L = NULL, *I = NULL;
@@ -41,12 +39,21 @@ Result* radixHashJoin(JoinRelation &R, JoinRelation &S) {
         L = &R;
         saveLfirst = false;
     }
+    // Define Result lists object to fill
+    Result *result = new Result;
+    Result *tempResults = new Result[I->getNumberOfBuckets() - 1];
     // Iteratively perform phases 2 and 3 for all buckets of both similarly partitioned Relations and add results bucket by bucket
-	for (unsigned int i = 0 ; i < I->getNumberOfBuckets() ; i++) {
-		scheduler->schedule(new JoinJob(i, *I, *L, result, saveLfirst));    // (!) this will be virtually deleted by the JobScheduler
+    scheduler->schedule(new JoinJob(0, *I, *L, result, saveLfirst));
+    for (unsigned int i = 1 ; i < I->getNumberOfBuckets() ; i++) {
+		scheduler->schedule(new JoinJob(i, *I, *L, &tempResults[i - 1], saveLfirst));    // (!) this will be virtually deleted by the JobScheduler
 	}
 	// wait for RHJ to finish (IMPORTANT)
     scheduler->waitUntilAllJobsHaveFinished();
+    // and merge results to one big result list to return
+    for (unsigned int i = 1 ; i < I->getNumberOfBuckets() ; i++) {
+        result->addList(&tempResults[i - 1]);
+    }
+    delete[] tempResults;
     return result;
 }
 

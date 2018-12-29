@@ -2,4 +2,4 @@
 #include "catch.hpp"
 #include "../Headers/JobScheduler.h"
 
-JobScheduler *scheduler = new JobScheduler();
+JobScheduler *scheduler = new JobScheduler();  // this is a leak but for testing purposes it's fine

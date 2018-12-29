@@ -32,7 +32,6 @@ void ResultNode::printRowIds() {
 
 /* Result Implementation */
 Result::Result() : head(NULL), cur(NULL), size(0) {
-    CHECK_PERROR(pthread_mutex_init(&lock, NULL), "JoinResults::pthread_mutex_init failed", )
 }
 
 Result::~Result() {
@@ -42,11 +41,9 @@ Result::~Result() {
         delete temp;
         temp = next;
     }
-    CHECK_PERROR(pthread_mutex_destroy(&lock), "JoinResults::pthread_mutex_destroy failed", )
 }
 
 bool Result::addTuple(unsigned int rowid1, unsigned int rowid2) {
-    CHECK_PERROR(pthread_mutex_lock(&lock), "JoinResults::pthread_mutex_lock failed", )
     bool ret_val = false;
     if (head == NULL){
         head = new ResultNode;
@@ -71,8 +68,34 @@ bool Result::addTuple(unsigned int rowid1, unsigned int rowid2) {
             }
         }
     }
-    CHECK_PERROR(pthread_mutex_unlock(&lock), "JoinResults::pthread_mutex_unlock failed", )
     return ret_val;
+}
+
+void Result::addList(Result *r2) {
+    if (r2 == NULL) {
+        cerr << "Warning: NULL r2 result in Result::addList()" << endl;
+        return;
+    }
+    if ( (cur == NULL || head == NULL || size == 0 ) && (r2->cur == NULL || r2->head == NULL || r2->size == 0 )) {
+        // do nothing - nothing to append + result must remain NULL
+        return;
+    } else if (cur == NULL || head == NULL || size == 0 ) {
+        head = r2->head;
+        cur = r2->cur;
+        size = r2->size;
+    } else if (r2->cur == NULL || r2->head == NULL || r2->size == 0 ) {
+        // do nothing - nothing to append
+        return;
+    } else {
+        // append r2 to current Result list
+        cur->next = r2->head;
+        cur = r2->cur;
+        size += r2->size;
+    }
+    // "empty" r2  (!) Important so that r2's destructor does not kill everything we appended
+    r2->head = NULL;
+    r2->cur = NULL;
+    r2->size = 0;
 }
 
 #ifdef DDEBUG
