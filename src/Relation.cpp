@@ -87,6 +87,29 @@ bool JoinRelation::partitionRelation(unsigned int H1_N) {
         scheduler->schedule(new PartitionJob(newJoinField, joinField, newRowids, rowids, nextBucketPos, i * chunk_size, MIN((i+1) * chunk_size, size), num_of_buckets, bucket_nums, Psum));
     }
     scheduler->waitUntilAllJobsHaveFinished();
+
+#ifdef DDEBUG
+    ///DEBUG: check if it was done correctly
+    for (int i = 0 ; i < size ; i++ ){
+        unsigned int bucket = H1(joinField[i], H1_N);
+        if ( bucket != bucket_nums[i] ) { cerr << "Wrong bucket_nums table" << endl; }
+        bool found = false;
+        for (int j = Psum[bucket] ; j < Psum[bucket] + getBucketSize(bucket) ; j++){
+            if ( rowids[i] == newRowids[j] ) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            cerr << "Wrong partition!!!\nCould not found rowids[" << i << "] =  " << rowids[i] << " in bucket " << bucket << endl;
+            //cerr << "That bucket contains:" << endl;
+            //for (int j = Psum[bucket] ; j < Psum[bucket] + getBucketSize(bucket) ; j++){
+            //    cerr << newRowids[j] << endl;
+            //}
+        }
+    }
+#endif
+
     delete[] nextBucketPos;
     delete[] bucket_nums;
     // 4) overwrite joinField and rowids with new re-ordered versions of it
@@ -98,6 +121,48 @@ bool JoinRelation::partitionRelation(unsigned int H1_N) {
 }
 
 #ifdef DDEBUG
+// phase 1: partition in place JoinRelation R into buckets and fill Psum to distinguish them (|Psum| = num_of_buckets = 2^H1_N)
+bool JoinRelation::partitionRelationSequentially(unsigned int H1_N) {
+    if (this->getSize() == 0 || rowids == NULL || joinField == NULL ) return true;     // nothing to partition
+    const unsigned int num_of_buckets = (unsigned int) pow(2, H1_N);
+    // 1) calculate Hist - O(n)
+    unsigned int *Hist = new unsigned int[num_of_buckets]();    // all Hist[i] are initialized to 0
+    unsigned int *bucket_nums = new unsigned int[size];
+    for (unsigned int i = 0 ; i < size ; i++){
+        bucket_nums[i] = H1(joinField[i], H1_N);
+        if ( bucket_nums[i] >= num_of_buckets ){ delete[] Hist; delete[] bucket_nums; return false; }  // ERROR CHECK
+        Hist[bucket_nums[i]]++;
+    }
+    // 2) convert Hist table to Psum table
+    unsigned int sum = 0;
+    for (unsigned int i = 0 ; i < num_of_buckets ; i++){
+        unsigned int temp = Hist[i];
+        Hist[i] = sum;
+        sum += temp;
+    }
+    Psum = Hist;
+    numberOfBuckets = num_of_buckets;
+    // 3) create new re-ordered versions for joinField and rowids based on their bucket_nums - O(n)
+    intField *newJoinField = new intField[size]();
+    unsigned int *newRowids = new unsigned int[size]();
+    unsigned int *nextBucketPos = new unsigned int[num_of_buckets]();
+    for (unsigned int i = 0 ; i < size ; i++) {
+        const unsigned int pos = Psum[bucket_nums[i]] + nextBucketPos[bucket_nums[i]];   // value's position in the re-ordered version
+        if ( pos >= size ) { delete[] newJoinField; delete[] newRowids; delete[] bucket_nums; delete[] nextBucketPos; Psum = NULL; numberOfBuckets = 0;  return false; }  // ERROR CHECK
+        newJoinField[pos] = joinField[i];
+        newRowids[pos] = rowids[i];
+        nextBucketPos[bucket_nums[i]]++;
+    }
+    delete[] nextBucketPos;
+    delete[] bucket_nums;
+    // 4) overwrite joinField and rowids with new re-ordered versions of it
+    delete[] joinField;
+    joinField = newJoinField;
+    delete[] rowids;
+    rowids = newRowids;
+    return true;
+}
+
 void JoinRelation::printDebugInfo() {
     if (Psum != NULL) {
         printf("This JoinRelation is partitioned.\n%u buckets created with Psum as follows:\n", numberOfBuckets);
@@ -105,10 +170,10 @@ void JoinRelation::printDebugInfo() {
             printf("Psum[%u] = %u\n", i, Psum[i]);
         }
     }
-    printf(" joinField | rowids\n");
-    for (unsigned int i = 0 ; i < size ; i++){
-        printf("%10u | %u\n", (unsigned int) joinField[i], rowids[i]);
-    }
+    //printf(" joinField | rowids\n");
+    //for (unsigned int i = 0 ; i < size ; i++){
+    //    printf("%10u | %u\n", (unsigned int) joinField[i], rowids[i]);
+    //}
 }
 #endif
 

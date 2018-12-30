@@ -161,14 +161,19 @@ PartitionJob::~PartitionJob() {
 }
 
 bool PartitionJob::run() {
+    unsigned int next_bucket_pos;
     for (unsigned int i = start ; i < end ; i++) {
-        unsigned int next_bucket_pos;
         CHECK_PERROR(pthread_mutex_lock(&bucket_pos_locks[bucket_nums[i]]), "pthread_mutex_lock failed", )
         next_bucket_pos = nextBucketPos[bucket_nums[i]];   // accessing this
         nextBucketPos[bucket_nums[i]]++;                   // and increment must be atomic
         CHECK_PERROR(pthread_mutex_unlock(&bucket_pos_locks[bucket_nums[i]]), "pthread_mutex_unlock failed", )
         const unsigned int pos = Psum[bucket_nums[i]] + next_bucket_pos;   // value's position in the re-ordered version
         newJoinField[pos] = oldJoinField[i];
+#ifdef DDEBUG
+        if (newRowids[pos] != 0 ){
+            cerr << "Thread Warning: overwriting newRowids[ " << pos << "] = " << newRowids[pos] << " to " << oldRowids[i] << " | next_bucket_pos = " << next_bucket_pos << endl;
+        }
+#endif
         newRowids[pos] = oldRowids[i];
     }
     return true;

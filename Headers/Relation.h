@@ -7,7 +7,7 @@
 #include "FieldTypes.h"
 #include "SQLParser.h"
 
-//#define DDEBUG         // define this if functions used for debugging such as printing info should be compiled
+#define DDEBUG         // define this if functions used for debugging such as printing info should be compiled
 
 #define CACHE 512        // smaller CACHE SIZE means more parallel stuff
 
@@ -40,6 +40,7 @@ public:
     /* Operations */
     bool partitionRelation(unsigned int H1_N);     // partitions JoinRelation by creating Psum and reordering it's tuples
 #ifdef DDEBUG
+    bool partitionRelationSequentially(unsigned int H1_N);
     void printDebugInfo();
 #endif
 };

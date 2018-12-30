@@ -279,3 +279,33 @@ SCENARIO("The entire join is being tested on a realistic case", "[RHJ]") {
         catch (...) { printf("Could not load relations\n"); }
     }
 }
+
+#ifdef DDEBUG
+TEST_CASE("Test multi-threaded partition", "[multithreaded-partition]"){
+    char file_r[]="Files/r7";
+
+    try {
+        Relation R1(file_r);
+        Relation R2(file_r);
+
+        JoinRelation *JR1 = R1.extractJoinRelation(1);
+        JoinRelation *JR2 = R2.extractJoinRelation(1);
+
+
+        unsigned int H1_N = (unsigned int) ( ceil( log2( R1.getSize() / CACHE )));
+        REQUIRE( JR1 != NULL );
+        REQUIRE( JR2 != NULL );
+        REQUIRE( JR1->partitionRelation(H1_N) );
+        REQUIRE( JR2->partitionRelationSequentially(H1_N) );
+        cout << "multi-threaded: " << endl;
+        JR1->printDebugInfo();
+        cout << "sequential: " << endl;
+        JR2->printDebugInfo();
+        REQUIRE( JR1->getNumberOfBuckets() == JR2->getNumberOfBuckets() );
+        for (int i = 0 ; i < JR1->getNumberOfBuckets() ; i++){
+            CHECK( JR1->getBucketSize(i) == JR2->getBucketSize(i) );
+        }
+    }
+    catch (...) { printf("Could not load relations\n"); }
+}
+#endif
