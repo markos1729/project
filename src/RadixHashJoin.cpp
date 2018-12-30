@@ -1,9 +1,11 @@
 #include <iostream>
 #include <cstring>
 #include <cmath>
+#include <pthread.h>
 #include "../Headers/RadixHashJoin.h"
 
 #define CHECK(call, msg, action) { if ( ! (call) ) { std::cerr << msg << std::endl; action } }
+#define CHECK_PERROR(call, msg, actions) { if ( (call) < 0 ) { perror(msg); actions } }
 #define MAX(A, B) ( (A) > (B) ? (A) : (B) )
 
 
@@ -112,15 +114,62 @@ bool JoinJob::run(){
     return true;
 }
 
+
 HistJob::HistJob(const intField *_joinField, unsigned int _start, unsigned int _end, unsigned int *_Hist, unsigned int *_bucket_nums, unsigned int _H1_N)
-        : Job(), joinField(_joinField), start(_start), end(_end), Hist(_Hist), bucket_nums(_bucket_nums), H1_N(_H1_N) { }
+        : Job(), num_of_buckets((unsigned int) 0x01 << H1_N) , joinField(_joinField), start(_start), end(_end), Hist(_Hist), bucket_nums(_bucket_nums), H1_N(_H1_N) {
+    Hist_bucket_locks = new pthread_mutex_t[num_of_buckets];
+    for (unsigned int i = 0 ; i < num_of_buckets ; i++){
+        CHECK_PERROR(pthread_mutex_init(&Hist_bucket_locks[i], NULL) , "pthread_mutex_init failed", )
+    }
+}
+
+HistJob::~HistJob() {
+    for (unsigned int i = 0 ; i < num_of_buckets ; i++){
+        CHECK_PERROR(pthread_mutex_destroy(&Hist_bucket_locks[i]) , "pthread_mutex_init failed", )
+    }
+    delete[] Hist_bucket_locks;
+}
 
 bool HistJob::run() {
-    const unsigned int num_of_buckets = (unsigned int) 0x01 << H1_N;  // = 2^H1_N
     for (unsigned int i = start ; i < end ; i++){
         bucket_nums[i] = H1(joinField[i], H1_N);
         if ( bucket_nums[i] >= num_of_buckets ){ cerr << "Error: H1() false?" << endl; delete[] Hist; delete[] bucket_nums; return false; }  // ERROR CHECK
-        Hist[bucket_nums[i]]++;
+        CHECK_PERROR(pthread_mutex_lock(&Hist_bucket_locks[bucket_nums[i]]), "pthread_mutex_lock failed", )
+        Hist[bucket_nums[i]]++;   // this must be atomic to work properly
+        CHECK_PERROR(pthread_mutex_unlock(&Hist_bucket_locks[bucket_nums[i]]), "pthread_mutex_unlock failed", )
+    }
+    return true;
+}
+
+
+PartitionJob::PartitionJob(intField *_newJoinField, intField *_oldJoinField, unsigned int *_newRowids, unsigned int *_oldRowids,
+                           unsigned int *_nextBucketPos, unsigned int _start, unsigned int _end, unsigned int _num_of_buckets,
+                           const unsigned int *_bucket_nums, unsigned int *_Psum)
+                           : Job(), newJoinField(_newJoinField), oldJoinField(_oldJoinField), newRowids(_newRowids), oldRowids(_oldRowids),
+                           nextBucketPos(_nextBucketPos), start(_start), end(_end), num_of_buckets(_num_of_buckets), bucket_nums(_bucket_nums), Psum(_Psum) {
+    bucket_pos_locks = new pthread_mutex_t[num_of_buckets];
+    for (unsigned int i = 0 ; i < num_of_buckets ; i++){
+        CHECK_PERROR(pthread_mutex_init(&bucket_pos_locks[i], NULL) , "pthread_mutex_init failed", )
+    }
+}
+
+PartitionJob::~PartitionJob() {
+    for (unsigned int i = 0 ; i < num_of_buckets ; i++){
+        CHECK_PERROR(pthread_mutex_destroy(&bucket_pos_locks[i]) , "pthread_mutex_init failed", )
+    }
+    delete[] bucket_pos_locks;
+}
+
+bool PartitionJob::run() {
+    for (unsigned int i = start ; i < end ; i++) {
+        unsigned int next_bucket_pos;
+        CHECK_PERROR(pthread_mutex_lock(&bucket_pos_locks[bucket_nums[i]]), "pthread_mutex_lock failed", )
+        next_bucket_pos = nextBucketPos[bucket_nums[i]];   // accessing this
+        nextBucketPos[bucket_nums[i]]++;                   // and increment must be atomic
+        CHECK_PERROR(pthread_mutex_unlock(&bucket_pos_locks[bucket_nums[i]]), "pthread_mutex_unlock failed", )
+        const unsigned int pos = Psum[bucket_nums[i]] + next_bucket_pos;   // value's position in the re-ordered version
+        newJoinField[pos] = oldJoinField[i];
+        newRowids[pos] = oldRowids[i];
     }
     return true;
 }

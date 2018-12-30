@@ -53,7 +53,7 @@ bool JoinRelation::partitionRelation(unsigned int H1_N) {
     unsigned int *Hist = new unsigned int[num_of_buckets]();          // all Hist[i] are initialized to 0
     unsigned int *bucket_nums = new unsigned int[size];
     unsigned int **tempHists = new unsigned int *[NUMBER_OF_THREADS];
-    unsigned int chunk_size = size / NUMBER_OF_THREADS + ((size % NUMBER_OF_THREADS > 0) ? 1 : 0);
+    const unsigned int chunk_size = size / NUMBER_OF_THREADS + ((size % NUMBER_OF_THREADS > 0) ? 1 : 0);
     for (int i = 0 ; i < NUMBER_OF_THREADS ; i++){
         tempHists[i] = new unsigned int[num_of_buckets]();            // (!) init to 0
         scheduler->schedule(new HistJob(joinField, i * chunk_size, MIN((i+1) * chunk_size, size), tempHists[i], bucket_nums, H1_N));
@@ -83,13 +83,10 @@ bool JoinRelation::partitionRelation(unsigned int H1_N) {
     intField *newJoinField = new intField[size]();
     unsigned int *newRowids = new unsigned int[size]();
     unsigned int *nextBucketPos = new unsigned int[num_of_buckets]();
-    for (unsigned int i = 0 ; i < size ; i++) {
-        const unsigned int pos = Psum[bucket_nums[i]] + nextBucketPos[bucket_nums[i]];   // value's position in the re-ordered version
-        if ( pos >= size ) { delete[] newJoinField; delete[] newRowids; delete[] bucket_nums; delete[] nextBucketPos; Psum = NULL; numberOfBuckets = 0;  return false; }  // ERROR CHECK
-        newJoinField[pos] = joinField[i];
-        newRowids[pos] = rowids[i];
-        nextBucketPos[bucket_nums[i]]++;
+    for (int i = 0 ; i < NUMBER_OF_THREADS ; i++){
+        scheduler->schedule(new PartitionJob(newJoinField, joinField, newRowids, rowids, nextBucketPos, i * chunk_size, MIN((i+1) * chunk_size, size), num_of_buckets, bucket_nums, Psum));
     }
+    scheduler->waitUntilAllJobsHaveFinished();
     delete[] nextBucketPos;
     delete[] bucket_nums;
     // 4) overwrite joinField and rowids with new re-ordered versions of it
