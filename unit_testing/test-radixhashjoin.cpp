@@ -1,10 +1,9 @@
 #include <stdio.h>
 #include "catch.hpp"
-#include "../Headers/RadixHashJoin.h"
-
-// The following are only used for unit_testing, not for the implementation of Radix Hash Join
 #include <vector>
 #include <algorithm>
+#include "../Headers/RadixHashJoin.h"
+#include "../Headers/HashFunctions.h"
 
 
 /* Partition Unit Testing */
@@ -280,7 +279,6 @@ SCENARIO("The entire join is being tested on a realistic case", "[RHJ]") {
     }
 }
 
-#ifdef DDEBUG
 TEST_CASE("Test multi-threaded partition", "[multithreaded-partition]"){
     char file_r[]="Files/r7";
 
@@ -291,16 +289,17 @@ TEST_CASE("Test multi-threaded partition", "[multithreaded-partition]"){
         JoinRelation *JR1 = R1.extractJoinRelation(1);
         JoinRelation *JR2 = R2.extractJoinRelation(1);
 
-
         unsigned int H1_N = (unsigned int) ( ceil( log2( R1.getSize() / CACHE )));
         REQUIRE( JR1 != NULL );
         REQUIRE( JR2 != NULL );
         REQUIRE( JR1->partitionRelation(H1_N) );
         REQUIRE( JR2->partitionRelationSequentially(H1_N) );
+#ifdef DDEBUG
         cout << "multi-threaded: " << endl;
         JR1->printDebugInfo();
         cout << "sequential: " << endl;
         JR2->printDebugInfo();
+#endif
         REQUIRE( JR1->getNumberOfBuckets() == JR2->getNumberOfBuckets() );
         for (int i = 0 ; i < JR1->getNumberOfBuckets() ; i++){
             CHECK( JR1->getBucketSize(i) == JR2->getBucketSize(i) );
@@ -308,4 +307,3 @@ TEST_CASE("Test multi-threaded partition", "[multithreaded-partition]"){
     }
     catch (...) { printf("Could not load relations\n"); }
 }
-#endif

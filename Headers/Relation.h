@@ -7,16 +7,16 @@
 #include "FieldTypes.h"
 #include "SQLParser.h"
 
-#define DDEBUG         // define this if functions used for debugging such as printing info should be compiled
 
-#define CACHE 512        // smaller CACHE SIZE means more parallel stuff
+//#define DDEBUG         // define this if functions used for debugging such as printing info should be compiled
+
+
+#define CACHE 512        // smaller CACHE SIZE means more buckets (=> more parallel joins but bigger parallel partition cost)
+
 
 // Forward delcarations:
 class Relation;
 class IntermediateRelation;
-
-
-unsigned int H1(intField, unsigned int N);
 
 
 class JoinRelation {     // Relation struct used for RadixHashJoin, only stores Join Field and rowids

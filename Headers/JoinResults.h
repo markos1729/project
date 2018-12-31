@@ -15,7 +15,7 @@
 using namespace std;
 
 
-struct ResultNode{
+struct ResultNode {
 	friend class Iterator;
 private:
 	unsigned int nextpos;

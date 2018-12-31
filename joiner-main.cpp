@@ -5,24 +5,26 @@
 #include "Headers/SQLParser.h"
 #include "Headers/Relation.h"
 #include "Headers/JobScheduler.h"
-#include "Headers/util.h"
+#include "Headers/macros.h"
 
 
 #define STARTING_VECTOR_SIZE 16
 
 
-#define PRINT_SUM                // define this to print SUM of projected columns instead of their values
+#define PRINT_SUM                  // define this to print SUM of projected columns instead of their values
 //#define PRINT_FEEDBACK_MESSAGES  // define this for extra feedback messages to be printed by joiner. Do not define this if the only stdout output you want is the results
 
 
 using namespace std;
 
 
+/* Global variables */
 JobScheduler *scheduler = NULL;
 
 
 /* Local Functions */
 unsigned int find_rel_pos(QueryRelation **QueryRelations, unsigned int size, unsigned int rel_id);
+unsigned int count_not_null(void **ptrarray, unsigned int size);
 
 
 int main(){
@@ -226,4 +228,12 @@ unsigned int find_rel_pos(QueryRelation **QueryRelations, unsigned int size, uns
         }
     }
     return -1;  // unsigned -> 111..1 -> should be caught by a CHECK(..)
+}
+
+unsigned int count_not_null(void **ptrarray, unsigned int size){
+    unsigned int count = 0;
+    for (unsigned int i = 0 ; i < size ; i++){
+        if ( ptrarray[i] != NULL ) count++;
+    }
+    return count;
 }

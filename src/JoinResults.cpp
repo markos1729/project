@@ -1,8 +1,6 @@
 #include <stdio.h>
 #include "../Headers/JoinResults.h"
-
-
-#define CHECK_PERROR(call, msg, actions) { if ( (call) < 0 ) { perror(msg); actions } }
+#include "../Headers/macros.h"
 
 
 /* ResultNode Implementation */

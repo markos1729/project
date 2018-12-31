@@ -8,26 +8,14 @@
 #include <sys/stat.h>
 #include "../Headers/Relation.h"
 #include "../Headers/RadixHashJoin.h"
-#include "../Headers/util.h"
+#include "../Headers/HashFunctions.h"
+#include "../Headers/macros.h"
 
 
 using namespace std;
 
-#define CHECK_PERROR(call, msg, actions) { if ( (call) < 0 ) { perror(msg); actions } }
-#define MIN(A, B) ( (A) < (B) ? (A) : (B) )
-
 
 extern JobScheduler *scheduler;
-
-
-/* H1 Function used in partitioning*/
-unsigned int H1(intField value, unsigned int n){
-    intField mask = 0;
-    for (unsigned int i = 0 ; i < n ; i++ ){
-        mask |= 0x01<<i;
-    }
-    return (unsigned int) (mask & value);
-}
 
 
 /* Join Relation Implementation */
@@ -46,7 +34,7 @@ JoinRelation::~JoinRelation() {
     delete[] rowids;
 }
 
-// multi-threaded version phase 1: partition in place JoinRelation R into buckets and fill Psum to distinguish them (|Psum| = num_of_buckets = 2^H1_N)
+// (multi-threaded version) phase 1: partition in place JoinRelation R into buckets and fill Psum to distinguish them (|Psum| = num_of_buckets = 2^H1_N)
 bool JoinRelation::partitionRelation(unsigned int H1_N) {
     if (this->getSize() == 0 || rowids == NULL || joinField == NULL ) return true;     // nothing to partition
     const unsigned int num_of_buckets = (unsigned int) 0x01 << H1_N;  // = 2^H1_N
@@ -80,7 +68,7 @@ bool JoinRelation::partitionRelation(unsigned int H1_N) {
     }
     Psum = Hist;
     numberOfBuckets = num_of_buckets;
-    // 3) create new re-ordered versions for joinField and rowids based on their bucket_nums - O(n)
+    // 3) create new re-ordered versions for joinField and rowids based on their bucket_nums using available threads
     intField *newJoinField = new intField[size]();
     unsigned int *newRowids = new unsigned int[size]();
     unsigned int *nextBucketPos = new unsigned int[num_of_buckets]();
@@ -106,7 +94,7 @@ bool JoinRelation::partitionRelation(unsigned int H1_N) {
     return true;
 }
 
-// single-threaded version phase 1: partition in place JoinRelation R into buckets and fill Psum to distinguish them (|Psum| = num_of_buckets = 2^H1_N)
+// (single-threaded version) phase 1: partition in place JoinRelation R into buckets and fill Psum to distinguish them (|Psum| = num_of_buckets = 2^H1_N)
 bool JoinRelation::partitionRelationSequentially(unsigned int H1_N) {
     if (this->getSize() == 0 || rowids == NULL || joinField == NULL ) return true;     // nothing to partition
     const unsigned int num_of_buckets = (unsigned int) pow(2, H1_N);
@@ -211,7 +199,7 @@ Relation::Relation(unsigned int _size, unsigned int _num_of_columns) : QueryRela
     columns = new intField*[_num_of_columns]();   // initialize to NULL
 }
 
-Relation::Relation(const char* file) : QueryRelation(false), allocatedWithMmap(true), id(-1) {
+Relation::Relation(const char* file) : QueryRelation(false), allocatedWithMmap(true), id(-1) , size(0) {
     int fd = open(file,O_RDONLY);
     if (fd == -1) throw 0;
 

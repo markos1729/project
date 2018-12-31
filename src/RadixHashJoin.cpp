@@ -3,10 +3,12 @@
 #include <cmath>
 #include <pthread.h>
 #include "../Headers/RadixHashJoin.h"
+#include "../Headers/HashFunctions.h"
+#include "../Headers/macros.h"
 
-#define CHECK(call, msg, action) { if ( ! (call) ) { std::cerr << msg << std::endl; action } }
-#define CHECK_PERROR(call, msg, actions) { if ( (call) < 0 ) { perror(msg); actions } }
-#define MAX(A, B) ( (A) > (B) ? (A) : (B) )
+
+/// choose a partition parallel scheme:
+//#define PARALLEL_IMPLEMENTATION_OF_PARTITION_INSTEAD_OF_THEIR_CALL
 
 
 using namespace std;
@@ -15,12 +17,21 @@ using namespace std;
 extern JobScheduler *scheduler;
 
 
+/* Globals */
 unsigned int H1_N, H2_N;
-unsigned int H2(intField value) { return ( value & ( ((1 << (H1_N + H2_N)) - 1) ^ ( (1 << H1_N) - 1) ) ) >> H1_N; }
 
 
-//for unit testing
+/* Local Functions & structs */
 void setH(unsigned int _H1_N, unsigned int _H2_N) { H1_N = _H1_N; H2_N = _H2_N; }
+#ifndef PARALLEL_IMPLEMENTATION_OF_PARTITION_INSTEAD_OF_THEIR_CALL
+struct partition_args{
+    JoinRelation &R;
+    unsigned int H1_N;
+    partition_args(JoinRelation &_R, unsigned int _H1_N) : R(_R), H1_N(_H1_N) { }
+};
+
+void *thread_partition(void *args);
+#endif
 
 
 Result* radixHashJoin(JoinRelation &R, JoinRelation &S) {
@@ -28,8 +39,23 @@ Result* radixHashJoin(JoinRelation &R, JoinRelation &S) {
     // Partition R and S, whilst keeping a 'Psum' table for each bucket in R and S (phase 1)
     H1_N = (unsigned int) ( ceil( log2( MAX(R.getSize(), S.getSize()) / CACHE ))); // H1_N is the same for both Relations rounded up  TODO: I think ceil() does not work properly!
     H2_N = H1_N/2;
+#ifdef PARALLEL_IMPLEMENTATION_OF_PARTITION_INSTEAD_OF_THEIR_CALL
     CHECK( R.partitionRelation(H1_N) , "partitioning R failed", return NULL; )
     CHECK( S.partitionRelation(H1_N) , "partitioning S failed", return NULL; )
+#else
+    // R will be partitioned by the main thread whilst S by a new thread
+    bool fail = false;
+    pthread_t tid;
+    struct partition_args args(S, H1_N);
+    CHECK_PERROR(pthread_create(&tid, NULL, thread_partition, (void *) &args), "pthread_create failed", fail = true; )
+    if (fail) {    // should not happen
+        CHECK( R.partitionRelationSequentially(H1_N) , "partitioning R failed", return NULL; )
+        CHECK( S.partitionRelationSequentially(H1_N) , "partitioning S failed", return NULL; )
+    } else {
+        CHECK( R.partitionRelationSequentially(H1_N) , "partitioning R failed", return NULL; )
+        CHECK_PERROR(pthread_join(tid, NULL), "pthread_create failed", fail = true; )
+    }
+#endif
     // Choose one of them for indexing, lets say I, and keep the other for scanning, lets say L
     bool saveLfirst;
     JoinRelation *L = NULL, *I = NULL;
@@ -71,7 +97,7 @@ bool indexRelation(intField *bucketJoinField, unsigned int bucketSize, unsigned 
     memset(table, 0, sz * sizeof(unsigned int));
     memset(chain, 0, bucketSize * sizeof(unsigned int));
     for (unsigned int i = bucketSize ; i > 0 ; --i) {
-        unsigned int h = H2(bucketJoinField[i - 1]);
+        unsigned int h = H2(bucketJoinField[i - 1], H1_N, H2_N);
         if (table[h] == 0) last[h] = table[h] = i;
         else last[h] = chain[last[h] - 1] = i;
     }
@@ -86,7 +112,7 @@ bool probeResults(const intField *LbucketJoinField, const unsigned int *LbucketR
                   const unsigned int *chain, const unsigned int *H2HashTable,
                   unsigned int LbucketSize, Result *result, bool saveLfirst){
 	for (unsigned int i = 0; i < LbucketSize; i++) {
-		unsigned int h = H2(LbucketJoinField[i]);
+		unsigned int h = H2(LbucketJoinField[i], H1_N, H2_N);
 		if (H2HashTable[h] == 0) continue;		// no records in I with that value
 		unsigned int chainIndex = H2HashTable[h];
 		while (chainIndex > 0) {
@@ -100,7 +126,12 @@ bool probeResults(const intField *LbucketJoinField, const unsigned int *LbucketR
 	return true;
 }
 
-/* Parallel Job Implementation */
+
+
+/***********************************/
+/*** Parallel Job Implementation ***/
+/***********************************/
+/* Join Job */
 JoinJob::JoinJob(const unsigned int bucket, JoinRelation &_I, JoinRelation &_L, Result *_result, const bool _saveLfirst)
         : Job(), bucket_num(bucket), I(_I), L(_L), result(_result), saveLfirst(_saveLfirst) { }
 
@@ -114,7 +145,7 @@ bool JoinJob::run(){
     return true;
 }
 
-
+/* Hist Job */
 HistJob::HistJob(const intField *_joinField, unsigned int _start, unsigned int _end, unsigned int *_Hist, unsigned int *_bucket_nums, unsigned int _H1_N)
         : Job(), num_of_buckets((unsigned int) 0x01 << H1_N) , joinField(_joinField), start(_start), end(_end), Hist(_Hist), bucket_nums(_bucket_nums), H1_N(_H1_N) { }
 
@@ -128,7 +159,7 @@ bool HistJob::run() {
     return true;
 }
 
-
+/* Partition Job */
 PartitionJob::PartitionJob(intField *_newJoinField, intField *_oldJoinField, unsigned int *_newRowids, unsigned int *_oldRowids,
                            unsigned int *_nextBucketPos, unsigned int _start, unsigned int _end, unsigned int _num_of_buckets,
                            const unsigned int *_bucket_nums, unsigned int *_Psum, pthread_mutex_t *_bucket_pos_locks)
@@ -149,3 +180,12 @@ bool PartitionJob::run() {
     }
     return true;
 }
+
+
+#ifndef PARALLEL_IMPLEMENTATION_OF_PARTITION_INSTEAD_OF_THEIR_CALL
+void *thread_partition(void *args){
+    struct partition_args *argptr = (struct partition_args *) args;
+    CHECK( argptr->R.partitionRelationSequentially(argptr->H1_N), "thread partitioning sequentially failed", )
+    pthread_exit((void *) 0);
+}
+#endif

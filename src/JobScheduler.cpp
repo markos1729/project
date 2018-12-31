@@ -1,11 +1,10 @@
 #include <iostream>
 #include "../Headers/JobScheduler.h"
-
-
-#define CHECK_PERROR(call, msg, actions) { if ( (call) < 0 ) { perror(msg); actions } }
+#include "../Headers/macros.h"
 
 
 using namespace std;
+
 
 /* Globals for control */
 volatile bool threads_must_exit;

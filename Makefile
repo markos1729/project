@@ -1,7 +1,7 @@
 CXX         = g++
 CXXFLAGS    = -O2 -g3 -pedantic -std=c++11 #-Wall -Wextra
 COMMON_OBJ  = objects/Relation.o objects/RadixHashJoin.o objects/JoinResults.o objects/JobScheduler.o
-JOINER_OBJ  = objects/joiner-main.o objects/SQLParser.o objects/util.o
+JOINER_OBJ  = objects/joiner-main.o objects/SQLParser.o
 COMMON_HEAD = Headers/*.h
 
 
@@ -41,7 +41,7 @@ objects/JobScheduler.o: src/JobScheduler.cpp Headers/JobScheduler.h
 ##########
 
 joiner: assert_objects_dir $(JOINER_OBJ) $(COMMON_OBJ)
-	$(CXX) $(CXXFLAGS) objects/joiner-main.o objects/util.o objects/SQLParser.o $(COMMON_OBJ) -o joiner -pthread
+	$(CXX) $(CXXFLAGS) objects/joiner-main.o objects/SQLParser.o $(COMMON_OBJ) -o joiner -pthread
 
 objects/joiner-main.o: joiner-main.cpp $(COMMON_HEAD)
 	$(CXX) -c $(CXXFLAGS) joiner-main.cpp
@@ -50,10 +50,6 @@ objects/joiner-main.o: joiner-main.cpp $(COMMON_HEAD)
 objects/SQLParser.o: src/SQLParser.cpp $(COMMON_HEAD) Headers/SQLParser.h
 	$(CXX) -c $(CXXFLAGS) src/SQLParser.cpp
 	mv SQLParser.o objects/SQLParser.o
-
-objects/util.o: src/util.cpp $(COMMON_HEAD)
-	$(CXX) -c $(CXXFLAGS) src/util.cpp
-	mv util.o objects/util.o
 
 
 ################
