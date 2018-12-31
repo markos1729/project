@@ -39,8 +39,8 @@ public:
     unsigned int getBucketSize(unsigned int i) const { return (Psum != NULL && i < numberOfBuckets) ? ((i == numberOfBuckets - 1) ? size - Psum[i] : Psum[i + 1] - Psum[i]) : 0; }
     /* Operations */
     bool partitionRelation(unsigned int H1_N);     // partitions JoinRelation by creating Psum and reordering it's tuples
-#ifdef DDEBUG
     bool partitionRelationSequentially(unsigned int H1_N);
+#ifdef DDEBUG
     void printDebugInfo();
 #endif
 };

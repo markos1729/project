@@ -13,6 +13,7 @@
 
 using namespace std;
 
+#define CHECK_PERROR(call, msg, actions) { if ( (call) < 0 ) { perror(msg); actions } }
 #define MIN(A, B) ( (A) < (B) ? (A) : (B) )
 
 
@@ -45,7 +46,7 @@ JoinRelation::~JoinRelation() {
     delete[] rowids;
 }
 
-// phase 1: partition in place JoinRelation R into buckets and fill Psum to distinguish them (|Psum| = num_of_buckets = 2^H1_N)
+// multi-threaded version phase 1: partition in place JoinRelation R into buckets and fill Psum to distinguish them (|Psum| = num_of_buckets = 2^H1_N)
 bool JoinRelation::partitionRelation(unsigned int H1_N) {
     if (this->getSize() == 0 || rowids == NULL || joinField == NULL ) return true;     // nothing to partition
     const unsigned int num_of_buckets = (unsigned int) 0x01 << H1_N;  // = 2^H1_N
@@ -56,7 +57,7 @@ bool JoinRelation::partitionRelation(unsigned int H1_N) {
     const unsigned int chunk_size = size / NUMBER_OF_THREADS + ((size % NUMBER_OF_THREADS > 0) ? 1 : 0);
     for (int i = 0 ; i < NUMBER_OF_THREADS ; i++){
         tempHists[i] = new unsigned int[num_of_buckets]();            // (!) init to 0
-        scheduler->schedule(new HistJob(joinField, i * chunk_size, MIN((i+1) * chunk_size, size), tempHists[i], bucket_nums, H1_N));
+        if (i * chunk_size < size ) scheduler->schedule(new HistJob(joinField, i * chunk_size, MIN((i+1) * chunk_size, size), tempHists[i], bucket_nums, H1_N));
     }
     scheduler->waitUntilAllJobsHaveFinished();
     // and then sum them up to create one Hist
@@ -83,33 +84,18 @@ bool JoinRelation::partitionRelation(unsigned int H1_N) {
     intField *newJoinField = new intField[size]();
     unsigned int *newRowids = new unsigned int[size]();
     unsigned int *nextBucketPos = new unsigned int[num_of_buckets]();
+    pthread_mutex_t *bucket_pos_locks = new pthread_mutex_t[num_of_buckets];   // one lock per bucket i to protect nextBocketPos[i]
+    for (unsigned int i = 0 ; i < num_of_buckets ; i++){
+        CHECK_PERROR(pthread_mutex_init(&bucket_pos_locks[i], NULL) , "pthread_mutex_init failed", )
+    }
     for (int i = 0 ; i < NUMBER_OF_THREADS ; i++){
-        scheduler->schedule(new PartitionJob(newJoinField, joinField, newRowids, rowids, nextBucketPos, i * chunk_size, MIN((i+1) * chunk_size, size), num_of_buckets, bucket_nums, Psum));
+        if (i * chunk_size < size ) scheduler->schedule(new PartitionJob(newJoinField, joinField, newRowids, rowids, nextBucketPos, i * chunk_size, MIN((i + 1) * chunk_size, size), num_of_buckets, bucket_nums, Psum, bucket_pos_locks));
     }
     scheduler->waitUntilAllJobsHaveFinished();
-
-#ifdef DDEBUG
-    ///DEBUG: check if it was done correctly
-    for (int i = 0 ; i < size ; i++ ){
-        unsigned int bucket = H1(joinField[i], H1_N);
-        if ( bucket != bucket_nums[i] ) { cerr << "Wrong bucket_nums table" << endl; }
-        bool found = false;
-        for (int j = Psum[bucket] ; j < Psum[bucket] + getBucketSize(bucket) ; j++){
-            if ( rowids[i] == newRowids[j] ) {
-                found = true;
-                break;
-            }
-        }
-        if (!found) {
-            cerr << "Wrong partition!!!\nCould not found rowids[" << i << "] =  " << rowids[i] << " in bucket " << bucket << endl;
-            //cerr << "That bucket contains:" << endl;
-            //for (int j = Psum[bucket] ; j < Psum[bucket] + getBucketSize(bucket) ; j++){
-            //    cerr << newRowids[j] << endl;
-            //}
-        }
+    for (unsigned int i = 0 ; i < num_of_buckets ; i++){
+        CHECK_PERROR(pthread_mutex_destroy(&bucket_pos_locks[i]) , "pthread_mutex_init failed", )
     }
-#endif
-
+    delete[] bucket_pos_locks;
     delete[] nextBucketPos;
     delete[] bucket_nums;
     // 4) overwrite joinField and rowids with new re-ordered versions of it
@@ -120,8 +106,7 @@ bool JoinRelation::partitionRelation(unsigned int H1_N) {
     return true;
 }
 
-#ifdef DDEBUG
-// phase 1: partition in place JoinRelation R into buckets and fill Psum to distinguish them (|Psum| = num_of_buckets = 2^H1_N)
+// single-threaded version phase 1: partition in place JoinRelation R into buckets and fill Psum to distinguish them (|Psum| = num_of_buckets = 2^H1_N)
 bool JoinRelation::partitionRelationSequentially(unsigned int H1_N) {
     if (this->getSize() == 0 || rowids == NULL || joinField == NULL ) return true;     // nothing to partition
     const unsigned int num_of_buckets = (unsigned int) pow(2, H1_N);
@@ -163,6 +148,8 @@ bool JoinRelation::partitionRelationSequentially(unsigned int H1_N) {
     return true;
 }
 
+
+#ifdef DDEBUG
 void JoinRelation::printDebugInfo() {
     if (Psum != NULL) {
         printf("This JoinRelation is partitioned.\n%u buckets created with Psum as follows:\n", numberOfBuckets);
@@ -170,10 +157,10 @@ void JoinRelation::printDebugInfo() {
             printf("Psum[%u] = %u\n", i, Psum[i]);
         }
     }
-    //printf(" joinField | rowids\n");
-    //for (unsigned int i = 0 ; i < size ; i++){
-    //    printf("%10u | %u\n", (unsigned int) joinField[i], rowids[i]);
-    //}
+    printf(" joinField | rowids\n");
+    for (unsigned int i = 0 ; i < size ; i++){
+        printf("%10u | %u\n", (unsigned int) joinField[i], rowids[i]);
+    }
 }
 #endif
 

@@ -29,10 +29,8 @@ class HistJob : public Job {
     unsigned int *Hist;
     unsigned int *bucket_nums;
     const unsigned int num_of_buckets;
-    pthread_mutex_t *Hist_bucket_locks;   // one lock per bucket i to protect Hist[i]
 public:
     HistJob(const intField *_joinField, unsigned int _start, unsigned int _end, unsigned int *_Hist, unsigned int *_bucket_nums, unsigned int _H1_N);
-    ~HistJob();
     bool run();
 };
 
@@ -43,10 +41,9 @@ class PartitionJob : public Job {
     unsigned int *nextBucketPos;
     const unsigned int start, end, num_of_buckets;
     const unsigned int *bucket_nums, *Psum;
-    pthread_mutex_t *bucket_pos_locks;   // one lock per bucket i to protect nextBocketPos[i]
+    pthread_mutex_t *bucket_pos_locks;
 public:
-    PartitionJob(intField *_newJoinField, intField *_oldJoinField, unsigned int *_newRowids, unsigned int *_oldRowids, unsigned int *_nextBucketPos, unsigned int _start, unsigned int _end, unsigned int _num_of_buckets, const unsigned int *_bucket_nums, unsigned int *_Psum);
-    ~PartitionJob();
+    PartitionJob(intField *_newJoinField, intField *_oldJoinField, unsigned int *_newRowids, unsigned int *_oldRowids, unsigned int *_nextBucketPos, unsigned int _start, unsigned int _end, unsigned int _num_of_buckets, const unsigned int *_bucket_nums, unsigned int *_Psum, pthread_mutex_t *_bucket_pos_locks);
     bool run();
 };
 
