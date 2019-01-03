@@ -1,5 +1,5 @@
-#include <math.h>
-#include <limits.h>
+#include <cmath>
+#include <climits>
 #include "../Headers/Optimizer.h"
 
 #define BIG_N 50000000
@@ -13,11 +13,11 @@ void Optimizer::initialize(unsigned int rid,unsigned int rows,unsigned int cols,
 	F[rid]=new unsigned int[cols];
 	D[rid]=new unsigned int[cols];
 	N[rid]=new unsigned int[cols];
-	bitmap[rid]=new unsigned int*[cols];
+	bitmap[rid]=new uint64_t*[cols];
 	
 	for (unsigned int c=0; c<cols; c++) {
+		intField u=0;
 		intField i=ULLONG_MAX;
-		intField u=ULLONG_MIN;
 		
 		for (unsigned int r=0; r<rows; r++) {
 			i=min(i,columns[c][r]);
@@ -34,9 +34,9 @@ void Optimizer::initialize(unsigned int rid,unsigned int rows,unsigned int cols,
 		
 		for (unsigned int r=0; r<rows; r++) {
 			unsigned int cell=(columns[c][r]-I[rid][c]) % N[rid][c];
-			if (bitmap[rid][cell/64] & (1<<(cell%64))==0) {
+			if (bitmap[rid][c][cell/64] & (1<<(cell%64))==0) {
 				D[rid][c]++;
-				bitmap[rid][cell/64]|=1<<(cell%64);
+				bitmap[rid][c][cell/64]|=1<<(cell%64);
 				}
 			}
 		}
@@ -91,15 +91,15 @@ void Optimizer::filter() {
 		unsigned int cola=parser.predicates[p].cola_id;
 		unsigned int colb=parser.predicates[p].colb_id;
 		
-		unsigned int pF=F[rel][cola];
+		unsigned int pF=F[rela][cola];
 		
 		I[rela][cola]=I[rela][colb]=max(I[rela][cola],I[rela][colb]);
 		U[rela][cola]=U[rela][colb]=min(U[rela][cola],U[rela][colb]);
-		F[rela][cola]=F[rela][colb]=F[rel][cola]/(U[rel][cola]-I[rel][cola]+1);
+		F[rela][cola]=F[rela][colb]=F[rela][cola]/(U[rela][cola]-I[rela][cola]+1);
 		D[rela][cola]=D[rela][colb]=D[rela][cola]*(1-pow((1-float(F[rela][cola])/pF),float(pF)/D[rela][cola]));
 		
 		for (unsigned int c=0; c<ncol[rela]; c++) if (c!=cola && c!=colb) {
-			D[rela][c]=D[rela][c]*(1-pow((1-float(F[rel][cola])/pF),float(F[rela][c])/D[rela][c]));
+			D[rela][c]=D[rela][c]*(1-pow((1-float(F[rela][cola])/pF),float(F[rela][c])/D[rela][c]));
 			F[rela][c]=F[rela][cola];
 			}
 		}

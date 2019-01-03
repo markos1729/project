@@ -16,14 +16,14 @@ class Optimizer {
 		unsigned int **F; //number of rows for each column
 		unsigned int **D; //number of distinct values for each column
 
-		SQLParser parser; //parser for this query
-		unsigned int **N; //bitmap size for each column
-		uint64_t ***bitmap //compact bitmap for each column
+		SQLParser parser;   //parser for this query
+		unsigned int **N;   //bitmap size for each column
+		uint64_t ***bitmap; //compact bitmap for each column
 
 		void filter();
 
 	public:
-		Optimizer(unsigned int _nrel,SQLParser _parser) : n(_nrel), parser(_parser) {
+		Optimizer(unsigned int _nrel,SQLParser _parser) : nrel(_nrel), parser(_parser) {
 			ncol=new unsigned int[nrel];
 			I=new intField*[nrel];
 			U=new intField*[nrel];
@@ -54,6 +54,6 @@ class Optimizer {
 		
 		void initialize(unsigned int rid,unsigned int rows,unsigned int cols,intField **columns);
 		void best_plan();
-	}
+	};
 
 #endif
