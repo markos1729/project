@@ -13,7 +13,7 @@ private:
 
     intField **I;     //minimum value for each column
     intField **U;     //maximum value for each column
-    unsigned int **F; //number of rows for each column
+    unsigned int **F; //number of rows for each column          // TODO: just int
     unsigned int **D; //number of distinct values for each column
 
     SQLParser parser;   //parser for this query
@@ -21,31 +21,35 @@ private:
     uint64_t ***bitmap; //compact bitmap for each column
 
     void filter();
+    bool connected(int RId, string SIdStr);
 
     class JoinTree {
     public:
+        int treeNrel;
+        int *treeNcol;
         int *rowJoinOrder;
         int nextRelOrder;
         intField *treeI;
         intField *treeU;
-        unsigned int *treeF;
+        unsigned int treeF;
         unsigned int *treeD;
-        JoinTree(int _nrel, int relId, intField *relI, intField *relU, unsigned int *relF, unsigned int *relD)
-                : treeI(relI), treeU(relU), treeF(relF), treeD(relD) {
+        JoinTree(int _nrel, int _ncol, int relId, intField *relI, intField *relU, unsigned int relF, unsigned int *relD)
+                : treeNrel(_nrel) {
+            treeNcol = new int[_nrel];
+            treeI = new intField[_nrel];
+            treeU = new intField[_nrel];
+            treeD = new unsigned int[_nrel];
+            // TODO: Initialize the above??
             rowJoinOrder = new int[_nrel]();
             rowJoinOrder[relId] = 1;
             nextRelOrder = 2;
         };
-        JoinTree(JoinTree *currBestTree, int _nrel, int relId, intField *relI, intField *relU, unsigned int *relF, unsigned int *relD) {
-            rowJoinOrder = new int[_nrel];
-            rowJoinOrder[relId] = nextRelOrder;
-            nextRelOrder++;
-            // TODO: calculate stats
-            // TODO: on multiple columns???
-        };
+        JoinTree(JoinTree *currBestTree, int relId, intField *relI, intField *relU, unsigned int relF, unsigned int *relD, SQLParser parser);
         ~JoinTree() {
             delete[] rowJoinOrder;
+            // TODO: delete whatever else ends up being allocated by constructor
         };
+        int calcJoinStats(SQLParser parser, int relId, unsigned int relF, unsigned int *relD, unsigned int *newTreeF, unsigned int **newTreeD);
     };
 
 public:

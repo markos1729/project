@@ -7,6 +7,49 @@
 
 #define BIG_N 50000000
 
+Optimizer::JoinTree::JoinTree(JoinTree *currBestTree, int relId, intField *relI, intField *relU, unsigned int relF,
+		unsigned int *relD, SQLParser parser) : treeNrel(currBestTree->treeNrel) {
+    rowJoinOrder = new int[currBestTree->treeNrel];
+    rowJoinOrder[relId] = nextRelOrder;
+    nextRelOrder++;
+    int predicateJoined = calcJoinStats(parser, relId, relF, relD, &treeF, &treeD);
+	CHECK( (predicateJoined > -1), "Error: tried to create Join Tree on non-connected realtions", );
+	// TODO: pass parser by reference and update with predicateJoined
+};
+
+int Optimizer::JoinTree::calcJoinStats(SQLParser parser, int relId, unsigned int relF, unsigned int *relD,
+                  unsigned int *newTreeF, unsigned int **newTreeD) {
+    int predicateJoined = -1;
+    int bestF = -1;
+    unsigned int currF;
+    int cola, colb;
+    for (int i = 0; i < parser.npredicates; i++) {
+        if (rowJoinOrder[parser.predicates[i].rela_id] > 0 && relId == parser.predicates[i].relb_id) {      // rela is in tree or is relId
+            cola = parser.predicates[i].cola_id;
+            colb = parser.predicates[i].colb_id;
+            currF = (treeF * relF) / (treeU[cola] - treeI[cola] + 1);
+            if (bestF == -1 || currF < bestF) {         // join at this column is the best join (yet)
+                bestF = *newTreeF = currF;
+                *newTreeD[cola] = (treeD[cola] * relD[colb]) / (treeU[cola] - treeI[cola] + 1);
+                // TODO: update stats for the other columns:
+                // d' = treeD[j] * (1 - pow((1 - *newTreeD[cola] / treeD[cola]), treeF / treeD[j]) )
+                for (int j; j < ncola; j++) {
+                	if (j == cola) continue;
+
+                }
+                for (int j; j < ncolb; j++) {
+                	if (j == colb) continue;
+
+                }
+                predicateJoined = i;
+            }
+        } else if (rowJoinOrder[parser.predicates[i].relb_id] > 0 && relId == parser.predicates[i].rela_id) {
+			// TODO: the above, but reversed
+        }
+    }
+    return predicateJoined;
+}
+
 void Optimizer::initialize(unsigned int rid,unsigned int rows,unsigned int cols,intField **columns) {
 	ncol[rid]=cols;
 	I[rid]=new intField[cols];
@@ -106,33 +149,44 @@ void Optimizer::filter() {
 	}
 }
 
-bool ctob(char boolChar) {
-	return (boolChar == '1');
-}
+//bool ctob(char boolChar) {
+//	return (boolChar == '1');
+//}
+//
+//char btoc(bool charBool) {
+//	return (charBool) ? '1' : '0';
+//}
+//
+//string getCombinedIdStr(string str1, string str2) {
+//	string newRelId;
+//	for (int i = 0; i < str1.length(); i++) {
+//		newRelId += btoc(ctob(str1[i]) | ctob(str2[i]));
+//	}
+//	return newRelId;
+//}
 
-char btoc(bool charBool) {
-	return (charBool) ? '1' : '0';
-}
-
-string getCombinedIdStr(string str1, string str2) {
-	string newRelId;
-	for (int i = 0; i < str1.length(); i++) {
-		newRelId += btoc(ctob(str1[i]) | ctob(str2[i]));
-	}
-	return newRelId;
+bool Optimizer::connected(int RId, string SIdStr) {
+    /* linearly traversing the predicate list to check for connection between columns might not seem like optimal,
+     * but it's bound to be so small in size (<10) that using another data structure would not only complicate things
+     * but also probably not even end up being more efficient */
+    for (int i = 0; i < parser.npredicates; i++) {
+        if ( (parser.predicates[i].rela_id == RId && SIdStr[parser.predicates[i].relb_id] == '1') ||
+            (parser.predicates[i].relb_id == RId && SIdStr[parser.predicates[i].rela_id] == '1') )
+            return true;
+    }
+    return false;
 }
 
 int *Optimizer::best_plan() {
 	filter();		// TODO: does this belong elswhere?
 	unordered_map<string, class JoinTree*> BestTree;
 	JoinTree *currTree;
-	string RIdStr[nrel];
 	for (int i = 0; i < nrel; i++) {
-		RIdStr[i].append(nrel, '0');
-		RIdStr[i][i] = '1';
+		string RIdStr(nrel, '0');
+		RIdStr[i] = '1';
 		// e.g. RIdStr for rel 2 with nrel=4 would be "0010" (relIds start from 0)
-		currTree = new JoinTree(nrel, i, I[i], U[i], F[i], D[i]);
-		BestTree[RIdStr[i]] = currTree;
+		currTree = new JoinTree(nrel, ncol[i], i, I[i], U[i], F[i][0], D[i]);
+		BestTree[RIdStr] = currTree;
 	}
 	for (int i = 1; i < nrel; i++) {
 		string SIdStr(nrel - i, '0');
@@ -141,13 +195,12 @@ int *Optimizer::best_plan() {
 		do {	// get all treeIdStr permutations with exactly i '1's
 			for (int j = 0; j < nrel; j++) {
 				// if R[j] is included in S or is not to be joined with S, continue
-				if ( SIdStr[j] == '1' || !connected(parser, j, SIdStr) ) continue;
-				int colJoined;
-				currTree = new JoinTree(BestTree[SIdStr], nrel, i, I[i], U[i], F[i], D[i]);
-				// TODO: get colJoined when creating JoinTree
-				string newSIdStr = getCombinedIdStr(SIdStr, RIdStr[i]);
+				if ( SIdStr[j] == '1' || !connected(j, SIdStr) ) continue;
+				currTree = new JoinTree(BestTree[SIdStr], j, I[j], U[j], F[j][0], D[j], parser);
+				string newSIdStr = SIdStr;
+				newSIdStr[j] = '1';
 				// if there's no BestTree yet for newS or its cost is greater than currTree
-				if ( BestTree.find(newSIdStr) == BestTree.end() || BestTree[SIdStr]->treeF[colJoined] < currTree->treeF[colJoined] ) {
+				if ( BestTree.find(newSIdStr) == BestTree.end() || BestTree[SIdStr]->treeF < currTree->treeF) {
 					BestTree[newSIdStr] = currTree;
 				}
 			}
@@ -159,6 +212,14 @@ int *Optimizer::best_plan() {
 	for (int i = 0; i < nrel; i++) {
 		bestJoinOrder[i] = currTree->rowJoinOrder[i];
 	}
-	// TODO delete Trees
+	// cleaning up BestTree:
+	for (int i = 1; i < nrel; i++) {
+		string SIdStr(nrel - i, '0');
+		SIdStr.append((unsigned int) i, '1');
+		sort(SIdStr.begin(), SIdStr.end());
+		do {
+			delete BestTree[SIdStr];
+		} while ( next_permutation(SIdStr.begin(), SIdStr.end()) );
+	}
 	return bestJoinOrder;
 }
