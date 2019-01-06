@@ -7,6 +7,19 @@
 
 #define BIG_N 50000000
 
+Optimizer::JoinTree::JoinTree(int _nrel, int _ncol, int relId, intField *relL, intField *relU, unsigned int relF, unsigned int *relD, unsigned int npredicates)
+		: treeNrel(_nrel) {
+	treeNcol = new int[_nrel];
+	treeL = new intField[_nrel];
+	treeU = new intField[_nrel];
+	treeD = new unsigned int[_nrel];
+	// TODO: Initialize the above??
+	rowJoinOrder = new int[_nrel]();
+	rowJoinOrder[relId] = 1;
+	nextRelOrder = 2;
+	predicatesJoined = new bool[npredicates]();
+};
+
 Optimizer::JoinTree::JoinTree(JoinTree *currBestTree, int relId, intField *relL, intField *relU, unsigned int relF,
 		unsigned int *relD, SQLParser parser) : treeNrel(currBestTree->treeNrel) {
     rowJoinOrder = new int[currBestTree->treeNrel];
@@ -15,6 +28,12 @@ Optimizer::JoinTree::JoinTree(JoinTree *currBestTree, int relId, intField *relL,
     int predJoined = calcJoinStats(parser, relId, relF, relD, &treeF, &treeD);
 	CHECK( (predJoined > -1), "Error: tried to create Join Tree on non-connected relations", );
 	predicatesJoined[predJoined] = true;
+};
+
+Optimizer::JoinTree::~JoinTree() {
+	delete[] rowJoinOrder;
+	delete[] predicatesJoined;
+	// TODO: delete whatever else ends up being allocated by constructor
 };
 
 int Optimizer::JoinTree::calcJoinStats(SQLParser parser, int relId, unsigned int relF, unsigned int *relD,
@@ -48,6 +67,34 @@ int Optimizer::JoinTree::calcJoinStats(SQLParser parser, int relId, unsigned int
         }
     }
     return predJoined;
+}
+
+Optimizer::Optimizer(SQLParser _parser) : nrel(_parser.nrelations), parser(_parser) {
+		ncol = new unsigned int[nrel];
+		L = new intField*[nrel];
+		U = new intField*[nrel];
+		F = new unsigned int[nrel];
+		D = new unsigned int*[nrel];
+		N = new unsigned int*[nrel];
+		bitmap = new uint64_t**[nrel];
+}
+
+Optimizer::~Optimizer() {
+	for (unsigned int r = 0; r < nrel; r++) {
+		delete[] L[r];
+		delete[] U[r];
+		delete[] F;
+		delete[] D[r];
+		delete[] N[r];
+		delete L;
+		delete U;
+		delete D;
+		delete N;
+		for (unsigned int c = 0; c < ncol[r]; c++) delete[] bitmap[r][c];
+		delete bitmap[r];
+		delete bitmap;
+	}
+	delete[] ncol;
 }
 
 void Optimizer::initialize(unsigned int rid,unsigned int rows,unsigned int cols,intField **columns) {
@@ -146,22 +193,6 @@ void Optimizer::filter() {
 	}
 }
 
-//bool ctob(char boolChar) {
-//	return (boolChar == '1');
-//}
-//
-//char btoc(bool charBool) {
-//	return (charBool) ? '1' : '0';
-//}
-//
-//string getCombinedIdStr(string str1, string str2) {
-//	string newRelId;
-//	for (int i = 0; i < str1.length(); i++) {
-//		newRelId += btoc(ctob(str1[i]) | ctob(str2[i]));
-//	}
-//	return newRelId;
-//}
-
 bool Optimizer::connected(int RId, string SIdStr) {
     /* linearly traversing the predicate list to check for connection between columns might not seem like optimal,
      * but it's bound to be so small in size (<10) that using another data structure would not only complicate things
@@ -190,6 +221,7 @@ int *Optimizer::best_plan(bool **predsJoined) {
 		SIdStr.append((unsigned int) i, '1');
 		sort(SIdStr.begin(), SIdStr.end());
 		do {	// get all treeIdStr permutations with exactly i '1's
+			currTree = NULL;
 			for (int j = 0; j < nrel; j++) {
 				// if R[j] is included in S or is not to be joined with S, continue
 				if ( SIdStr[j] == '1' || !connected(j, SIdStr) ) continue;
@@ -200,6 +232,19 @@ int *Optimizer::best_plan(bool **predsJoined) {
 				if ( BestTree.find(newSIdStr) == BestTree.end() || BestTree[SIdStr]->treeF < currTree->treeF) {
 					BestTree[newSIdStr] = currTree;
 				}
+			}
+			if (currTree == NULL) {		// No relations could be joined with currTree; CrossProducts are needed; Aborting best_plan()
+				cout << "CrossProducts were found; Aborting BestTree!" << endl;
+				// cleaning up BestTree:
+				for (int ii = 1; ii <= i; ii++) {
+					string iiSIdStr(nrel - ii, '0');
+					iiSIdStr.append((unsigned int) ii, '1');
+					sort(iiSIdStr.begin(), iiSIdStr.end());
+					do {
+						delete BestTree[iiSIdStr];
+					} while ( next_permutation(iiSIdStr.begin(), iiSIdStr.end()) );
+				}
+				return NULL;
 			}
 		} while ( next_permutation(SIdStr.begin(), SIdStr.end()) );
 	}
