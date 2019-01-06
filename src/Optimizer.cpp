@@ -14,36 +14,32 @@ Optimizer::JoinTree::JoinTree(int _nrel, int _ncol, int relId, intField *relL, i
 	treeU = new intField[_nrel];
 	treeD = new unsigned int[_nrel];
 	// TODO: Initialize the above??
-	rowJoinOrder = new int[_nrel]();
-	rowJoinOrder[relId] = 1;
-	nextRelOrder = 2;
-	predicatesJoined = new bool[npredicates]();
+	predsOrder = new int[npredicates]();
+    nextPredOrder = 1;
 };
 
 Optimizer::JoinTree::JoinTree(JoinTree *currBestTree, int relId, intField *relL, intField *relU, unsigned int relF,
-		unsigned int *relD, SQLParser parser) : treeNrel(currBestTree->treeNrel) {
-    rowJoinOrder = new int[currBestTree->treeNrel];
-    rowJoinOrder[relId] = nextRelOrder;
-    nextRelOrder++;
+                              unsigned int *relD, const SQLParser &parser) : treeNrel(currBestTree->treeNrel) {
+    predsOrder = new int[currBestTree->treeNrel];
     int predJoined = calcJoinStats(parser, relId, relF, relD, &treeF, &treeD);
 	CHECK( (predJoined > -1), "Error: tried to create Join Tree on non-connected relations", );
-	predicatesJoined[predJoined] = true;
+    predsOrder[predJoined] = currBestTree->nextPredOrder;
+    this->nextPredOrder = currBestTree->nextPredOrder + 1;
 };
 
 Optimizer::JoinTree::~JoinTree() {
-	delete[] rowJoinOrder;
-	delete[] predicatesJoined;
+	delete[] predsOrder;
 	// TODO: delete whatever else ends up being allocated by constructor
 };
 
-int Optimizer::JoinTree::calcJoinStats(SQLParser parser, int relId, unsigned int relF, unsigned int *relD,
-                  unsigned int *newTreeF, unsigned int **newTreeD) {
+int Optimizer::JoinTree::calcJoinStats(const SQLParser &parser, int relId, unsigned int relF, unsigned int *relD,
+                                       unsigned int *newTreeF, unsigned int **newTreeD) {
     int predJoined = -1;
     int bestF = -1;
     unsigned int currF;
     int cola, colb;
     for (int i = 0; i < parser.npredicates; i++) {
-        if (rowJoinOrder[parser.predicates[i].rela_id] > 0 && relId == parser.predicates[i].relb_id) {      // rela is in tree or is relId
+        if (predsOrder[parser.predicates[i].rela_id] > 0 && relId == parser.predicates[i].relb_id) {      // rela is in tree or is relId
             cola = parser.predicates[i].cola_id;
             colb = parser.predicates[i].colb_id;
             currF = (treeF * relF) / (treeU[cola] - treeL[cola] + 1);
@@ -62,14 +58,14 @@ int Optimizer::JoinTree::calcJoinStats(SQLParser parser, int relId, unsigned int
                 }
 				predJoined = i;
             }
-        } else if (rowJoinOrder[parser.predicates[i].relb_id] > 0 && relId == parser.predicates[i].rela_id) {
+        } else if (predsOrder[parser.predicates[i].relb_id] > 0 && relId == parser.predicates[i].rela_id) {
 			// TODO: the above, but reversed
         }
     }
     return predJoined;
 }
 
-Optimizer::Optimizer(SQLParser _parser) : nrel(_parser.nrelations), parser(_parser) {
+Optimizer::Optimizer(const SQLParser &_parser) : nrel(_parser.nrelations), parser(_parser) {
 		ncol = new unsigned int[nrel];
 		L = new intField*[nrel];
 		U = new intField*[nrel];
@@ -205,8 +201,8 @@ bool Optimizer::connected(int RId, string SIdStr) {
     return false;
 }
 
-int *Optimizer::best_plan(bool **predsJoined) {
-	filter();		// TODO: does this belong elswhere?
+int *Optimizer::best_plan() {
+	filter();		// TODO: does this belong elsewhere?
 	unordered_map<string, class JoinTree*> BestTree;
 	JoinTree *currTree;
 	for (int i = 0; i < nrel; i++) {
@@ -221,6 +217,7 @@ int *Optimizer::best_plan(bool **predsJoined) {
 		SIdStr.append((unsigned int) i, '1');
 		sort(SIdStr.begin(), SIdStr.end());
 		do {	// get all treeIdStr permutations with exactly i '1's
+		    if (BestTree[SIdStr] == NULL) continue;
 			currTree = NULL;
 			for (int j = 0; j < nrel; j++) {
 				// if R[j] is included in S or is not to be joined with S, continue
@@ -229,8 +226,11 @@ int *Optimizer::best_plan(bool **predsJoined) {
 				string newSIdStr = SIdStr;
 				newSIdStr[j] = '1';
 				// if there's no BestTree yet for newS or its cost is greater than currTree
-				if ( BestTree.find(newSIdStr) == BestTree.end() || BestTree[SIdStr]->treeF < currTree->treeF) {
+				if ( BestTree.find(newSIdStr) == BestTree.end() || BestTree[newSIdStr]->treeF > currTree->treeF) {
+				    delete BestTree[newSIdStr];
 					BestTree[newSIdStr] = currTree;
+				} else {
+				    delete currTree;
 				}
 			}
 			if (currTree == NULL) {		// No relations could be joined with currTree; CrossProducts are needed; Aborting best_plan()
@@ -248,15 +248,11 @@ int *Optimizer::best_plan(bool **predsJoined) {
 			}
 		} while ( next_permutation(SIdStr.begin(), SIdStr.end()) );
 	}
-	int *bestJoinOrder = new int[nrel];
+	int *bestJoinOrder = new int[parser.npredicates];
 	string bestTreeIdStr(nrel, '1');
 	currTree = BestTree[bestTreeIdStr];
 	for (int i = 0; i < nrel; i++) {
-		bestJoinOrder[i] = currTree->rowJoinOrder[i];
-	}
-	*predsJoined = new bool[parser.npredicates];
-	for (int i = 0; i < parser.npredicates; i++) {
-		*predsJoined[i] = currTree->predicatesJoined[i];
+		bestJoinOrder[i] = currTree->predsOrder[i];
 	}
 	// cleaning up BestTree:
 	for (int i = 1; i < nrel; i++) {

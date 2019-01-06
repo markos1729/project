@@ -7,7 +7,6 @@
 using namespace std;
 
 class Optimizer {
-private:
     unsigned int nrel;  // number of relations
     unsigned int *ncol; // number of columns for each relation
 
@@ -27,24 +26,26 @@ private:
     public:
         int treeNrel;
         int *treeNcol;
-        int *rowJoinOrder;
-        int nextRelOrder;
         intField *treeL;
         intField *treeU;
         unsigned int treeF;
         unsigned int *treeD;
-        bool *predicatesJoined;
+        int *predsOrder;
+        int nextPredOrder;
+
         JoinTree(int _nrel, int _ncol, int relId, intField *relL, intField *relU, unsigned int relF, unsigned int *relD, unsigned int npredicates);
-        JoinTree(JoinTree *currBestTree, int relId, intField *relL, intField *relU, unsigned int relF, unsigned int *relD, SQLParser parser);
+        JoinTree(JoinTree *currBestTree, int relId, intField *relL, intField *relU, unsigned int relF,
+                 unsigned int *relD, const SQLParser &parser);
         ~JoinTree();
-        int calcJoinStats(SQLParser parser, int relId, unsigned int relF, unsigned int *relD, unsigned int *newTreeF, unsigned int **newTreeD);
+        int calcJoinStats(const SQLParser &parser, int relId, unsigned int relF, unsigned int *relD,
+                          unsigned int *newTreeF, unsigned int **newTreeD);
     };
 
 public:
-    Optimizer(SQLParser _parser);
+    explicit Optimizer(const SQLParser &_parser);
     ~Optimizer();
     void initialize(unsigned int rid, unsigned int rows, unsigned int cols, intField **columns);
-    int *best_plan(bool **predsJoined);
+    int *best_plan();
 };
 
 #endif
