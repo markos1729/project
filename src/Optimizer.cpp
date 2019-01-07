@@ -7,121 +7,121 @@
 
 #define BIG_N 50000000
 
-Optimizer::JoinTree::JoinTree(int _nrel, int _ncol, int relId, intField *relL, intField *relU, unsigned int relF, unsigned int *relD, unsigned int npredicates)
-		: treeNrel(_nrel) {
-	treeNcol = new int[_nrel];
-	treeL = new intField[_nrel];
-	treeU = new intField[_nrel];
-	treeD = new unsigned int[_nrel];
-	// TODO: Initialize the above??
+Optimizer::JoinTree::JoinTree(unsigned int relId, RelationStats *relStats, unsigned int npredicates) : treeF(relStats->f), nextPredOrder(1) {
+    relationsStats[relId] = relStats;
 	predsOrder = new int[npredicates]();
-    nextPredOrder = 1;
 };
 
-Optimizer::JoinTree::JoinTree(JoinTree *currBestTree, int relId, intField *relL, intField *relU, unsigned int relF,
-                              unsigned int *relD, const SQLParser &parser) : treeNrel(currBestTree->treeNrel) {
-    predsOrder = new int[currBestTree->treeNrel];
-    int predJoined = calcJoinStats(parser, relId, relF, relD, &treeF, &treeD);
+Optimizer::JoinTree::JoinTree(JoinTree *currBestTree, unsigned int relId, RelationStats *relStats, const SQLParser &parser)
+		: treeF(currBestTree->treeF), nextPredOrder(currBestTree->nextPredOrder) {
+	predsOrder = new int[parser.npredicates];
+	for (int i = 0; i < parser.npredicates; i++) {
+		this->predsOrder[i] = currBestTree->predsOrder[i];
+	}
+	this->relationsStats = currBestTree->relationsStats;	// TODO: what kind of copy do we want here?
+	int predJoined = bestJoinWithRel(parser, relId, relStats);
 	CHECK( (predJoined > -1), "Error: tried to create Join Tree on non-connected relations", );
-    predsOrder[predJoined] = currBestTree->nextPredOrder;
-    this->nextPredOrder = currBestTree->nextPredOrder + 1;
+    predsOrder[predJoined] = nextPredOrder;
+    nextPredOrder++;
 };
 
 Optimizer::JoinTree::~JoinTree() {
+	auto it = relationsStats.begin();
+	while (it != relationsStats.end()) {
+		delete it->second;
+		it++;
+	}
 	delete[] predsOrder;
-	// TODO: delete whatever else ends up being allocated by constructor
 };
 
-int Optimizer::JoinTree::calcJoinStats(const SQLParser &parser, int relId, unsigned int relF, unsigned int *relD,
-                                       unsigned int *newTreeF, unsigned int **newTreeD) {
+/* Performs join between the JoinTree and the given relation using the best predicate (at the best column) according to the calculated stats.
+ * It then updates JoinTree's stats and adds the new relation's stats to relationsStats */
+int Optimizer::JoinTree::bestJoinWithRel(const SQLParser &parser, unsigned int relbId, RelationStats *relbStats) {
     int predJoined = -1;
     int bestF = -1;
     unsigned int currF;
-    int cola, colb;
+    unsigned int relaId, cola, colb, joinedRelaId;
+    RelationStats *relaStats, *joinedRelaStats;
+	RelationStats *joinedRelbStats = relbStats;
     for (int i = 0; i < parser.npredicates; i++) {
-        if (predsOrder[parser.predicates[i].rela_id] > 0 && relId == parser.predicates[i].relb_id) {      // rela is in tree or is relId
+        if (predsOrder[parser.predicates[i].rela_id] > 0 && relbId == parser.predicates[i].relb_id) {      // rela is in tree and relbId is relb
+        	relaId = parser.predicates[i].rela_id;
             cola = parser.predicates[i].cola_id;
             colb = parser.predicates[i].colb_id;
-            currF = (treeF * relF) / (treeU[cola] - treeL[cola] + 1);
-            if (bestF == -1 || currF < bestF) {         // join at this column is the best join (yet)
-                bestF = *newTreeF = currF;
-                *newTreeD[cola] = (treeD[cola] * relD[colb]) / (treeU[cola] - treeL[cola] + 1);
-                // TODO: update stats for the other columns:
-                // d' = treeD[j] * (1 - pow((1 - *newTreeD[cola] / treeD[cola]), treeF / treeD[j]) )
-                for (int j; j < ncola; j++) {
-                	if (j == cola) continue;
-
-                }
-                for (int j; j < ncolb; j++) {
-                	if (j == colb) continue;
-
-                }
-				predJoined = i;
-            }
-        } else if (predsOrder[parser.predicates[i].relb_id] > 0 && relId == parser.predicates[i].rela_id) {
-			// TODO: the above, but reversed
-        }
+		} else if (predsOrder[parser.predicates[i].relb_id] > 0 && relbId == parser.predicates[i].rela_id) {    // reverse rela and relb so that the follwing code remains the same
+			relaId = parser.predicates[i].relb_id;
+			cola = parser.predicates[i].colb_id;
+			colb = parser.predicates[i].cola_id;
+		} else continue;
+		currF = (treeF * relbStats->f) / (relbStats->u[colb] - relbStats->l[colb] + 1);
+		if (bestF == -1 || currF < bestF) {         // join at this column is the best join (yet)
+			relaStats = relationsStats[relaId];
+			joinedRelaStats = relaStats;
+			joinedRelaId = relaId;
+			// update stats for joined columns
+			bestF = joinedRelaStats->f = joinedRelbStats->f = currF;
+			joinedRelaStats->d[cola] = (relaStats->d[cola] * relbStats->d[colb]) / (relbStats->u[colb] - relbStats->l[colb] + 1);
+			joinedRelbStats->d[colb] = (relaStats->d[cola] * relbStats->d[colb]) / (relbStats->u[colb] - relbStats->l[colb] + 1);
+			// update stats for the other columns:
+			for (int c = 0; c < joinedRelaStats->ncol; c++) {
+				if (c == cola) continue;
+				joinedRelaStats->d[c] = relaStats->d[c] * (1 - pow((1 - joinedRelaStats->d[cola] / relaStats->d[cola]), joinedRelaStats->f / relaStats->d[c]) );
+			}
+			for (int c = 0; c < joinedRelbStats->ncol; c++) {
+				if (c == colb) continue;
+				joinedRelbStats->d[c] = relbStats->d[c] * (1 - pow((1 - joinedRelbStats->d[colb] / relbStats->d[colb]), joinedRelbStats->f / relaStats->d[c]) );
+			}
+			predJoined = i;
+		}
     }
+	CHECK( (predJoined > -1), "Error: bestJoinWithRel() failed to join at all", return -1;);
+	relationsStats[joinedRelaId] = joinedRelaStats;
+	relationsStats[relbId] = joinedRelbStats;
     return predJoined;
 }
 
 Optimizer::Optimizer(const SQLParser &_parser) : nrel(_parser.nrelations), parser(_parser) {
-		ncol = new unsigned int[nrel];
-		L = new intField*[nrel];
-		U = new intField*[nrel];
-		F = new unsigned int[nrel];
-		D = new unsigned int*[nrel];
-		N = new unsigned int*[nrel];
-		bitmap = new uint64_t**[nrel];
+    relStats = new RelationStats*[nrel];
+	N = new unsigned int*[nrel];
+	bitmap = new uint64_t**[nrel];
 }
 
 Optimizer::~Optimizer() {
 	for (unsigned int r = 0; r < nrel; r++) {
-		delete[] L[r];
-		delete[] U[r];
-		delete[] F;
-		delete[] D[r];
-		delete[] N[r];
-		delete L;
-		delete U;
-		delete D;
-		delete N;
-		for (unsigned int c = 0; c < ncol[r]; c++) delete[] bitmap[r][c];
+		for (unsigned int c = 0; c < relStats[r]->ncol; c++) delete[] bitmap[r][c];
+        delete relStats[r];
 		delete bitmap[r];
 		delete bitmap;
 	}
-	delete[] ncol;
+	delete[] relStats;
 }
 
-void Optimizer::initialize(unsigned int rid,unsigned int rows,unsigned int cols,intField **columns) {
-	ncol[rid] = cols;
-	L[rid] = new intField[cols];
-	U[rid] = new intField[cols];
-	D[rid] = new unsigned int[cols];
-	N[rid] = new unsigned int[cols];
+void Optimizer::initializeRelation(unsigned int rid, unsigned int rows, unsigned int cols, intField **columns) {
+	relStats[rid] = new RelationStats(cols);
 	bitmap[rid] = new uint64_t*[cols];
-	
+
+	relStats[rid]->f = rows;
 	for (unsigned int c = 0; c < cols; c++) {
-        intField u = 0;
-		intField i = ULLONG_MAX;
+		intField u, l;
+		// TODO: what happens to stats for empty relations?
+		u = l = columns[c][0];		// currMin = currMax = value of first row
 		
-		for (unsigned int r = 0; r < rows; r++) {
-			i = MIN(i, columns[c][r]);
+		for (unsigned int r = 1; r < rows; r++) {
+			l = MIN(l, columns[c][r]);
 			u = MAX(u, columns[c][r]);
 		}
-		
-		L[rid][c] = i;
-		U[rid][c] = u;
-		F[rid] = rows;
-		D[rid][c]=0;
+
+		relStats[rid]->l[c] = l;
+		relStats[rid]->u[c] = u;
+		relStats[rid]->d[c] = 0;
 	
-		N[rid][c] = MIN(U[rid][c]-L[rid][c], BIG_N);
+		N[rid][c] = MIN(relStats[rid]->u[c] - relStats[rid]->l[c], BIG_N);
 		bitmap[rid][c] = new uint64_t[N[rid][c]/64+1]();
 		
 		for (unsigned int r = 0; r < rows; r++) {
-			unsigned int cell = (columns[c][r]-L[rid][c]) % N[rid][c];
+			unsigned int cell = (columns[c][r]-relStats[rid]->l[c]) % N[rid][c];
 			if (bitmap[rid][c][cell/64] & (1<<(cell%64))==0) {
-				D[rid][c]++;
+				relStats[rid]->d[c]++;
 				bitmap[rid][c][cell/64]|=1<<(cell%64);
 			}
 		}
@@ -135,36 +135,36 @@ void Optimizer::filter() {
 		unsigned int rel = parser.filters[f].rel_id;
 		unsigned int col = parser.filters[f].col_id;
 
-		unsigned int pF = F[rel];
+		unsigned int pF = relStats[rel]->f;
 		
 		if (cmp == '=') {
-			L[rel][col] = value;
-			U[rel][col] = value;
+			relStats[rel]->l[col] = value;
+			relStats[rel]->u[col] = value;
 			unsigned int cell = value % N[rel][col];
 			
 			if (bitmap[rel][col][cell/64] & (1<<(cell%64))) {
-				F[rel] = F[rel] / D[rel][col];
-				D[rel][col]=1;
+				relStats[rel]->f = relStats[rel]->f / relStats[rel]->d[col];
+				relStats[rel]->d[col]=1;
 			}
-			else D[rel][col] = F[rel] = 0;
+			else relStats[rel]->d[col] = relStats[rel]->f = 0;
 		}
 		
 		if (cmp == '<') {
-			if (value-1>=U[rel][col]) continue;
-			U[rel][col]=value-1;
-			D[rel][col] = D[rel][col]*double(value-1-L[rel][col])/(U[rel][col]-L[rel][col]);
-			F[rel] = F[rel]*double(value-1-L[rel][col])/(U[rel][col]-L[rel][col]);
+			if (value - 1 >= relStats[rel]->u[col]) continue;
+			relStats[rel]->u[col]=value-1;
+			relStats[rel]->d[col] = relStats[rel]->d[col] * double(value - 1 - relStats[rel]->l[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col]);
+			relStats[rel]->f = relStats[rel]->f * double(value - 1 - relStats[rel]->l[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col]);
 		}
 			
 		if (cmp == '>') {
-			if (value+1 <= L[rel][col]) continue;
-			L[rel][col] = value+1;
-			D[rel][col] = D[rel][col]*double(-value-1+U[rel][col])/(U[rel][col]-L[rel][col]);
-			F[rel] = F[rel]*double(-value-1+U[rel][col])/(U[rel][col]-L[rel][col]);
+			if (value+1 <= relStats[rel]->l[col]) continue;
+			relStats[rel]->l[col] = value+1;
+			relStats[rel]->d[col] = relStats[rel]->d[col] * double(-value - 1 + relStats[rel]->u[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col]);
+			relStats[rel]->f = relStats[rel]->f * double(- value - 1 + relStats[rel]->u[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col]);
 		}
 		
-		for (unsigned int c = 0; c < ncol[rel]; c++) if (c != col) {
-			D[rel][c] = D[rel][c]*(1-pow((1-float(F[rel])/pF),float(F[rel])/D[rel][c]));
+		for (unsigned int c = 0; c < relStats[rel]->ncol; c++) if (c != col) {
+			relStats[rel]->d[c] = relStats[rel]->d[c] * (1-pow((1-float(relStats[rel]->f)/pF),float(relStats[rel]->f)/ relStats[rel]->d[c]));
 		}
 	}
 		
@@ -176,15 +176,15 @@ void Optimizer::filter() {
 		unsigned int cola = parser.predicates[p].cola_id;
 		unsigned int colb = parser.predicates[p].colb_id;
 		
-		unsigned int pF = F[rela];
+		unsigned int pF = relStats[rela]->f;
+
+		relStats[rela]->l[cola] = relStats[rela]->l[colb] = MAX(relStats[rela]->l[cola], relStats[rela]->l[colb]);
+		relStats[rela]->u[cola] = relStats[rela]->u[colb] = MIN(relStats[rela]->u[cola], relStats[rela]->u[colb]);
+		relStats[rela]->f = relStats[rela]->f / (relStats[rela]->u[cola] - relStats[rela]->l[cola]+1);
+		relStats[rela]->d[cola] = relStats[rela]->d[colb] = relStats[rela]->d[cola] * (1 - pow((1 - float(relStats[rela]->f) / pF), float(pF) / relStats[rela]->d[cola]) );
 		
-		L[rela][cola] = L[rela][colb] = MAX(L[rela][cola], L[rela][colb]);
-		U[rela][cola] = U[rela][colb] = MIN(U[rela][cola], U[rela][colb]);
-		F[rela] = F[rela]/(U[rela][cola]-L[rela][cola]+1);
-		D[rela][cola] = D[rela][colb] = D[rela][cola]*(1-pow((1-float(F[rela])/pF),float(pF)/D[rela][cola]));
-		
-		for (unsigned int c = 0; c < ncol[rela]; c++) if (c != cola && c != colb) {
-			D[rela][c] = D[rela][c]*(1-pow((1-float(F[rela])/pF),float(F[rela])/D[rela][c]));
+		for (unsigned int c = 0; c < relStats[rela]->ncol; c++) if (c != cola && c != colb) {
+			relStats[rela]->d[c] = relStats[rela]->d[c] * (1 - pow((1 - float(relStats[rela]->f) / pF), float(relStats[rela]->f) / relStats[rela]->d[c]) );
 		}
 	}
 }
@@ -209,20 +209,20 @@ int *Optimizer::best_plan() {
 		string RIdStr(nrel, '0');
 		RIdStr[i] = '1';
 		// e.g. RIdStr for rel 2 with nrel=4 would be "0010" (relIds start from 0)
-		currTree = new JoinTree(nrel, ncol[i], i, L[i], U[i], F[i], D[i], parser.npredicates);
+		currTree = new JoinTree(nrel, relStats[i], parser.npredicates);
 		BestTree[RIdStr] = currTree;
 	}
-	for (int i = 1; i < nrel; i++) {
+	for (unsigned int i = 1; i < nrel; i++) {
 		string SIdStr(nrel - i, '0');
-		SIdStr.append((unsigned int) i, '1');
+		SIdStr.append(i, '1');
 		sort(SIdStr.begin(), SIdStr.end());
 		do {	// get all treeIdStr permutations with exactly i '1's
 		    if (BestTree[SIdStr] == NULL) continue;
 			currTree = NULL;
-			for (int j = 0; j < nrel; j++) {
+			for (unsigned int j = 0; j < nrel; j++) {
 				// if R[j] is included in S or is not to be joined with S, continue
 				if ( SIdStr[j] == '1' || !connected(j, SIdStr) ) continue;
-				currTree = new JoinTree(BestTree[SIdStr], j, L[j], U[j], F[j], D[j], parser);
+				currTree = new JoinTree(BestTree[SIdStr], j, relStats[j], parser);
 				string newSIdStr = SIdStr;
 				newSIdStr[j] = '1';
 				// if there's no BestTree yet for newS or its cost is greater than currTree
@@ -236,13 +236,10 @@ int *Optimizer::best_plan() {
 			if (currTree == NULL) {		// No relations could be joined with currTree; CrossProducts are needed; Aborting best_plan()
 				cout << "CrossProducts were found; Aborting BestTree!" << endl;
 				// cleaning up BestTree:
-				for (int ii = 1; ii <= i; ii++) {
-					string iiSIdStr(nrel - ii, '0');
-					iiSIdStr.append((unsigned int) ii, '1');
-					sort(iiSIdStr.begin(), iiSIdStr.end());
-					do {
-						delete BestTree[iiSIdStr];
-					} while ( next_permutation(iiSIdStr.begin(), iiSIdStr.end()) );
+				auto it = BestTree.begin();
+				while (it != BestTree.end()) {
+					delete it->second;
+					it++;
 				}
 				return NULL;
 			}
@@ -251,17 +248,14 @@ int *Optimizer::best_plan() {
 	int *bestJoinOrder = new int[parser.npredicates];
 	string bestTreeIdStr(nrel, '1');
 	currTree = BestTree[bestTreeIdStr];
-	for (int i = 0; i < nrel; i++) {
+	for (unsigned int i = 0; i < nrel; i++) {
 		bestJoinOrder[i] = currTree->predsOrder[i];
 	}
 	// cleaning up BestTree:
-	for (int i = 1; i < nrel; i++) {
-		string SIdStr(nrel - i, '0');
-		SIdStr.append((unsigned int) i, '1');
-		sort(SIdStr.begin(), SIdStr.end());
-		do {
-			delete BestTree[SIdStr];
-		} while ( next_permutation(SIdStr.begin(), SIdStr.end()) );
+	auto it = BestTree.begin();
+	while (it != BestTree.end()) {
+		delete it->second;
+		it++;
 	}
 	return bestJoinOrder;
 }

@@ -6,14 +6,55 @@
 
 using namespace std;
 
+class RelationStats {
+public:
+    unsigned int ncol;
+    unsigned int f;     // number of rows (same for each column)
+    intField *l;        // minimum value for each column
+    intField *u;        // maximum value for each column
+    unsigned int *d;    // number of distinct values for each column
+
+    explicit RelationStats(unsigned int _ncol) : ncol(_ncol), f(0) {
+        l = new intField[ncol];
+        u = new intField[ncol];
+        d = new unsigned int[ncol];
+    };
+    RelationStats(const RelationStats& relStats) : ncol(relStats.ncol), f(relStats.f) {
+        l = new intField[ncol];
+        u = new intField[ncol];
+        d = new unsigned int[ncol];
+        for (int i = 0; i < ncol; i++) {
+            l[i] = relStats.l[i];
+            u[i] = relStats.u[i];
+            d[i] = relStats.d[i];
+        }
+    }
+    RelationStats& operator= (const RelationStats& relStats) {
+        ncol = relStats.ncol;
+        f = relStats.f;
+        delete[] l;
+        l = new intField[ncol];
+        delete[] u;
+        u = new intField[ncol];
+        delete[] d;
+        d = new unsigned int[ncol];
+        for (int i = 0; i < ncol; i++) {
+            l[i] = relStats.l[i];
+            u[i] = relStats.u[i];
+            d[i] = relStats.d[i];
+        }
+        return *this;
+    };
+    ~RelationStats() {
+        delete[] l;
+        delete[] u;
+        delete[] d;
+    }
+};
+
 class Optimizer {
     unsigned int nrel;  // number of relations
-    unsigned int *ncol; // number of columns for each relation
-
-    intField **L;       // minimum value for each column
-    intField **U;       // maximum value for each column
-    unsigned int *F;    // number of rows (same for each column)
-    unsigned int **D;   // number of distinct values for each column
+    RelationStats **relStats;
 
     SQLParser parser;   // parser for this query
     unsigned int **N;   // bitmap size for each column
@@ -24,27 +65,21 @@ class Optimizer {
 
     class JoinTree {
     public:
-        int treeNrel;
-        int *treeNcol;
-        intField *treeL;
-        intField *treeU;
         unsigned int treeF;
-        unsigned int *treeD;
+        unordered_map<unsigned int, RelationStats*> relationsStats;
         int *predsOrder;
         int nextPredOrder;
 
-        JoinTree(int _nrel, int _ncol, int relId, intField *relL, intField *relU, unsigned int relF, unsigned int *relD, unsigned int npredicates);
-        JoinTree(JoinTree *currBestTree, int relId, intField *relL, intField *relU, unsigned int relF,
-                 unsigned int *relD, const SQLParser &parser);
+        JoinTree(unsigned int relId, RelationStats *relStats, unsigned int npredicates);
+        JoinTree(JoinTree *currBestTree, unsigned int relId, RelationStats *relStats, const SQLParser &parser);
         ~JoinTree();
-        int calcJoinStats(const SQLParser &parser, int relId, unsigned int relF, unsigned int *relD,
-                          unsigned int *newTreeF, unsigned int **newTreeD);
+        int bestJoinWithRel(const SQLParser &parser, unsigned int relbId, RelationStats *relbStats);
     };
 
 public:
     explicit Optimizer(const SQLParser &_parser);
     ~Optimizer();
-    void initialize(unsigned int rid, unsigned int rows, unsigned int cols, intField **columns);
+    void initializeRelation(unsigned int rid, unsigned int rows, unsigned int cols, intField **columns);
     int *best_plan();
 };
 
