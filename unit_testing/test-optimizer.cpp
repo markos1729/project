@@ -123,17 +123,17 @@ void R_init3() {
 
 // TODO: prints to catch CHECK()s
 
-//TEST_CASE("Optimizer::initializeRelation()", "[INIT]") {
-//    R_init3();
-//    SQLParser *parser = new SQLParser("0 1 2|0.0=0.0|0.0");
-//    printf("---------------------------------\n");
-//    Optimizer *optimizer = new Optimizer(*parser);
-//    for (unsigned int i = 0; i < Rlen; i++) {
-//        optimizer->initializeRelation(i, R[i]->getSize(), R[i]->getNumOfColumns(), R[i]->getColumns());
-//    }
-//    optimizer->printAllRelStats();
-//    printf("=================================\n");
-//}
+TEST_CASE("Optimizer::initializeRelation()", "[INIT]") {
+    R_init3();
+    SQLParser *parser = new SQLParser("0 1 2|0.0=0.0|0.0");
+    printf("---------------------------------\n");
+    Optimizer *optimizer = new Optimizer(*parser);
+    for (unsigned int i = 0; i < Rlen; i++) {
+        optimizer->initializeRelation(i, R[i]->getSize(), R[i]->getNumOfColumns(), R[i]->getColumns());
+    }
+    optimizer->printAllRelStats();
+    printf("=================================\n");
+}
 
 TEST_CASE("Optimizer::filter()", "[FILTER]") {
     R_init3();
@@ -150,17 +150,17 @@ TEST_CASE("Optimizer::filter()", "[FILTER]") {
     printf("=================================\n");
 }
 
-//TEST_CASE("Optimizer::filter() - including equal columns", "[FILTER]") {
-//    R_init3();
-//    SQLParser *parser = new SQLParser("0 1 2|0.0=0.1&2.0=2.1|0.0");
-//    printf("---------------------------------\n");
-//    Optimizer *optimizer = new Optimizer(*parser);
-//    for (unsigned int i = 0; i < Rlen; i++) {
-//        optimizer->initializeRelation(i, R[i]->getSize(), R[i]->getNumOfColumns(), R[i]->getColumns());
-//    }
-//    optimizer->printAllRelStats();
-//    printf("---------------------------------\n");
-//    optimizer->filter();
-//    optimizer->printAllRelStats();
-//    printf("=================================\n");
-//}
+TEST_CASE("Optimizer::filter() - equal columns", "[FILTER]") {
+    R_init3();
+    SQLParser *parser = new SQLParser("0 1 2|0.0=0.1&2.0=2.1|0.0");
+    printf("---------------------------------\n");
+    Optimizer *optimizer = new Optimizer(*parser);
+    for (unsigned int i = 0; i < Rlen; i++) {
+        optimizer->initializeRelation(i, R[i]->getSize(), R[i]->getNumOfColumns(), R[i]->getColumns());
+    }
+    optimizer->printAllRelStats();
+    printf("---------------------------------\n");
+    optimizer->filter();
+    optimizer->printAllRelStats();
+    printf("=================================\n");
+}

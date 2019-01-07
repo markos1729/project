@@ -53,8 +53,13 @@ public:
 #ifdef DDEBUG
     void printStats(int relId) {
         printf("R%d stats: f=%d\n", relId, f);
+        // TODO
+//        if (f == 0) {
+//            printf("  column stats N/A\n");
+//            return;
+//        }
         for (int c = 0; c < ncol; c++) {
-            printf("  col%d: {l:%ld u:%ld d:%d}\n", c, l[c], u[c], d[c]);
+            printf("  col%d: { l:%ld | u:%ld | d:%d }\n", c, l[c], u[c], d[c]);
         }
     }
 #endif

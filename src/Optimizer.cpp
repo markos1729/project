@@ -118,15 +118,14 @@ void Optimizer::initializeRelation(unsigned int rid, unsigned int rows, unsigned
 		relStats[rid]->u[c] = u;
 		relStats[rid]->d[c] = 0;
 
-		// TODO @markos: you missed "+1", N[rid][c] happened to be 0
 		N[rid][c] = MIN(relStats[rid]->u[c] - relStats[rid]->l[c] + 1, BIG_N);
-		bitmap[rid][c] = new uint64_t[N[rid][c]/64+1]();
+		bitmap[rid][c] = new uint64_t[N[rid][c] / 64+1]();
 
 		for (unsigned int r = 0; r < rows; r++) {
-			unsigned int cell = (columns[c][r]-relStats[rid]->l[c]) % N[rid][c];
-			if (bitmap[rid][c][cell/64] & (1<<(cell%64))==0) {          // TODO: never gets here
+			unsigned int cell = (columns[c][r] - relStats[rid]->l[c]) % N[rid][c];
+			if ((bitmap[rid][c][cell / 64] & (1 << (cell % 64)) ) == 0) {
 				relStats[rid]->d[c]++;
-				bitmap[rid][c][cell/64]|=1<<(cell%64);
+				bitmap[rid][c][cell / 64] |= 1 << (cell % 64);
 			}
 		}
 	}
@@ -144,13 +143,13 @@ void Optimizer::filter() {
 		if (cmp == '=') {
 			relStats[rel]->l[col] = value;
 			relStats[rel]->u[col] = value;
-//			unsigned int cell = value % N[rel][col];
-//
-//			if (bitmap[rel][col][cell/64] & (1<<(cell%64))) {
-//				relStats[rel]->f = relStats[rel]->f / relStats[rel]->d[col];
-//				relStats[rel]->d[col]=1;
-//			}
-//			else relStats[rel]->d[col] = relStats[rel]->f = 0;
+			unsigned int cell = value % N[rel][col];
+
+			if (bitmap[rel][col][cell/64] & (1<<(cell%64))) {
+				relStats[rel]->f = relStats[rel]->f / relStats[rel]->d[col];
+				relStats[rel]->d[col]=1;
+			}
+			else relStats[rel]->d[col] = relStats[rel]->f = 0;
 		}
 
 		/* some of the formulas below contain "uA - lA" at the denominator which cannot be right, right?
@@ -158,19 +157,19 @@ void Optimizer::filter() {
 		if (cmp == '<') {
 			if (value - 1 >= relStats[rel]->u[col]) continue;
 			relStats[rel]->u[col] = value - 1;
-//			relStats[rel]->d[col] = relStats[rel]->d[col] * (value - 1 - relStats[rel]->l[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col] + 1);
+			relStats[rel]->d[col] = relStats[rel]->d[col] * (value - 1 - relStats[rel]->l[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col] + 1);
 			relStats[rel]->f = relStats[rel]->f * (value - 1 - relStats[rel]->l[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col] + 1);
 		}
 			
 		if (cmp == '>') {
 			if (value + 1 <= relStats[rel]->l[col]) continue;
 			relStats[rel]->l[col] = value + 1;
-//			relStats[rel]->d[col] = relStats[rel]->d[col] * (-value - 1 + relStats[rel]->u[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col] + 1);
+			relStats[rel]->d[col] = relStats[rel]->d[col] * (-value - 1 + relStats[rel]->u[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col] + 1);
 			relStats[rel]->f = relStats[rel]->f * (- value - 1 + relStats[rel]->u[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col] + 1);
 		}
 		
 		for (unsigned int c = 0; c < relStats[rel]->ncol; c++) if (c != col) {
-//			relStats[rel]->d[c] = relStats[rel]->d[c] * (1 - pow((1 - (relStats[rel]->f)/pF), (relStats[rel]->f) / relStats[rel]->d[c]));
+			relStats[rel]->d[c] = relStats[rel]->d[c] * (1 - pow((1 - (relStats[rel]->f)/pF), (relStats[rel]->f) / relStats[rel]->d[c]));
 		}
 	}
 		
@@ -187,10 +186,10 @@ void Optimizer::filter() {
 		relStats[rela]->l[cola] = relStats[rela]->l[colb] = MAX(relStats[rela]->l[cola], relStats[rela]->l[colb]);
 		relStats[rela]->u[cola] = relStats[rela]->u[colb] = MIN(relStats[rela]->u[cola], relStats[rela]->u[colb]);
 		relStats[rela]->f = relStats[rela]->f / (relStats[rela]->u[cola] - relStats[rela]->l[cola] + 1);
-//		relStats[rela]->d[cola] = relStats[rela]->d[colb] = relStats[rela]->d[cola] * (1 - pow((1 - relStats[rela]->f / pF), pF / relStats[rela]->d[cola]) );
+		relStats[rela]->d[cola] = relStats[rela]->d[colb] = relStats[rela]->d[cola] * (1 - pow((1 - relStats[rela]->f / pF), pF / relStats[rela]->d[cola]) );
 		
 		for (unsigned int c = 0; c < relStats[rela]->ncol; c++) if (c != cola && c != colb) {
-//			relStats[rela]->d[c] = relStats[rela]->d[c] * (1 - pow((1 - relStats[rela]->f / pF), relStats[rela]->f / relStats[rela]->d[c]) );
+			relStats[rela]->d[c] = relStats[rela]->d[c] * (1 - pow((1 - relStats[rela]->f / pF), relStats[rela]->f / relStats[rela]->d[c]) );
 		}
 	}
 }
