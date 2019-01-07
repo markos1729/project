@@ -8,7 +8,7 @@
 #include "SQLParser.h"
 
 
-//#define DDEBUG         // define this if functions used for debugging such as printing info should be compiled
+#define DDEBUG         // define this if functions used for debugging such as printing info should be compiled
 
 
 #define CACHE 512        // smaller CACHE SIZE means more buckets (=> more parallel joins but bigger parallel partition cost)
@@ -77,6 +77,7 @@ public:
     unsigned int getSize() const { return size; }
     unsigned int getNumOfColumns() const { return num_of_columns; }
     unsigned int getId() const { return id; }
+    intField **getColumns() const { return columns; }
     void setId(unsigned int _id) { id = _id; }
     intField getValueAt(unsigned int columnNum, unsigned int rowId) const;
     bool addColumn(unsigned int col_num, const intField *values);

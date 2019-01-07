@@ -10,7 +10,7 @@
 Optimizer::JoinTree::JoinTree(unsigned int relId, RelationStats *relStats, unsigned int npredicates) : treeF(relStats->f), nextPredOrder(1) {
     relationsStats[relId] = relStats;
 	predsOrder = new int[npredicates]();
-};
+}
 
 Optimizer::JoinTree::JoinTree(JoinTree *currBestTree, unsigned int relId, RelationStats *relStats, const SQLParser &parser)
 		: treeF(currBestTree->treeF), nextPredOrder(currBestTree->nextPredOrder) {
@@ -23,7 +23,7 @@ Optimizer::JoinTree::JoinTree(JoinTree *currBestTree, unsigned int relId, Relati
 	CHECK( (predJoined > -1), "Error: tried to create Join Tree on non-connected relations", );
     predsOrder[predJoined] = nextPredOrder;
     nextPredOrder++;
-};
+}
 
 Optimizer::JoinTree::~JoinTree() {
 	auto it = relationsStats.begin();
@@ -32,7 +32,7 @@ Optimizer::JoinTree::~JoinTree() {
 		it++;
 	}
 	delete[] predsOrder;
-};
+}
 
 /* Performs join between the JoinTree and the given relation using the best predicate (at the best column) according to the calculated stats.
  * It then updates JoinTree's stats and adds the new relation's stats to relationsStats */
@@ -90,14 +90,17 @@ Optimizer::~Optimizer() {
 	for (unsigned int r = 0; r < nrel; r++) {
 		for (unsigned int c = 0; c < relStats[r]->ncol; c++) delete[] bitmap[r][c];
         delete relStats[r];
-		delete bitmap[r];
-		delete bitmap;
+        delete[] N[r];
+		delete[] bitmap[r];
 	}
 	delete[] relStats;
+	delete[] N;
+	delete[] bitmap;
 }
 
 void Optimizer::initializeRelation(unsigned int rid, unsigned int rows, unsigned int cols, intField **columns) {
 	relStats[rid] = new RelationStats(cols);
+	N[rid] = new unsigned int[cols];
 	bitmap[rid] = new uint64_t*[cols];
 
 	relStats[rid]->f = rows;
@@ -117,7 +120,7 @@ void Optimizer::initializeRelation(unsigned int rid, unsigned int rows, unsigned
 	
 		N[rid][c] = MIN(relStats[rid]->u[c] - relStats[rid]->l[c], BIG_N);
 		bitmap[rid][c] = new uint64_t[N[rid][c]/64+1]();
-		
+
 		for (unsigned int r = 0; r < rows; r++) {
 			unsigned int cell = (columns[c][r]-relStats[rid]->l[c]) % N[rid][c];
 			if (bitmap[rid][c][cell/64] & (1<<(cell%64))==0) {
@@ -140,31 +143,31 @@ void Optimizer::filter() {
 		if (cmp == '=') {
 			relStats[rel]->l[col] = value;
 			relStats[rel]->u[col] = value;
-			unsigned int cell = value % N[rel][col];
-			
-			if (bitmap[rel][col][cell/64] & (1<<(cell%64))) {
-				relStats[rel]->f = relStats[rel]->f / relStats[rel]->d[col];
-				relStats[rel]->d[col]=1;
-			}
-			else relStats[rel]->d[col] = relStats[rel]->f = 0;
+//			unsigned int cell = value % N[rel][col];
+//
+//			if (bitmap[rel][col][cell/64] & (1<<(cell%64))) {
+//				relStats[rel]->f = relStats[rel]->f / relStats[rel]->d[col];
+//				relStats[rel]->d[col]=1;
+//			}
+//			else relStats[rel]->d[col] = relStats[rel]->f = 0;
 		}
 		
 		if (cmp == '<') {
 			if (value - 1 >= relStats[rel]->u[col]) continue;
-			relStats[rel]->u[col]=value-1;
-			relStats[rel]->d[col] = relStats[rel]->d[col] * double(value - 1 - relStats[rel]->l[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col]);
-			relStats[rel]->f = relStats[rel]->f * double(value - 1 - relStats[rel]->l[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col]);
+			relStats[rel]->u[col] = value - 1;
+//			relStats[rel]->d[col] = relStats[rel]->d[col] * (value - 1 - relStats[rel]->l[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col]);
+			relStats[rel]->f = relStats[rel]->f * (value - 1 - relStats[rel]->l[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col]);
 		}
 			
 		if (cmp == '>') {
 			if (value+1 <= relStats[rel]->l[col]) continue;
-			relStats[rel]->l[col] = value+1;
-			relStats[rel]->d[col] = relStats[rel]->d[col] * double(-value - 1 + relStats[rel]->u[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col]);
-			relStats[rel]->f = relStats[rel]->f * double(- value - 1 + relStats[rel]->u[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col]);
+			relStats[rel]->l[col] = value + 1;
+//			relStats[rel]->d[col] = relStats[rel]->d[col] * (-value - 1 + relStats[rel]->u[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col]);
+			relStats[rel]->f = relStats[rel]->f * (- value - 1 + relStats[rel]->u[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col]);
 		}
 		
 		for (unsigned int c = 0; c < relStats[rel]->ncol; c++) if (c != col) {
-			relStats[rel]->d[c] = relStats[rel]->d[c] * (1-pow((1-float(relStats[rel]->f)/pF),float(relStats[rel]->f)/ relStats[rel]->d[c]));
+//			relStats[rel]->d[c] = relStats[rel]->d[c] * (1 - pow((1 - (relStats[rel]->f)/pF), (relStats[rel]->f) / relStats[rel]->d[c]));
 		}
 	}
 		
@@ -180,11 +183,11 @@ void Optimizer::filter() {
 
 		relStats[rela]->l[cola] = relStats[rela]->l[colb] = MAX(relStats[rela]->l[cola], relStats[rela]->l[colb]);
 		relStats[rela]->u[cola] = relStats[rela]->u[colb] = MIN(relStats[rela]->u[cola], relStats[rela]->u[colb]);
-		relStats[rela]->f = relStats[rela]->f / (relStats[rela]->u[cola] - relStats[rela]->l[cola]+1);
-		relStats[rela]->d[cola] = relStats[rela]->d[colb] = relStats[rela]->d[cola] * (1 - pow((1 - float(relStats[rela]->f) / pF), float(pF) / relStats[rela]->d[cola]) );
+		relStats[rela]->f = relStats[rela]->f / (relStats[rela]->u[cola] - relStats[rela]->l[cola] + 1);
+//		relStats[rela]->d[cola] = relStats[rela]->d[colb] = relStats[rela]->d[cola] * (1 - pow((1 - relStats[rela]->f / pF), pF / relStats[rela]->d[cola]) );
 		
 		for (unsigned int c = 0; c < relStats[rela]->ncol; c++) if (c != cola && c != colb) {
-			relStats[rela]->d[c] = relStats[rela]->d[c] * (1 - pow((1 - float(relStats[rela]->f) / pF), float(relStats[rela]->f) / relStats[rela]->d[c]) );
+//			relStats[rela]->d[c] = relStats[rela]->d[c] * (1 - pow((1 - relStats[rela]->f / pF), relStats[rela]->f / relStats[rela]->d[c]) );
 		}
 	}
 }

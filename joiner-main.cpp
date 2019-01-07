@@ -5,6 +5,7 @@
 #include "Headers/SQLParser.h"
 #include "Headers/Relation.h"
 #include "Headers/JobScheduler.h"
+#include "Headers/Optimizer.h"
 #include "Headers/macros.h"
 
 
@@ -105,6 +106,20 @@ int main(){
             }
             delete[] seen_at;
             if (abort) continue;
+
+//            // Join Optimization here:
+//            Optimizer *optimizer = new Optimizer(*p);
+//            for (unsigned int i = 0; i < Rlen; i++) {
+//                optimizer->initializeRelation(i, R[i]->getSize(), R[i]->getNumOfColumns(), R[i]->getColumns());
+//            }
+//            optimizer->printAllRelStats();
+//            optimizer->filter();
+//            cout << endl << "Stats after filters:" << endl;
+//            optimizer->printAllRelStats();
+////            int *bestJoinOrder = optimizer->best_plan();
+////            for (int i = 0; i < p->npredicates; i++) printf("%d_", bestJoinOrder[i]);
+//            exit(42);
+
 
             // execute WHERE: filters > equal columns > joins (+ equal columns if they end up to be)
             // First, do filters

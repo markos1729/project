@@ -142,5 +142,6 @@ void SQLParser::show() {
 	printf("%u projections:\n",nprojections);
 	for (int i=0; i<nprojections; ++i)
 		printf("  σ %u(%u)\n",projections[i].rel_id,projections[i].col_id);
+	printf("\n");
 }
 #endif

@@ -50,6 +50,14 @@ public:
         delete[] u;
         delete[] d;
     }
+#ifdef DDEBUG
+    void printStats(int relId) {
+        printf("R%d stats: f=%d\n", relId, f);
+        for (int c = 0; c < ncol; c++) {
+            printf("  col%d: {l:%ld u:%ld d:%d}\n", c, l[c], u[c], d[c]);
+        }
+    }
+#endif
 };
 
 class Optimizer {
@@ -60,7 +68,6 @@ class Optimizer {
     unsigned int **N;   // bitmap size for each column
     uint64_t ***bitmap; // compact bitmap for each column
 
-    void filter();
     bool connected(int RId, string SIdStr);
 
     class JoinTree {
@@ -80,7 +87,16 @@ public:
     explicit Optimizer(const SQLParser &_parser);
     ~Optimizer();
     void initializeRelation(unsigned int rid, unsigned int rows, unsigned int cols, intField **columns);
+    void filter();
     int *best_plan();
+#ifdef DDEBUG
+    void printAllRelStats() {
+        for (int i = 0; i < nrel; i++) {
+            relStats[i]->printStats(i);
+            cout << endl;
+        }
+    }
+#endif
 };
 
 #endif

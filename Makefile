@@ -76,6 +76,14 @@ objects/test-joiner.o: unit_testing/test-joiner.cpp $(COMMON_HEAD) unit_testing/
 	mv test-joiner.o objects/test-joiner.o
 
 
+test-optimizer: assert_objects_dir objects/test-main.o objects/test-optimizer.o objects/SQLParser.o objects/Optimizer.o $(COMMON_OBJ)
+	$(CXX) $(CXXFLAGS) objects/test-main.o objects/test-optimizer.o objects/SQLParser.o objects/Optimizer.o $(COMMON_OBJ) -o test-optimizer -pthread
+
+objects/test-optimizer.o: unit_testing/test-optimizer.cpp $(COMMON_HEAD) unit_testing/catch.hpp
+	$(CXX) -c $(CXXFLAGS) unit_testing/test-optimizer.cpp
+	mv test-optimizer.o objects/test-optimizer.o
+
+
 objects/test-main.o: unit_testing/test-main.cpp $(COMMON_HEAD) unit_testing/catch.hpp
 	$(CXX) -c $(CXXFLAGS) unit_testing/test-main.cpp
 	mv test-main.o objects/test-main.o
