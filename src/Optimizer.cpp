@@ -117,13 +117,14 @@ void Optimizer::initializeRelation(unsigned int rid, unsigned int rows, unsigned
 		relStats[rid]->l[c] = l;
 		relStats[rid]->u[c] = u;
 		relStats[rid]->d[c] = 0;
-	
-		N[rid][c] = MIN(relStats[rid]->u[c] - relStats[rid]->l[c], BIG_N);
+
+		// TODO @markos: you missed "+1", N[rid][c] happened to be 0
+		N[rid][c] = MIN(relStats[rid]->u[c] - relStats[rid]->l[c] + 1, BIG_N);
 		bitmap[rid][c] = new uint64_t[N[rid][c]/64+1]();
 
 		for (unsigned int r = 0; r < rows; r++) {
 			unsigned int cell = (columns[c][r]-relStats[rid]->l[c]) % N[rid][c];
-			if (bitmap[rid][c][cell/64] & (1<<(cell%64))==0) {
+			if (bitmap[rid][c][cell/64] & (1<<(cell%64))==0) {          // TODO: never gets here
 				relStats[rid]->d[c]++;
 				bitmap[rid][c][cell/64]|=1<<(cell%64);
 			}
@@ -151,19 +152,21 @@ void Optimizer::filter() {
 //			}
 //			else relStats[rel]->d[col] = relStats[rel]->f = 0;
 		}
-		
+
+		/* some of the formulas below contain "uA - lA" at the denominator which cannot be right, right?
+		 * changed these to "uA - lA + 1" as is used elsewhere */
 		if (cmp == '<') {
 			if (value - 1 >= relStats[rel]->u[col]) continue;
 			relStats[rel]->u[col] = value - 1;
-//			relStats[rel]->d[col] = relStats[rel]->d[col] * (value - 1 - relStats[rel]->l[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col]);
-			relStats[rel]->f = relStats[rel]->f * (value - 1 - relStats[rel]->l[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col]);
+//			relStats[rel]->d[col] = relStats[rel]->d[col] * (value - 1 - relStats[rel]->l[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col] + 1);
+			relStats[rel]->f = relStats[rel]->f * (value - 1 - relStats[rel]->l[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col] + 1);
 		}
 			
 		if (cmp == '>') {
-			if (value+1 <= relStats[rel]->l[col]) continue;
+			if (value + 1 <= relStats[rel]->l[col]) continue;
 			relStats[rel]->l[col] = value + 1;
-//			relStats[rel]->d[col] = relStats[rel]->d[col] * (-value - 1 + relStats[rel]->u[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col]);
-			relStats[rel]->f = relStats[rel]->f * (- value - 1 + relStats[rel]->u[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col]);
+//			relStats[rel]->d[col] = relStats[rel]->d[col] * (-value - 1 + relStats[rel]->u[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col] + 1);
+			relStats[rel]->f = relStats[rel]->f * (- value - 1 + relStats[rel]->u[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col] + 1);
 		}
 		
 		for (unsigned int c = 0; c < relStats[rel]->ncol; c++) if (c != col) {

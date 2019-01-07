@@ -114,20 +114,53 @@ void R_init3() {
         R[2] = new Relation(5, 3);
         intField col1[] = {3, 3, 3, 3, 3, 3};
         intField col2[] = {6, 6, 6, 6, 6, 6};
-        intField col3[] = {11, 11, 12, 13, 11, 11};
+        intField col3[] = {2, 3, 4, 5, 6, 7};
         R[2]->addColumn(0, col1);
         R[2]->addColumn(1, col2);
         R[2]->addColumn(2, col3);
     }
 }
 
+// TODO: prints to catch CHECK()s
 
-TEST_CASE("Optimizer::initializeRelation()", "[INIT]") {
+//TEST_CASE("Optimizer::initializeRelation()", "[INIT]") {
+//    R_init3();
+//    SQLParser *parser = new SQLParser("0 1 2|0.0=0.0|0.0");
+//    printf("---------------------------------\n");
+//    Optimizer *optimizer = new Optimizer(*parser);
+//    for (unsigned int i = 0; i < Rlen; i++) {
+//        optimizer->initializeRelation(i, R[i]->getSize(), R[i]->getNumOfColumns(), R[i]->getColumns());
+//    }
+//    optimizer->printAllRelStats();
+//    printf("=================================\n");
+//}
+
+TEST_CASE("Optimizer::filter()", "[FILTER]") {
     R_init3();
-    SQLParser *parser = new SQLParser("0 1 2|0.0=0.0|0.0");
+    SQLParser *parser = new SQLParser("0 1 2|0.1=5&1.0>4&2.2<3|0.0");
+    printf("---------------------------------\n");
     Optimizer *optimizer = new Optimizer(*parser);
     for (unsigned int i = 0; i < Rlen; i++) {
         optimizer->initializeRelation(i, R[i]->getSize(), R[i]->getNumOfColumns(), R[i]->getColumns());
     }
     optimizer->printAllRelStats();
+    printf("---------------------------------\n");
+    optimizer->filter();
+    optimizer->printAllRelStats();
+    printf("=================================\n");
 }
+
+//TEST_CASE("Optimizer::filter() - including equal columns", "[FILTER]") {
+//    R_init3();
+//    SQLParser *parser = new SQLParser("0 1 2|0.0=0.1&2.0=2.1|0.0");
+//    printf("---------------------------------\n");
+//    Optimizer *optimizer = new Optimizer(*parser);
+//    for (unsigned int i = 0; i < Rlen; i++) {
+//        optimizer->initializeRelation(i, R[i]->getSize(), R[i]->getNumOfColumns(), R[i]->getColumns());
+//    }
+//    optimizer->printAllRelStats();
+//    printf("---------------------------------\n");
+//    optimizer->filter();
+//    optimizer->printAllRelStats();
+//    printf("=================================\n");
+//}
