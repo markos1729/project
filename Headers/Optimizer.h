@@ -3,8 +3,11 @@
 
 #include "SQLParser.h"
 #include "FieldTypes.h"
+#include "ConfigureParameters.h"
+
 
 using namespace std;
+
 
 class RelationStats {
 public:
@@ -64,6 +67,7 @@ public:
     }
 #endif
 };
+
 
 class Optimizer {
     unsigned int nrel;  // number of relations

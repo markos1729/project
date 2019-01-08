@@ -5,10 +5,7 @@
 #include "../Headers/RadixHashJoin.h"
 #include "../Headers/HashFunctions.h"
 #include "../Headers/macros.h"
-
-
-/// choose a partition parallel scheme:
-//#define PARALLEL_IMPLEMENTATION_OF_PARTITION_INSTEAD_OF_THEIR_CALL
+#include "../Headers/ConfigureParameters.h"
 
 
 using namespace std;

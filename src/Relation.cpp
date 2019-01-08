@@ -10,6 +10,7 @@
 #include "../Headers/RadixHashJoin.h"
 #include "../Headers/HashFunctions.h"
 #include "../Headers/macros.h"
+#include "../Headers/ConfigureParameters.h"
 
 
 using namespace std;
@@ -41,16 +42,16 @@ bool JoinRelation::partitionRelation(unsigned int H1_N) {
     // 1) calculate Hist using available threads
     unsigned int *Hist = new unsigned int[num_of_buckets]();          // all Hist[i] are initialized to 0
     unsigned int *bucket_nums = new unsigned int[size];
-    unsigned int **tempHists = new unsigned int *[NUMBER_OF_THREADS];
-    const unsigned int chunk_size = size / NUMBER_OF_THREADS + ((size % NUMBER_OF_THREADS > 0) ? 1 : 0);
-    for (int i = 0 ; i < NUMBER_OF_THREADS ; i++){
+    unsigned int **tempHists = new unsigned int *[scheduler->get_number_of_threads()];
+    const unsigned int chunk_size = size / scheduler->get_number_of_threads() + ((size % scheduler->get_number_of_threads() > 0) ? 1 : 0);
+    for (int i = 0 ; i < scheduler->get_number_of_threads() ; i++){
         tempHists[i] = new unsigned int[num_of_buckets]();            // (!) init to 0
         if (i * chunk_size < size ) scheduler->schedule(new HistJob(joinField, i * chunk_size, MIN((i+1) * chunk_size, size), tempHists[i], bucket_nums, H1_N));
     }
     scheduler->waitUntilAllJobsHaveFinished();
     // and then sum them up to create one Hist
     bool failed = false;
-    for (unsigned int j = 0 ; j < NUMBER_OF_THREADS ; j++){
+    for (unsigned int j = 0 ; j < scheduler->get_number_of_threads() ; j++){
         if (tempHists[j] == NULL) { failed = true; continue; }
         for (unsigned int i = 0 ; i < num_of_buckets ; i++){
             Hist[i] += tempHists[j][i];
@@ -76,7 +77,7 @@ bool JoinRelation::partitionRelation(unsigned int H1_N) {
     for (unsigned int i = 0 ; i < num_of_buckets ; i++){
         CHECK_PERROR(pthread_mutex_init(&bucket_pos_locks[i], NULL) , "pthread_mutex_init failed", )
     }
-    for (int i = 0 ; i < NUMBER_OF_THREADS ; i++){
+    for (int i = 0 ; i < scheduler->get_number_of_threads() ; i++){
         if (i * chunk_size < size ) scheduler->schedule(new PartitionJob(newJoinField, joinField, newRowids, rowids, nextBucketPos, i * chunk_size, MIN((i + 1) * chunk_size, size), num_of_buckets, bucket_nums, Psum, bucket_pos_locks));
     }
     scheduler->waitUntilAllJobsHaveFinished();
@@ -155,6 +156,62 @@ void JoinRelation::printDebugInfo() {
 
 /* QueryRelation Implementation */
 bool *QueryRelation::filterField(intField *field, unsigned int size, intField value, char cmp, unsigned int &count){
+#ifdef DO_FILTER_PARALLEL
+    const unsigned int chunk_size = size / scheduler->get_number_of_threads() + ((size % scheduler->get_number_of_threads() > 0) ? 1 : 0);
+    class FilterJob : public Job {
+        const unsigned int start, end;
+        const char cmp;
+        intField *field;
+        intField value;
+        unsigned int *countptr;
+        bool *filter;
+    public:
+        FilterJob(unsigned int s, unsigned int e, char c, unsigned int *cptr, intField *f, intField v, bool *fltr)
+                 : Job(), start(s), end(e), cmp(c), countptr(cptr), field(f), value(v), filter(fltr) {}
+        bool run(){
+            (*countptr) = 0;
+            switch(cmp){
+                case '>':
+                    for (unsigned int i = start ; i < end ; i++) {
+                        filter[i] = (field[i] > value);
+                        if (filter[i]) (*countptr)++;
+                    }
+                    break;
+                case '<':
+                    for (unsigned int i = start ; i < end ; i++) {
+                        filter[i] = (field[i] < value);
+                        if (filter[i]) (*countptr)++;
+                    }
+                    break;
+                case '=':
+                    for (unsigned int i = start ; i < end ; i++) {
+                        filter[i] = (field[i] == value);
+                        if (filter[i]) (*countptr)++;
+                    }
+                    break;
+                default:
+                    cerr << "Warning: Unknown comparison symbol from parsing" << endl;
+                    return false;
+            }
+            return true;
+        }
+    };
+    bool *filter = new bool[size]();
+    unsigned int *thread_count = new unsigned int[scheduler->get_number_of_threads()]();
+    for (int i = 0 ; i < scheduler->get_number_of_threads() ; i++){
+        unsigned int start = i * chunk_size, end = MIN((i+1) * chunk_size, size);
+        if (i * chunk_size < size ) {
+            scheduler->schedule(new FilterJob(start, end, cmp, &thread_count[i], field, value, filter));
+        }
+    }
+    scheduler->waitUntilAllJobsHaveFinished();
+    count = 0;
+    for (int i = 0 ; i < scheduler->get_number_of_threads() ; i++) {
+        count += thread_count[i];
+    }
+    delete[] thread_count;
+    return filter;
+#else
     count = 0;
     bool *filter = new bool[size]();
     switch(cmp){
@@ -181,9 +238,45 @@ bool *QueryRelation::filterField(intField *field, unsigned int size, intField va
             break;
     }
     return filter;
+#endif
 }
 
 bool *QueryRelation::eqColumnsFields(intField *field1, intField *field2, unsigned int size, unsigned int &count) {
+#ifdef DO_EQUALCOLUMNS_PARALLEL
+    const unsigned int chunk_size = size / scheduler->get_number_of_threads() + ((size % scheduler->get_number_of_threads() > 0) ? 1 : 0);
+    class EqColumnsJob : public Job {
+        const unsigned int start, end;
+        intField *field1, *field2;
+        unsigned int *countptr;
+        bool *eqColumns;
+    public:
+        EqColumnsJob(unsigned int s, unsigned int e, unsigned int *cptr, intField *f1, intField *f2, bool *eqcl)
+                    : Job(), start(s), end(e), countptr(cptr), field1(f1), field2(f2), eqColumns(eqcl) {}
+        bool run() {
+            *(countptr) = 0;
+            for (unsigned int i = start; i < end; i++) {
+                eqColumns[i] = (field1[i] == field2[i]);
+                if (eqColumns[i]) (*countptr)++;
+            }
+            return true;
+        }
+    };
+    bool *eqColumns = new bool[size]();
+    unsigned int *thread_count = new unsigned int[scheduler->get_number_of_threads()]();
+    for (int i = 0 ; i < scheduler->get_number_of_threads() ; i++) {
+        unsigned int start = i * chunk_size, end = MIN((i+1) * chunk_size, size);
+        if (i * chunk_size < size ) {
+            scheduler->schedule(new EqColumnsJob(start, end, &thread_count[i], field1, field2, eqColumns));
+        }
+    }
+    scheduler->waitUntilAllJobsHaveFinished();
+    count = 0;
+    for (int i = 0 ; i < scheduler->get_number_of_threads() ; i++) {
+        count += thread_count[i];
+    }
+    delete[] thread_count;
+    return eqColumns;
+#else
     count = 0;
     bool *eqColumns = new bool[size]();
     for (unsigned int i = 0 ; i < size ; i++){
@@ -191,6 +284,7 @@ bool *QueryRelation::eqColumnsFields(intField *field1, intField *field2, unsigne
         if (eqColumns[i]) count++;
     }
     return eqColumns;
+#endif
 }
 
 
@@ -405,20 +499,20 @@ void Relation::performSelect(projection *projections, unsigned int nprojections)
 
 void Relation::performSum(projection *projections, unsigned int nprojections) {
     if (size == 0) {
-    	for (unsigned int k = 0 ; k < nprojections - 1 ; ++k) printf("NULL ");
-    	printf("NULL\n");
-    	return;
-	}
+        for (unsigned int k = 0 ; k < nprojections - 1 ; ++k) printf("NULL ");
+        printf("NULL\n");
+        return;
+    }
 
     intField *sum = new intField[nprojections]();
-    
+
     for (unsigned int i=0; i<size; ++i) {
         for (unsigned int j = 0; j < nprojections; ++j){
             sum[j] += this->getValueAt(projections[j].col_id, i);
         }
     }
     for (unsigned int k = 0; k < nprojections - 1 ; ++k) printf("%lu ", sum[k]);
-	printf("%lu\n", sum[nprojections - 1]);
+    printf("%lu\n", sum[nprojections - 1]);
 
     delete[] sum;
 }
@@ -536,7 +630,7 @@ IntermediateRelation *IntermediateRelation::performJoinWith(QueryRelation &B, un
 IntermediateRelation *IntermediateRelation::performJoinWithOriginal(const Relation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) {
     if (size <= 0) {
         numberOfRelations++;
-	    rowids[relb_id] = (unsigned int *) NULL;
+        rowids[relb_id] = (unsigned int *) NULL;
         originalRelations[relb_id] = &B;   // insert new original relation's address
         return this;
     } else if (B.getSize() <= 0){
@@ -609,10 +703,10 @@ IntermediateRelation *IntermediateRelation::performJoinWithOriginal(const Relati
 IntermediateRelation *IntermediateRelation::performJoinWithIntermediate(IntermediateRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) {
     if (size <= 0) {
         numberOfRelations += B.numberOfRelations;
-    	for (auto &p: B.originalRelations){            // for every original relation in B
-             rowids[p.first] = (unsigned int *) NULL;
-             originalRelations[p.first] = p.second;   // insert new original relation's address to this
-    	}
+        for (auto &p: B.originalRelations){            // for every original relation in B
+            rowids[p.first] = (unsigned int *) NULL;
+            originalRelations[p.first] = p.second;   // insert new original relation's address to this
+        }
         return this;
     } else if ( B.getSize() <= 0 ){
         // clear the old map
@@ -686,7 +780,7 @@ IntermediateRelation *IntermediateRelation::performCrossProductWith(QueryRelatio
 IntermediateRelation *IntermediateRelation::performCrossProductWithOriginal(const Relation &B) {
     if (size <= 0) {
         numberOfRelations++;
-	    rowids[B.getId()] = (unsigned int *) NULL;
+        rowids[B.getId()] = (unsigned int *) NULL;
         originalRelations[B.getId()] = &B;   // insert new original relation's address
         return this;
     } else if (B.getSize() <= 0){
@@ -743,10 +837,10 @@ IntermediateRelation *IntermediateRelation::performCrossProductWithOriginal(cons
 IntermediateRelation *IntermediateRelation::performCrossProductWithIntermediate(IntermediateRelation &B) {
     if (size <= 0) {
         numberOfRelations += B.numberOfRelations;
-    	for (auto &p: B.originalRelations){            // for every original relation in B
-             rowids[p.first] = (unsigned int *) NULL;
-             originalRelations[p.first] = p.second;   // insert new original relation's address to this
-    	}
+        for (auto &p: B.originalRelations){            // for every original relation in B
+            rowids[p.first] = (unsigned int *) NULL;
+            originalRelations[p.first] = p.second;   // insert new original relation's address to this
+        }
         return this;
     } else if ( B.getSize() <= 0 ){
         // clear the old map
@@ -881,4 +975,3 @@ void IntermediateRelation::performSum(projection *projections, unsigned int npro
 
     delete[] sum;
 }
-

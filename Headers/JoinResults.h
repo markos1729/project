@@ -5,11 +5,7 @@
 #include <iostream>
 #include <pthread.h>
 #include "FieldTypes.h"
-
-
-//#define DDEBUG                     // define this if functions used for debugging such as printing info should be compiled
-
-#define BUFFER_SIZE 128000           // 128KB buffer size for each ResultNode
+#include "ConfigureParameters.h"
 
 
 using namespace std;

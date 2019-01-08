@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "../Headers/JoinResults.h"
 #include "../Headers/macros.h"
+#include "../Headers/ConfigureParameters.h"
 
 
 /* ResultNode Implementation */
@@ -27,6 +28,7 @@ void ResultNode::printRowIds() {
     printf("\n");
 }
 #endif
+
 
 /* Result Implementation */
 Result::Result() : head(NULL), cur(NULL), size(0) {

@@ -2,12 +2,10 @@
 #define PROJECT_JOBSCHEDULER_H
 
 
-#define NUMBER_OF_THREADS 16       // default value -> can be changed by constructor argument
-
-
 #include <queue>
 #include <pthread.h>
 #include <stdlib.h>
+#include "ConfigureParameters.h"
 
 
 using namespace std;
@@ -38,7 +36,7 @@ void *thread_code(void *args);
 
 class JobScheduler {
     pthread_t *threads;
-    unsigned int number_of_threads;
+    const unsigned int number_of_threads;
     queue<Job *> job_queue;
     pthread_mutex_t queue_lock;
     pthread_cond_t queue_cond;               // true -> not empty
@@ -52,6 +50,7 @@ public:
     void schedule(Job *job);
     bool allJobsHaveFinished();
     void waitUntilAllJobsHaveFinished();
+    unsigned int get_number_of_threads() const { return number_of_threads; }
 };
 
 

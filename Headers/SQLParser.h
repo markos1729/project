@@ -2,8 +2,8 @@
 #define SQLPARSER_H
 
 #include "FieldTypes.h"
+#include "ConfigureParameters.h"
 
-//#define DDEBUG
 
 struct projection {
 	unsigned int rel_id;

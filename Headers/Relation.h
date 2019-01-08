@@ -6,12 +6,7 @@
 #include "JoinResults.h"
 #include "FieldTypes.h"
 #include "SQLParser.h"
-
-
-#define DDEBUG         // define this if functions used for debugging such as printing info should be compiled
-
-
-#define CACHE 512        // smaller CACHE SIZE means more buckets (=> more parallel joins but bigger parallel partition cost)
+#include "ConfigureParameters.h"
 
 
 // Forward delcarations:
