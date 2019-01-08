@@ -404,20 +404,21 @@ void Relation::performSelect(projection *projections, unsigned int nprojections)
 }
 
 void Relation::performSum(projection *projections, unsigned int nprojections) {
-    if (size==0) {
-    	for (unsigned int k=0; k<nprojections-1; ++k) printf("NULL ");
+    if (size == 0) {
+    	for (unsigned int k = 0 ; k < nprojections - 1 ; ++k) printf("NULL ");
     	printf("NULL\n");
     	return;
 	}
 
-    intField *sum=new intField[nprojections]();
+    intField *sum = new intField[nprojections]();
     
-    for (unsigned int i=0; i<size; ++i)
-    for (unsigned int j=0; j<nprojections; ++j)
-        sum[j]+=this->getValueAt(projections[j].col_id,i);
-    
-    for (unsigned int k=0; k<nprojections-1; ++k) printf("%lu ",sum[k]);
-	printf("%lu\n",sum[nprojections-1]);
+    for (unsigned int i=0; i<size; ++i) {
+        for (unsigned int j = 0; j < nprojections; ++j){
+            sum[j] += this->getValueAt(projections[j].col_id, i);
+        }
+    }
+    for (unsigned int k = 0; k < nprojections - 1 ; ++k) printf("%lu ", sum[k]);
+	printf("%lu\n", sum[nprojections - 1]);
 
     delete[] sum;
 }
@@ -487,11 +488,9 @@ IntermediateRelation *IntermediateRelation::performFilter(unsigned int rel_id, u
     // recreate intField to be filtered from rowids
     const unsigned int *fieldrowids = rowids[rel_id];
     intField *field = new intField[size];
+    const Relation *OriginalR = getOriginalRelationFor(rel_id);
+    CHECK(OriginalR != NULL, "Warning: rel_id invalid or originalRelations map corrupted in IntermediateRelation::performFilter()", delete[] field; return NULL; )
     for (int i = 0 ; i < size ; i++){
-        //DEBUG Note: R[rel_id] is NOT the correct relation as rel_ids are only for the 'FROM' tables. We have to calculate it by searching or keeping info on it (TODO?)
-        const Relation *OriginalR = getOriginalRelationFor(rel_id);
-        CHECK(OriginalR != NULL, "Warning: rel_id invalid or originalRelations map corrupted in IntermediateRelation::performFilter()",
-              delete[] field; return NULL; )
         field[i] = OriginalR->getValueAt(col_id, fieldrowids[i] - 1);   // (!) -1 because rowids start at 1
     }
     // filter field
@@ -512,11 +511,10 @@ IntermediateRelation *IntermediateRelation::performEqColumns(unsigned int rela_i
     const unsigned int *fieldrowids_b = rowids[relb_id];
     intField *field1 = new intField[size];
     intField *field2 = new intField[size];
+    const Relation *OriginalRa = getOriginalRelationFor(rela_id);
+    const Relation *OriginalRb = getOriginalRelationFor(relb_id);
+    CHECK(OriginalRa != NULL && OriginalRb != NULL, "Warning: rela_id or relb_id invalid or originalRelations map corrupted in IntermediateRelation::performEqColumns()", delete[] field1; delete[] field2; return NULL; )
     for (int i = 0 ; i < size ; i++){
-        const Relation *OriginalRa = getOriginalRelationFor(rela_id);
-	const Relation *OriginalRb = getOriginalRelationFor(relb_id);
-        CHECK(OriginalRa != NULL && OriginalRb != NULL, "Warning: rela_id or relb_id invalid or originalRelations map corrupted in IntermediateRelation::performEqColumns()",
-              delete[] field1; delete[] field2; return NULL; )
         field1[i] = OriginalRa->getValueAt(cola_id, fieldrowids_a[i] - 1);   // (!) -1 because rowids start at 1
         field2[i] = OriginalRb->getValueAt(colb_id, fieldrowids_b[i] - 1);   // ^^
     }
@@ -811,20 +809,26 @@ void IntermediateRelation::performSelect(projection *projections, unsigned int n
         printf("\n\n");
         return;
     }
+
+    const Relation **OriginalRs = new const Relation *[nprojections];
+    for (unsigned int j = 0 ; j < nprojections ; j++) {
+        OriginalRs[j] = getOriginalRelationFor(projections[j].rel_id);
+        CHECK(OriginalRs[j] != NULL, "Warning: rel_id invalid or originalRelations map corrupted in IntermediateRelation::performSelect() ", break; )
+    }
+
     for (unsigned int j = 0 ; j < nprojections ; j++){
         printf("%3d.%2d", projections[j].rel_id, projections[j].col_id);
     }
     printf("\n");
     for (unsigned int i = 0 ; i < size ; i++){
         for (unsigned int j = 0 ; j < nprojections ; j++){
-            //DEBUG Note: R[rel_id] is NOT the correct relation as rel_ids are only for the 'FROM' tables. We have to calculate it by searching or keeping info on it (TODO?)
-            const Relation *OriginalR = getOriginalRelationFor(projections[j].rel_id);
-            CHECK(OriginalR != NULL, "Warning: rel_id invalid or originalRelations map corrupted in IntermediateRelation::performSelect() ", break; )
-            printf("%6lu", OriginalR->getValueAt(projections[j].col_id, rowids[projections[j].rel_id][i] - 1));   // (!) -1 because rowids start from 1
+            printf("%6lu", OriginalRs[j]->getValueAt(projections[j].col_id, rowids[projections[j].rel_id][i] - 1));   // (!) -1 because rowids start from 1
         }
         printf("\n");
     }
     printf("\n");
+
+    delete[] OriginalRs;
 }
 
 const Relation *IntermediateRelation::getOriginalRelationFor(unsigned int rel_id) {
@@ -857,7 +861,7 @@ void IntermediateRelation::keepOnlyMarkedRows(const bool *passing_rowids, unsign
 }
 
 void IntermediateRelation::performSum(projection *projections, unsigned int nprojections) {
-    if (size==0) {
+    if (size == 0) {
         for (unsigned int k=0; k<nprojections-1; ++k) printf("NULL ");
         printf("NULL\n");
         return;
@@ -865,14 +869,15 @@ void IntermediateRelation::performSum(projection *projections, unsigned int npro
 
     intField *sum = new intField[nprojections]();
 
-    for (unsigned int i=0; i<size; ++i)
-        for (unsigned int j=0; j<nprojections; ++j) {
-            const Relation *OriginalR = getOriginalRelationFor(projections[j].rel_id);
+    for (unsigned int j = 0; j < nprojections; ++j) {
+        const Relation *OriginalR = getOriginalRelationFor(projections[j].rel_id);
+        for (unsigned int i = 0; i < size; ++i) {
             sum[j] += OriginalR->getValueAt(projections[j].col_id, rowids[projections[j].rel_id][i] - 1);
         }
+    }
 
-    for (unsigned int k=0; k<nprojections-1; ++k) printf("%lu ",sum[k]);
-    printf("%lu\n",sum[nprojections-1]);
+    for (unsigned int k = 0; k < nprojections - 1 ; ++k) printf("%lu ", sum[k]);
+    printf("%lu\n", sum[nprojections - 1]);
 
     delete[] sum;
 }

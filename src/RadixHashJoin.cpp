@@ -23,6 +23,7 @@ unsigned int H1_N, H2_N;
 
 /* Local Functions & structs */
 void setH(unsigned int _H1_N, unsigned int _H2_N) { H1_N = _H1_N; H2_N = _H2_N; }
+
 #ifndef PARALLEL_IMPLEMENTATION_OF_PARTITION_INSTEAD_OF_THEIR_CALL
 struct partition_args{
     JoinRelation &R;

@@ -3,7 +3,7 @@
 
 #include "FieldTypes.h"
 
-#define DDEBUG
+//#define DDEBUG
 
 struct projection {
 	unsigned int rel_id;

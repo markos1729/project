@@ -16,7 +16,7 @@ pthread_cond_t jobs_finished_cond;
 /* JobScheduler Implementation */
 JobScheduler::JobScheduler() : jobs_running(0) {
     threads_must_exit = false;
-    CHECK_PERROR(pthread_mutex_init(&queue_lock, NULL), "pthread_mutext_init failed",)
+    CHECK_PERROR(pthread_mutex_init(&queue_lock, NULL), "pthread_mutex_t_init failed",)
     CHECK_PERROR(pthread_cond_init(&queue_cond, NULL), "pthread_cond_init failed",)
 #ifdef SCHEDULER_WAITS_FOR_JOBS_TO_FINISH
     CHECK_PERROR(pthread_cond_init(&jobs_finished_cond, NULL), "pthread_cond_init failed",)
