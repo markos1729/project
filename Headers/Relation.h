@@ -64,7 +64,6 @@ class Relation : public QueryRelation {        // Relation struct storing all fi
     unsigned int size;  // number of tuples
     unsigned int num_of_columns;
     intField **columns; // each column saved as a sequential array of intFields
-    
 public:
     Relation(unsigned int _size, unsigned int _num_of_columns);
     explicit Relation(const char* file);
@@ -89,6 +88,8 @@ public:
     IntermediateRelation *performCrossProductWith(QueryRelation &B) override;
     void performSelect(projection *projections, unsigned int nprojections) override;
     void performSum(projection *projections, unsigned int nprojections) override;
+private:
+    unsigned int *getPassingRowIds(const bool *passing_rowids, unsigned int count);
 };
 
 

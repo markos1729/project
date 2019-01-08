@@ -62,7 +62,7 @@ void parse_bindings(char *s, unsigned int &npredicates, predicate* &predicates, 
 			npredicates++;
 		}
 		else {
-			sscanf(token, "%u.%u%c%llu", &filters[nfilters].rel_id,&filters[nfilters].col_id, &filters[nfilters].cmp,&filters[nfilters].value);
+			sscanf(token, "%u.%u%c%llu", &filters[nfilters].rel_id,&filters[nfilters].col_id, &filters[nfilters].cmp, &filters[nfilters].value);
 			nfilters++;
 		}
 		token = strtok(NULL, "&");

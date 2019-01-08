@@ -355,17 +355,7 @@ IntermediateRelation *Relation::performFilter(unsigned int rel_id, unsigned int 
     // Note: rel_id is not needed here as there is only one relation to filter
     unsigned int count = 0;
     bool *passing_rowids = QueryRelation::filterField(columns[col_id], size, value, cmp, count);   // count will change accordingly
-    unsigned int *newrowids = NULL;
-    if (count > 0) {
-        newrowids = new unsigned int[count];
-        unsigned int j = 0;
-        for (unsigned int i = 0; i < size; i++) {
-            if (passing_rowids[i]) {
-                CHECK( j < count, "Warning: miscounted passing rowids in Relation::performFilter()", break; )
-                newrowids[j++] = i + 1;   // keep rowid for intermediate, not the intField columns[cold_id][i].
-            }
-        }
-    }
+    unsigned int *newrowids = getPassingRowIds(passing_rowids, count);
     delete[] passing_rowids;
     IntermediateRelation *result = new IntermediateRelation(this->id, newrowids, count, this);
     delete[] newrowids;
@@ -376,6 +366,14 @@ IntermediateRelation *Relation::performEqColumns(unsigned int rela_id, unsigned 
     // Note: rela_id and relb_id are not needed here as there is only one relation to perform eq columns on
     unsigned int count = 0;
     bool *passing_rowids = QueryRelation::eqColumnsFields(columns[cola_id], columns[colb_id], size, count);   // count will change accordingly
+    unsigned int *newrowids = getPassingRowIds(passing_rowids, count);
+    delete[] passing_rowids;
+    IntermediateRelation *result = new IntermediateRelation(this->id, newrowids, count, this);
+    delete[] newrowids;
+    return result;
+}
+
+unsigned int *Relation::getPassingRowIds(const bool *passing_rowids, unsigned int count) {
     unsigned int *newrowids = NULL;
     if (count > 0) {
         newrowids = new unsigned int[count];
@@ -387,11 +385,9 @@ IntermediateRelation *Relation::performEqColumns(unsigned int rela_id, unsigned 
             }
         }
     }
-    delete[] passing_rowids;
-    IntermediateRelation *result = new IntermediateRelation(this->id, newrowids, count, this);
-    delete[] newrowids;
-    return result;
+    return newrowids;
 }
+
 
 IntermediateRelation *Relation::performJoinWith(QueryRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) {
     return (B.isIntermediate) ? performJoinWithIntermediate((IntermediateRelation &) B, rela_id, cola_id, relb_id, colb_id) : performJoinWithOriginal((Relation &) B, rela_id, cola_id, relb_id, colb_id);
