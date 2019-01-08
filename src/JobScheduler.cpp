@@ -7,13 +7,14 @@ using namespace std;
 
 
 /* JobScheduler Implementation */
-JobScheduler::JobScheduler() : jobs_running(0), t_args(NULL) {
+JobScheduler::JobScheduler(unsigned int _number_of_threads) : jobs_running(0), number_of_threads(_number_of_threads), t_args(NULL) {
     threads_must_exit = false;
     CHECK_PERROR(pthread_mutex_init(&queue_lock, NULL), "pthread_mutex_t_init failed",)
     CHECK_PERROR(pthread_cond_init(&queue_cond, NULL), "pthread_cond_init failed",)
     CHECK_PERROR(pthread_cond_init(&jobs_finished_cond, NULL), "pthread_cond_init failed",)
-    t_args = new thread_args(&job_queue, &queue_lock, &queue_cond, &jobs_running, &threads_must_exit, &jobs_finished_cond);
-    for (int i = 0; i < NUMBER_OF_THREADS; i++) {
+    t_args = new struct thread_args(&job_queue, &queue_lock, &queue_cond, &jobs_running, &threads_must_exit, &jobs_finished_cond);
+    threads = new pthread_t[number_of_threads];
+    for (int i = 0; i < number_of_threads; i++) {
         CHECK_PERROR(pthread_create(&threads[i], NULL, thread_code, (void *) t_args), "pthread_create failed", threads[i] = 0;)
     }
 }
@@ -23,9 +24,10 @@ JobScheduler::~JobScheduler() {
     delete t_args;
     threads_must_exit = true;
     CHECK_PERROR(pthread_cond_broadcast(&queue_cond), "pthread_broadcast failed", )
-    for (int i = 0; i < NUMBER_OF_THREADS; i++) {
+    for (int i = 0; i < number_of_threads; i++) {
         CHECK_PERROR(pthread_join(threads[i], NULL), "pthread_join failed", )
     }
+    delete[] threads;
     CHECK_PERROR(pthread_mutex_destroy(&queue_lock), "pthread_mutex_destroy failed", )
     CHECK_PERROR(pthread_cond_destroy(&queue_cond), "pthread_cond_destroy failed", )
     CHECK_PERROR(pthread_cond_destroy(&jobs_finished_cond), "pthread_cond_destroy failed", )
