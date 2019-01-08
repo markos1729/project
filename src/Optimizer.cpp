@@ -122,10 +122,10 @@ void Optimizer::initializeRelation(unsigned int rid, unsigned int rows, unsigned
 		bitmap[rid][c] = new uint64_t[N[rid][c] / 64+1]();
 
 		for (unsigned int r = 0; r < rows; r++) {
-			unsigned int cell = (columns[c][r] - relStats[rid]->l[c]) % N[rid][c];
-			if ((bitmap[rid][c][cell / 64] & (1 << (cell % 64)) ) == 0) {
+			unsigned int cell = (columns[c][r]-relStats[rid]->l[c]) % N[rid][c];
+			if ((bitmap[rid][c][cell / 64] & (1LLU << (cell % 64)) ) == 0) {
 				relStats[rid]->d[c]++;
-				bitmap[rid][c][cell / 64] |= 1 << (cell % 64);
+				bitmap[rid][c][cell / 64] |= (1LLU << (cell % 64));
 			}
 		}
 	}
@@ -139,38 +139,38 @@ void Optimizer::filter() {
 		unsigned int col = parser.filters[f].col_id;
 
 		unsigned int pF = relStats[rel]->f;
-		
 		if (cmp == '=') {
+			unsigned int cell = (value-relStats[rel]->l[col]) % N[rel][col];
 			relStats[rel]->l[col] = value;
 			relStats[rel]->u[col] = value;
-			unsigned int cell = value % N[rel][col];
 
-			if (bitmap[rel][col][cell/64] & (1<<(cell%64))) {
-				relStats[rel]->f = relStats[rel]->f / relStats[rel]->d[col];
+			if (bitmap[rel][col][cell/64] & (1LLU<<(cell%64))) {
+				relStats[rel]->f = ceil(float(relStats[rel]->f) / relStats[rel]->d[col]);
 				relStats[rel]->d[col]=1;
 			}
 			else relStats[rel]->d[col] = relStats[rel]->f = 0;
 		}
 
+
 		/* some of the formulas below contain "uA - lA" at the denominator which cannot be right, right?
 		 * changed these to "uA - lA + 1" as is used elsewhere */
 		if (cmp == '<') {
 			if (value - 1 >= relStats[rel]->u[col]) continue;
+			relStats[rel]->d[col] = ceil(relStats[rel]->d[col] * float(value - relStats[rel]->l[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col] + 1));
+			relStats[rel]->f = ceil(relStats[rel]->f * float(value - relStats[rel]->l[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col] + 1));
 			relStats[rel]->u[col] = value - 1;
-			relStats[rel]->d[col] = relStats[rel]->d[col] * (value - 1 - relStats[rel]->l[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col] + 1);
-			relStats[rel]->f = relStats[rel]->f * (value - 1 - relStats[rel]->l[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col] + 1);
 		}
 			
 		if (cmp == '>') {
 			if (value + 1 <= relStats[rel]->l[col]) continue;
+			relStats[rel]->d[col] = ceil(relStats[rel]->d[col] * float(-value + relStats[rel]->u[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col] + 1));
+			relStats[rel]->f = ceil(relStats[rel]->f * float(- value + relStats[rel]->u[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col] + 1));
 			relStats[rel]->l[col] = value + 1;
-			relStats[rel]->d[col] = relStats[rel]->d[col] * (-value - 1 + relStats[rel]->u[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col] + 1);
-			relStats[rel]->f = relStats[rel]->f * (- value - 1 + relStats[rel]->u[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col] + 1);
 		}
 		
 		for (unsigned int c = 0; c < relStats[rel]->ncol; c++) if (c != col) {
-			relStats[rel]->d[c] = relStats[rel]->d[c] * (1 - pow((1 - (relStats[rel]->f)/pF), (relStats[rel]->f) / relStats[rel]->d[c]));
-		}
+			relStats[rel]->d[c] =ceil( relStats[rel]->d[c] * (1.0 - pow((1.0 - float(relStats[rel]->f)/pF), float(relStats[rel]->f) / relStats[rel]->d[c])));
+			}
 	}
 		
 	for (unsigned int p=0; p<parser.npredicates; p++) {
@@ -185,11 +185,11 @@ void Optimizer::filter() {
 
 		relStats[rela]->l[cola] = relStats[rela]->l[colb] = MAX(relStats[rela]->l[cola], relStats[rela]->l[colb]);
 		relStats[rela]->u[cola] = relStats[rela]->u[colb] = MIN(relStats[rela]->u[cola], relStats[rela]->u[colb]);
-		relStats[rela]->f = relStats[rela]->f / (relStats[rela]->u[cola] - relStats[rela]->l[cola] + 1);
-		relStats[rela]->d[cola] = relStats[rela]->d[colb] = relStats[rela]->d[cola] * (1 - pow((1 - relStats[rela]->f / pF), pF / relStats[rela]->d[cola]) );
+		relStats[rela]->f = ceil(float(relStats[rela]->f) / (relStats[rela]->u[cola] - relStats[rela]->l[cola] + 1));
+		relStats[rela]->d[cola] = relStats[rela]->d[colb] = ceil(relStats[rela]->d[cola] * (1.0 - pow((1.0 - float(relStats[rela]->f) / pF), float(pF) / relStats[rela]->d[cola]) ));
 		
 		for (unsigned int c = 0; c < relStats[rela]->ncol; c++) if (c != cola && c != colb) {
-			relStats[rela]->d[c] = relStats[rela]->d[c] * (1 - pow((1 - relStats[rela]->f / pF), relStats[rela]->f / relStats[rela]->d[c]) );
+			relStats[rela]->d[c] = ceil(relStats[rela]->d[c] * (1.0 - pow((1.0 - float(relStats[rela]->f) / pF), float(relStats[rela]->f) / relStats[rela]->d[c]) ));
 		}
 	}
 }

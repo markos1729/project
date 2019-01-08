@@ -62,7 +62,7 @@ public:
 //            return;
 //        }
         for (int c = 0; c < ncol; c++) {
-            printf("  col%d: { l:%ld | u:%ld | d:%d }\n", c, l[c], u[c], d[c]);
+            printf("  col%d: { l:%llu | u:%llu | d:%d }\n", c, l[c], u[c], d[c]);
         }
     }
 #endif
