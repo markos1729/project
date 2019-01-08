@@ -28,6 +28,21 @@ unsigned int find_rel_pos(QueryRelation **QueryRelations, unsigned int size, uns
 unsigned int count_not_null(void **ptrarray, unsigned int size);
 
 
+/* Local Structs */
+class IOJob : public Job {
+    QueryRelation *R;
+    projection *projections;
+    unsigned int nprojections;
+public:
+    IOJob(QueryRelation *_R, projection *_projections, unsigned int _nprojections) : Job(), R(_R), projections(_projections), nprojections(_nprojections) {}
+    ~IOJob() {    // must cleanup QueryRelation and projections when done
+        delete[] projections;
+        delete R;
+    }
+    bool run();
+};
+
+
 int main(){
     #ifdef PRINT_FEEDBACK_MESSAGES
     cout << "Loading relations..." << endl;
@@ -63,6 +78,7 @@ int main(){
     #endif
     // initing JobScheduler
     scheduler = new JobScheduler();
+    JobScheduler IOScheduler(1);             // make a new Scheduler only for IO with 1 thread in order not to waste CPU cycles
     // then start parsing 'sql' statements
     #ifdef PRINT_FEEDBACK_MESSAGES
     unsigned int count = 0;
@@ -207,24 +223,23 @@ int main(){
                 lastpos = i;
             }
 
-            // Choose one (sum or select):
-            #ifdef PRINT_SUM
-            QueryRelations[0]->performSum(p->projections,p->nprojections);
-            #else
-            QueryRelations[0]->performSelect(p->projections, p->nprojections);
-            #endif
+            // schedules results to be printed to std::out
+            projection *projections_copy = new projection[p->nprojections];
+            for (unsigned int i = 0 ; i < p->nprojections ; i++) { projections_copy[i] = p->projections[i]; }
+            IOScheduler.schedule(new IOJob(QueryRelations[0], projections_copy, p->nprojections));
 
             // cleanup
-            for (int i = 0 ; i < p->nrelations; i++){
+            for (int i = 1 ; i < p->nrelations; i++){   // (!) DO NOT delete QueryRelations[0] as this will be cleaned up after the IOJob scheduled has finished
                 if ( QueryRelations[i] != NULL && QueryRelations[i]->isIntermediate ) delete QueryRelations[i];
             }
-            delete[] QueryRelations;
-            delete p;
+            delete[] QueryRelations;                    // this is ok to delete, QueryRelations[0] pointer has been saved
+            delete p;                                   // this is also ok to delete since we pass a copy of p->projections
         }
         #ifdef PRINT_FEEDBACK_MESSAGES
         cout << endl;
         #endif
     } while ( !cin.eof() && !cin.fail() );
+    IOScheduler.waitUntilAllJobsHaveFinished();
     // cleanup
     for (unsigned int i = 0 ; i < Rlen ; i++ ) {
         delete R[i];
@@ -251,4 +266,16 @@ unsigned int count_not_null(void **ptrarray, unsigned int size){
         if ( ptrarray[i] != NULL ) count++;
     }
     return count;
+}
+
+bool IOJob::run() {
+    if (R == NULL || projections == NULL) return false;
+    // Choose one (sum or select):
+    #ifdef PRINT_SUM
+    R->performSum(projections,nprojections);
+    #else
+    R->performSelect(projections, nprojections);
+    #endif
+    cout.flush();    // (!) important for harness to work
+    return true;
 }
