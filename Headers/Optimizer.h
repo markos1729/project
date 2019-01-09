@@ -84,7 +84,8 @@ class Optimizer {
         unsigned int treeF;
         unordered_map<unsigned int, RelationStats*> relationsStats;
         int *predsOrder;
-        int nextPredOrder;
+        int predsOrderIndex;
+        bool *predsJoined;
 
         JoinTree(unsigned int relId, RelationStats *relStats, unsigned int npredicates);
         JoinTree(JoinTree *currBestTree, unsigned int relId, RelationStats *relStats, const SQLParser &parser);

@@ -7,22 +7,26 @@
 
 #define BIG_N 50000000
 
-Optimizer::JoinTree::JoinTree(unsigned int relId, RelationStats *relStats, unsigned int npredicates) : treeF(relStats->f), nextPredOrder(1) {
+Optimizer::JoinTree::JoinTree(unsigned int relId, RelationStats *relStats, unsigned int npredicates) : treeF(relStats->f), predsOrderIndex(0) {
     relationsStats[relId] = relStats;
 	predsOrder = new int[npredicates]();
+	predsJoined = new bool[npredicates]();
 }
 
 Optimizer::JoinTree::JoinTree(JoinTree *currBestTree, unsigned int relId, RelationStats *relStats, const SQLParser &parser)
-		: treeF(currBestTree->treeF), nextPredOrder(currBestTree->nextPredOrder) {
+		: treeF(currBestTree->treeF), predsOrderIndex(currBestTree->predsOrderIndex) {
 	predsOrder = new int[parser.npredicates];
+	predsJoined = new bool[parser.npredicates];
 	for (int i = 0; i < parser.npredicates; i++) {
-		this->predsOrder[i] = currBestTree->predsOrder[i];
+		predsOrder[i] = currBestTree->predsOrder[i];
+		predsJoined[i] = currBestTree->predsJoined[i];
 	}
-	this->relationsStats = currBestTree->relationsStats;	// TODO: what kind of copy do we want here?
+	relationsStats = currBestTree->relationsStats;	// TODO: what kind of copy do we want here?
 	int predJoined = bestJoinWithRel(parser, relId, relStats);
 	CHECK( (predJoined > -1), "Error: tried to create Join Tree on non-connected relations", );
-    predsOrder[predJoined] = nextPredOrder;
-    nextPredOrder++;
+    predsOrder[predsOrderIndex] = predJoined;
+    predsOrderIndex++;
+    predsJoined[predJoined] = true;
 }
 
 Optimizer::JoinTree::~JoinTree() {
@@ -32,6 +36,7 @@ Optimizer::JoinTree::~JoinTree() {
 		it++;
 	}
 	delete[] predsOrder;
+	delete[] predsJoined;
 }
 
 /* Performs join between the JoinTree and the given relation using the best predicate (at the best column) according to the calculated stats.
@@ -55,7 +60,7 @@ int Optimizer::JoinTree::bestJoinWithRel(const SQLParser &parser, unsigned int r
 		} else continue;
 		currF = float(treeF * relbStats->f) / (relbStats->u[colb] - relbStats->l[colb] + 1);
 		if (bestF == -1 || currF < bestF) {         // join at this column is the best join (yet)
-            cout << "^" << currF << "^" << endl;
+            cout << "currF: " << currF << endl;     // DEBUG
 			relaStats = relationsStats[relaId];
 			joinedRelaStats = relaStats;
 			joinedRelaId = relaId;
@@ -110,8 +115,8 @@ void Optimizer::initializeRelation(unsigned int rid, unsigned int rows, unsigned
 	relStats[rid]->f = rows;
 	for (unsigned int c = 0; c < cols; c++) {
 		intField u, l;
-		// TODO: what happens to stats for empty relations?
-		u = l = columns[c][0];		// currMin = currMax = value of first row
+		if (rows == 0) u = l = 0;
+		else u = l = columns[c][0];		// currMin = currMax = value of first row
 		
 		for (unsigned int r = 1; r < rows; r++) {
 			l = MIN(l, columns[c][r]);
@@ -144,7 +149,7 @@ void Optimizer::filter() {
 
 		unsigned int pF = relStats[rel]->f;
 		if (cmp == '=') {
-			unsigned int cell = (value-relStats[rel]->l[col]) % N[rel][col];
+			unsigned int cell = (value - relStats[rel]->l[col]) % N[rel][col];
 			relStats[rel]->l[col] = value;
 			relStats[rel]->u[col] = value;
 
@@ -174,7 +179,7 @@ void Optimizer::filter() {
 		
 		for (unsigned int c = 0; c < relStats[rel]->ncol; c++) if (c != col) {
 			relStats[rel]->d[c] =ceil( relStats[rel]->d[c] * (1.0 - pow((1.0 - float(relStats[rel]->f) / pF), float(relStats[rel]->f) / relStats[rel]->d[c])));
-			}
+		}
 	}
 		
 	for (unsigned int p=0; p<parser.npredicates; p++) {
@@ -224,6 +229,7 @@ int *Optimizer::best_plan() {
 		string SIdStr(nrel - i, '0');
 		SIdStr.append(i, '1');
 		sort(SIdStr.begin(), SIdStr.end());
+		cout << "Level " << i << endl;
 		do {	// get all treeIdStr permutations with exactly i '1's
 		    if (BestTree[SIdStr] == NULL) continue;
 			currTree = NULL;
@@ -256,9 +262,14 @@ int *Optimizer::best_plan() {
 	int *bestJoinOrder = new int[parser.npredicates];
 	string bestTreeIdStr(nrel, '1');
 	currTree = BestTree[bestTreeIdStr];
-	cout << "|" << currTree->treeF << "|" << endl;
+	cout << "BestF: " << currTree->treeF << endl;            // DEBUG
 	for (unsigned int i = 0; i < parser.npredicates; i++) {
 		bestJoinOrder[i] = currTree->predsOrder[i];
+	}
+	for (unsigned int i = 0; i < parser.npredicates; i++) {
+		if (currTree->predsJoined[i]) continue;
+		bestJoinOrder[currTree->predsOrderIndex] = i;
+		currTree->predsOrderIndex++;
 	}
 	// cleaning up BestTree:
 //	auto it = BestTree.begin();

@@ -123,18 +123,18 @@ int main(){
             delete[] seen_at;
             if (abort) continue;
 
-//            // Join Optimization here:
-//            Optimizer *optimizer = new Optimizer(*p);
-//            for (unsigned int i = 0; i < p->nrelations; i++) {
-//                optimizer->initializeRelation(i, R[i]->getSize(), R[i]->getNumOfColumns(), R[i]->getColumns());
-//            }
-//            optimizer->printAllRelStats();
-//            optimizer->filter();
-//            cout << endl << "Stats after filters:" << endl;
-//            optimizer->printAllRelStats();
-//            int *bestJoinOrder = optimizer->best_plan();
-//            for (int i = 0; i < p->npredicates; i++) printf("%d_", bestJoinOrder[i]);
-//            cout << endl << endl;
+            // Join Optimization here:
+            Optimizer *optimizer = new Optimizer(*p);
+            for (unsigned int i = 0; i < p->nrelations; i++) {
+                optimizer->initializeRelation(i, R[i]->getSize(), R[i]->getNumOfColumns(), R[i]->getColumns());
+            }
+            optimizer->printAllRelStats();
+            optimizer->filter();
+            cout << endl << "Stats after filters:" << endl;
+            optimizer->printAllRelStats();
+            int *bestJoinOrder = optimizer->best_plan();
+            for (int i = 0; i < p->npredicates; i++) printf("%d_", bestJoinOrder[i]);
+            cout << endl << endl;
 //            exit(42);
 
 
