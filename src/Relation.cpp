@@ -40,18 +40,19 @@ bool JoinRelation::partitionRelation(unsigned int H1_N) {
     if (this->getSize() == 0 || rowids == NULL || joinField == NULL ) return true;     // nothing to partition
     const unsigned int num_of_buckets = (unsigned int) 0x01 << H1_N;  // = 2^H1_N
     // 1) calculate Hist using available threads
+    const unsigned int threads_to_use = MIN(CPU_CORES, scheduler->get_number_of_threads());
     unsigned int *Hist = new unsigned int[num_of_buckets]();          // all Hist[i] are initialized to 0
     unsigned int *bucket_nums = new unsigned int[size];
-    unsigned int **tempHists = new unsigned int *[scheduler->get_number_of_threads()];
-    const unsigned int chunk_size = size / scheduler->get_number_of_threads() + ((size % scheduler->get_number_of_threads() > 0) ? 1 : 0);
-    for (int i = 0 ; i < scheduler->get_number_of_threads() ; i++){
+    unsigned int **tempHists = new unsigned int *[threads_to_use];
+    const unsigned int chunk_size = size / threads_to_use + ((size % threads_to_use > 0) ? 1 : 0);
+    for (int i = 0 ; i < threads_to_use; i++){
         tempHists[i] = new unsigned int[num_of_buckets]();            // (!) init to 0
         if (i * chunk_size < size ) scheduler->schedule(new HistJob(joinField, i * chunk_size, MIN((i+1) * chunk_size, size), tempHists[i], bucket_nums, H1_N));
     }
     scheduler->waitUntilAllJobsHaveFinished();
     // and then sum them up to create one Hist
     bool failed = false;
-    for (unsigned int j = 0 ; j < scheduler->get_number_of_threads() ; j++){
+    for (unsigned int j = 0 ; j < threads_to_use ; j++){
         if (tempHists[j] == NULL) { failed = true; continue; }
         for (unsigned int i = 0 ; i < num_of_buckets ; i++){
             Hist[i] += tempHists[j][i];
@@ -77,7 +78,7 @@ bool JoinRelation::partitionRelation(unsigned int H1_N) {
     for (unsigned int i = 0 ; i < num_of_buckets ; i++){
         CHECK_PERROR(pthread_mutex_init(&bucket_pos_locks[i], NULL) , "pthread_mutex_init failed", )
     }
-    for (int i = 0 ; i < scheduler->get_number_of_threads() ; i++){
+    for (int i = 0 ; i < threads_to_use ; i++){
         if (i * chunk_size < size ) scheduler->schedule(new PartitionJob(newJoinField, joinField, newRowids, rowids, nextBucketPos, i * chunk_size, MIN((i + 1) * chunk_size, size), num_of_buckets, bucket_nums, Psum, bucket_pos_locks));
     }
     scheduler->waitUntilAllJobsHaveFinished();
@@ -157,7 +158,8 @@ void JoinRelation::printDebugInfo() {
 /* QueryRelation Implementation */
 bool *QueryRelation::filterField(intField *field, unsigned int size, intField value, char cmp, unsigned int &count){
 #ifdef DO_FILTER_PARALLEL
-    const unsigned int chunk_size = size / scheduler->get_number_of_threads() + ((size % scheduler->get_number_of_threads() > 0) ? 1 : 0);
+    const unsigned int threads_to_use = MIN(CPU_CORES, scheduler->get_number_of_threads());
+    const unsigned int chunk_size = size / threads_to_use + ((size % threads_to_use > 0) ? 1 : 0);
     class FilterJob : public Job {
         const unsigned int start, end;
         const char cmp;
@@ -197,8 +199,8 @@ bool *QueryRelation::filterField(intField *field, unsigned int size, intField va
         }
     };
     bool *filter = new bool[size]();
-    unsigned int *thread_count = new unsigned int[scheduler->get_number_of_threads()]();
-    for (int i = 0 ; i < scheduler->get_number_of_threads() ; i++){
+    unsigned int *thread_count = new unsigned int[threads_to_use]();
+    for (int i = 0 ; i < threads_to_use ; i++){
         unsigned int start = i * chunk_size, end = MIN((i+1) * chunk_size, size);
         if (i * chunk_size < size ) {
             scheduler->schedule(new FilterJob(start, end, cmp, &thread_count[i], field, value, filter));
@@ -206,7 +208,7 @@ bool *QueryRelation::filterField(intField *field, unsigned int size, intField va
     }
     scheduler->waitUntilAllJobsHaveFinished();
     count = 0;
-    for (int i = 0 ; i < scheduler->get_number_of_threads() ; i++) {
+    for (int i = 0 ; i < threads_to_use ; i++) {
         count += thread_count[i];
     }
     delete[] thread_count;
@@ -243,7 +245,8 @@ bool *QueryRelation::filterField(intField *field, unsigned int size, intField va
 
 bool *QueryRelation::eqColumnsFields(intField *field1, intField *field2, unsigned int size, unsigned int &count) {
 #ifdef DO_EQUALCOLUMNS_PARALLEL
-    const unsigned int chunk_size = size / scheduler->get_number_of_threads() + ((size % scheduler->get_number_of_threads() > 0) ? 1 : 0);
+    const unsigned int threads_to_use = MIN(CPU_CORES, scheduler->get_number_of_threads());
+    const unsigned int chunk_size = size / threads_to_use + ((size % threads_to_use > 0) ? 1 : 0);
     class EqColumnsJob : public Job {
         const unsigned int start, end;
         intField *field1, *field2;
@@ -262,8 +265,8 @@ bool *QueryRelation::eqColumnsFields(intField *field1, intField *field2, unsigne
         }
     };
     bool *eqColumns = new bool[size]();
-    unsigned int *thread_count = new unsigned int[scheduler->get_number_of_threads()]();
-    for (int i = 0 ; i < scheduler->get_number_of_threads() ; i++) {
+    unsigned int *thread_count = new unsigned int[threads_to_use]();
+    for (int i = 0 ; i < threads_to_use ; i++) {
         unsigned int start = i * chunk_size, end = MIN((i+1) * chunk_size, size);
         if (i * chunk_size < size ) {
             scheduler->schedule(new EqColumnsJob(start, end, &thread_count[i], field1, field2, eqColumns));
@@ -271,7 +274,7 @@ bool *QueryRelation::eqColumnsFields(intField *field1, intField *field2, unsigne
     }
     scheduler->waitUntilAllJobsHaveFinished();
     count = 0;
-    for (int i = 0 ; i < scheduler->get_number_of_threads() ; i++) {
+    for (int i = 0 ; i < threads_to_use ; i++) {
         count += thread_count[i];
     }
     delete[] thread_count;
