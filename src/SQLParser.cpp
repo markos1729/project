@@ -49,8 +49,8 @@ void parse_projections(char *s, unsigned int &nprojections, projection* &project
 
 void parse_bindings(char *s, unsigned int &npredicates, predicate* &predicates, unsigned int &nfilters, filter* &filters) {
 	char *token;
-	filters = new filter[strcnt(s,'&') + 1];
-	predicates = new predicate[strcnt(s,'&') + 1];
+	filters = new filter[strcnt(s,'&') + 1]();
+	predicates = new predicate[strcnt(s,'&') + 1]();
 	
 	nfilters = 0;
 	npredicates = 0;
@@ -62,7 +62,7 @@ void parse_bindings(char *s, unsigned int &npredicates, predicate* &predicates, 
 			npredicates++;
 		}
 		else {
-			sscanf(token, "%u.%u%c%llu", &filters[nfilters].rel_id,&filters[nfilters].col_id, &filters[nfilters].cmp, &filters[nfilters].value);
+			sscanf(token, "%u.%u%c%lu", &filters[nfilters].rel_id,&filters[nfilters].col_id, &filters[nfilters].cmp, &filters[nfilters].value);
 			nfilters++;
 		}
 		token = strtok(NULL, "&");

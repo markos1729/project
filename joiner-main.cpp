@@ -1,5 +1,5 @@
 #include <iostream>
-#include <string.h>
+#include <cstring>
 #include <unistd.h>
 #include <vector>
 #include "Headers/SQLParser.h"
@@ -125,15 +125,16 @@ int main(){
 
 //            // Join Optimization here:
 //            Optimizer *optimizer = new Optimizer(*p);
-//            for (unsigned int i = 0; i < Rlen; i++) {
+//            for (unsigned int i = 0; i < p->nrelations; i++) {
 //                optimizer->initializeRelation(i, R[i]->getSize(), R[i]->getNumOfColumns(), R[i]->getColumns());
 //            }
 //            optimizer->printAllRelStats();
 //            optimizer->filter();
 //            cout << endl << "Stats after filters:" << endl;
 //            optimizer->printAllRelStats();
-////            int *bestJoinOrder = optimizer->best_plan();
-////            for (int i = 0; i < p->npredicates; i++) printf("%d_", bestJoinOrder[i]);
+//            int *bestJoinOrder = optimizer->best_plan();
+//            for (int i = 0; i < p->npredicates; i++) printf("%d_", bestJoinOrder[i]);
+//            cout << endl << endl;
 //            exit(42);
 
 
