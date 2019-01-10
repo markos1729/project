@@ -5,7 +5,7 @@ JOINER_OBJ  = objects/joiner-main.o objects/SQLParser.o objects/Optimizer.o
 COMMON_HEAD = Headers/*.h
 
 
-all: radixhashjoin joiner test-radixhashjoin test-joiner
+all: radixhashjoin joiner test-radixhashjoin test-joiner test-optimizer
 
 
 #################

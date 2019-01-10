@@ -135,58 +135,43 @@ TEST_CASE("Optimizer::filter() - equal columns", "[FILTER]") {
 }
 */
 
-TEST_CASE("Optimizer::best_plan() - working", "[BEST_PLAN]") {
+TEST_CASE("Optimizer::best_plan() - simple", "[BEST_PLAN]") {
     R_init4();
-    // Uncomment one of these two:
+    // "0.0=1.1" produce 6 results, while "0.1=2.0" 12 results
     SQLParser *parser = new SQLParser("0 1 2|0.0=1.1&0.1=2.0|0.0");
-//    SQLParser *parser = new SQLParser("0 1 2|0.1=2.0&0.0=1.1|0.0");
-    printf("---------------------------------\n");
     Optimizer *optimizer = new Optimizer(*parser);
     for (unsigned int i = 0; i < Rlen; i++) {
         optimizer->initializeRelation(i, R[i]->getSize(), R[i]->getNumOfColumns(), R[i]->getColumns());
     }
-    optimizer->printAllRelStats();
-    printf("---------------------------------\n");
     int *bestJoinOrder = optimizer->best_plan();
-    for (int i = 0; i < parser->npredicates; i++) printf("%d_", bestJoinOrder[i]);
-    cout << endl;
+    CHECK( bestJoinOrder[0] == 0 );
+
+    parser = new SQLParser("0 1 2|0.1=2.0&0.0=1.1|0.0");
+    optimizer = new Optimizer(*parser);
+    for (unsigned int i = 0; i < Rlen; i++) {
+        optimizer->initializeRelation(i, R[i]->getSize(), R[i]->getNumOfColumns(), R[i]->getColumns());
+    }
+    bestJoinOrder = optimizer->best_plan();
+    CHECK( bestJoinOrder[0] == 1 );
 }
 
-TEST_CASE("Optimizer::best_plan()", "[BEST_PLAN]") {
+TEST_CASE("Optimizer::best_plan() - column prioritizing", "[BEST_PLAN]") {
     R_init3();
-//    SQLParser *parser = new SQLParser("0 1|0.0=1.1|0.0");
-//    SQLParser *parser = new SQLParser("0 2|0.1=1.0|0.0");
-//    SQLParser *parser = new SQLParser("0 1 2|0.0=1.1&0.1=2.0|0.0");
-//    SQLParser *parser = new SQLParser("0 1 2|0.0=1.1&0.1=2.0&0.1=2.1|0.0");
+    // "0.1=2.0" produces 0 results
     SQLParser *parser = new SQLParser("0 1 2|0.0=1.1&0.1=2.1&0.1=2.0|0.0");
-    printf("---------------------------------\n");
     Optimizer *optimizer = new Optimizer(*parser);
     for (unsigned int i = 0; i < Rlen; i++) {
         optimizer->initializeRelation(i, R[i]->getSize(), R[i]->getNumOfColumns(), R[i]->getColumns());
     }
-    optimizer->printAllRelStats();
-    printf("---------------------------------\n");
     int *bestJoinOrder = optimizer->best_plan();
-    for (int i = 0; i < parser->npredicates; i++) printf("%d_", bestJoinOrder[i]);
-    cout << endl;
-}
+    CHECK( bestJoinOrder[0] == 1 );
 
-TEST_CASE("Optimizer::best_plan() - 2", "[BEST_PLAN]") {
-    R_init4();
-//    SQLParser *parser = new SQLParser("0 1|0.0=1.1|0.0");
-//    SQLParser *parser = new SQLParser("0 2|0.1=1.0|0.0");
-    SQLParser *parser = new SQLParser("0 1 2|0.0=1.1&0.1=2.0|0.0");
-//    SQLParser *parser = new SQLParser("0 1 2|0.1=2.0&0.0=1.1|0.0");
-//    SQLParser *parser = new SQLParser("0 1 2|0.0=1.1&0.1=2.0&0.1=2.1|0.0");
-//    SQLParser *parser = new SQLParser("0 1 2|0.0=1.1&0.1=2.1&0.1=2.0|0.0");
-    printf("---------------------------------\n");
-    Optimizer *optimizer = new Optimizer(*parser);
+    // it will still be prefered even if there's an available join between "0" and "2" at another column
+    parser = new SQLParser("0 1 2|0.0=1.1&0.1=2.0&0.1=2.1|0.0");
+    optimizer = new Optimizer(*parser);
     for (unsigned int i = 0; i < Rlen; i++) {
         optimizer->initializeRelation(i, R[i]->getSize(), R[i]->getNumOfColumns(), R[i]->getColumns());
     }
-    optimizer->printAllRelStats();
-    printf("---------------------------------\n");
-    int *bestJoinOrder = optimizer->best_plan();
-    for (int i = 0; i < parser->npredicates; i++) printf("%d_", bestJoinOrder[i]);
-    cout << endl;
+    bestJoinOrder = optimizer->best_plan();
+    CHECK( bestJoinOrder[0] == 2 );
 }
