@@ -22,7 +22,7 @@ Optimizer::JoinTree::JoinTree(JoinTree *currBestTree, unsigned int relId, Relati
 		predsOrder[i] = currBestTree->predsOrder[i];
 		predsJoined[i] = currBestTree->predsJoined[i];
 	}
-	relationsStats = currBestTree->relationsStats;	// TODO: what kind of copy do we want here?
+	relationsStats = currBestTree->relationsStats;
 	int predJoined = bestJoinWithRel(parser, relId, relStats);
 	CHECK( (predJoined > -1), "Error: tried to create Join Tree on non-connected relations", );
     predsOrder[predsOrderIndex] = predJoined;
@@ -246,14 +246,13 @@ int *Optimizer::best_plan() {
 				}
 			}
 			if (currTree == NULL) {		// No relations could be joined with currTree; CrossProducts are needed; Aborting best_plan()
-//				cout << "CrossProducts were found; Aborting BestTree!" << endl;
+				cout << "CrossProducts were found; Aborting BestTree!" << endl;
 				// cleaning up BestTree:
-//				auto it = BestTree.begin();
-//				while (it != BestTree.end()) {
-//					delete it->second;
-//					it++;
-//				}
-//				return NULL;
+                for (auto it = BestTree.begin(); it != BestTree.end(); ) {
+                    delete it->second;
+                    it = BestTree.erase(it);
+                }
+				return NULL;
 			}
 		} while ( next_permutation(SIdStr.begin(), SIdStr.end()) );
 	}
@@ -269,9 +268,9 @@ int *Optimizer::best_plan() {
 		currTree->predsOrderIndex++;
 	}
 	// cleaning up BestTree:
-//    for (auto it = BestTree.begin(); it != BestTree.end(); ) {
-//		delete it->second;
-//        it = BestTree.erase(it);
-//	}
+    for (auto it = BestTree.begin(); it != BestTree.end(); ) {
+		delete it->second;
+        it = BestTree.erase(it);
+	}
 	return bestJoinOrder;
 }

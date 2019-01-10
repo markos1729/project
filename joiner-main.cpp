@@ -156,7 +156,7 @@ int main(){
 
 
             //////////////////////////////
-            /// Join Optimization here ///   // <---- TODO: HAS LEAKS - PLEASE DEBUG
+            /// Join Optimization here ///
             //////////////////////////////
             Optimizer *optimizer = new Optimizer(*p);
             for (unsigned int i = 0; i < p->nrelations; i++) {   // all QueryRelations here are still only consisted by 1 original relation
@@ -164,14 +164,9 @@ int main(){
                        for (int ii = 0 ; ii < p->nrelations; ii++) { if ( QueryRelations[ii] != NULL && QueryRelations[ii]->isIntermediate ) delete QueryRelations[ii]; } delete[] QueryRelations; delete p; abort = true; break; )
                 optimizer->initializeRelation(i, QueryRelations[i]->getSize(), QueryRelations[i]->getNumOfColumns(), QueryRelations[i]->getColumns());
             }
-            //optimizer->printAllRelStats();
-            //optimizer->filter();
-            //cout << endl << "Stats after filters:" << endl;
-            //optimizer->printAllRelStats();
+//            optimizer->filter();
             int *bestJoinOrder = optimizer->best_plan();
             delete optimizer;
-            for (int i = 0; i < p->npredicates; i++) printf("%d_", bestJoinOrder[i]);
-            cout << endl << endl;
             if (abort) continue;
 
             // And afterwards all the joins
