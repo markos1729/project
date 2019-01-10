@@ -518,7 +518,7 @@ void Relation::performSum(projection *projections, unsigned int nprojections) {
 
 
 /* IntermediateRelation Implementation */
-IntermediateRelation::IntermediateRelation(unsigned int rel_id, unsigned int *_rowids, unsigned int _size, const Relation *original_rel) : QueryRelation(true), numberOfRelations(1), size(_size){
+IntermediateRelation::IntermediateRelation(unsigned int rel_id, unsigned int *_rowids, unsigned int _size, const Relation *original_rel) : QueryRelation(true), numberOfRelations(1), size(_size), first_rel_id(rel_id), columns(NULL) {
     if (size > 0) {
         unsigned int *column = new unsigned int[size];
         for (unsigned int i = 0; i < size; i++) {
@@ -531,7 +531,7 @@ IntermediateRelation::IntermediateRelation(unsigned int rel_id, unsigned int *_r
     originalRelations.insert(make_pair(rel_id, original_rel));
 }
 
-IntermediateRelation::IntermediateRelation(unsigned int rela_id, unsigned int relb_id, unsigned int *_rowids_a, unsigned int *_rowids_b, unsigned int _size, const Relation *original_rel_a, const Relation *original_rel_b) : QueryRelation(true), numberOfRelations(2), size(_size) {
+IntermediateRelation::IntermediateRelation(unsigned int rela_id, unsigned int relb_id, unsigned int *_rowids_a, unsigned int *_rowids_b, unsigned int _size, const Relation *original_rel_a, const Relation *original_rel_b) : QueryRelation(true), numberOfRelations(2), size(_size), first_rel_id(rela_id), columns(NULL) {
     if (size > 0) {
         unsigned int *column_a = new unsigned int[size];
         unsigned int *column_b = new unsigned int[size];
@@ -554,6 +554,12 @@ IntermediateRelation::~IntermediateRelation() {
         for (auto iter = rowids.begin(); iter != rowids.end(); iter++) {
             delete[] iter->second;   // get unsigned int * from <unsigned int, unsigned int *> pair (!) if is necessary!
         }
+    }
+    if (columns != NULL){
+        for (int j = 0 ; j < originalRelations.at(first_rel_id)->getNumOfColumns() ; j++) {
+            delete[] columns[j];
+        }
+        delete[] columns;
     }
 }
 
@@ -973,4 +979,22 @@ void IntermediateRelation::performSum(projection *projections, unsigned int npro
     printf("%lu\n", sum[nprojections - 1]);
 
     delete[] sum;
+}
+
+
+intField **IntermediateRelation::getColumns() {
+    if (size <= 0 || numberOfRelations > 1) return NULL;
+    if (columns != NULL) return columns;              // (!) only create them once
+    // recreate intField to be filtered from rowids
+    const Relation *OriginalR = originalRelations.at(first_rel_id);
+    CHECK(OriginalR != NULL, "Warning: rel_id invalid or originalRelations map corrupted in IntermediateRelation::performFilter()", return NULL; )
+    const unsigned int *fieldrowids = rowids.at(first_rel_id);
+    columns = new intField *[OriginalR->getNumOfColumns()];
+    for (int j = 0 ; j < OriginalR->getNumOfColumns() ; j++) {
+        columns[j] = new intField[size];
+        for (int i = 0; i < size; i++) {
+            columns[j][i] = OriginalR->getValueAt(j, fieldrowids[i] - 1);   // (!) -1 because rowids start at 1
+        }
+    }
+    return columns;
 }

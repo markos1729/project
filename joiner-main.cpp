@@ -123,20 +123,6 @@ int main(){
             delete[] seen_at;
             if (abort) continue;
 
-            // Join Optimization here:
-            Optimizer *optimizer = new Optimizer(*p);
-            for (unsigned int i = 0; i < p->nrelations; i++) {
-                optimizer->initializeRelation(i, R[i]->getSize(), R[i]->getNumOfColumns(), R[i]->getColumns());
-            }
-            optimizer->printAllRelStats();
-            optimizer->filter();
-            cout << endl << "Stats after filters:" << endl;
-            optimizer->printAllRelStats();
-            int *bestJoinOrder = optimizer->best_plan();
-            for (int i = 0; i < p->npredicates; i++) printf("%d_", bestJoinOrder[i]);
-            cout << endl << endl;
-//            exit(42);
-
 
             // execute WHERE: filters > equal columns > joins (+ equal columns if they end up to be)
             // First, do filters
@@ -151,6 +137,7 @@ int main(){
                       QueryRelations[filter.rel_id] = prev; )  // restore prev
             }
             if (abort) continue;
+
             // Then equal columns operations
             for (int i = 0 ; i < p->npredicates ; i++){
                 if ( p->predicates[i].rela_id == p->predicates[i].relb_id && p->predicates[i].cola_id != p->predicates[i].colb_id){
@@ -166,9 +153,29 @@ int main(){
                 // else if p->predicates[i].rela_id == p->predicates[i].relb_id -> ignore predicate
             }
             if (abort) continue;
+
+
+            //////////////////////////////
+            /// Join Optimization here ///   // <---- TODO: HAS LEAKS - PLEASE DEBUG
+            //////////////////////////////
+            Optimizer *optimizer = new Optimizer(*p);
+            for (unsigned int i = 0; i < p->nrelations; i++) {   // all QueryRelations here are still only consisted by 1 original relation
+                CHECK( QueryRelations[i]->getNumOfColumns() > 0 , "Query Optimization Input Error: QueryRelation with more than one original relations?!",
+                       for (int ii = 0 ; ii < p->nrelations; ii++) { if ( QueryRelations[ii] != NULL && QueryRelations[ii]->isIntermediate ) delete QueryRelations[ii]; } delete[] QueryRelations; delete p; abort = true; break; )
+                optimizer->initializeRelation(i, QueryRelations[i]->getSize(), QueryRelations[i]->getNumOfColumns(), QueryRelations[i]->getColumns());
+            }
+            //optimizer->printAllRelStats();
+            //optimizer->filter();
+            //cout << endl << "Stats after filters:" << endl;
+            //optimizer->printAllRelStats();
+            int *bestJoinOrder = optimizer->best_plan();
+            //for (int i = 0; i < p->npredicates; i++) printf("%d_", bestJoinOrder[i]);
+            //cout << endl << endl;
+            if (abort) continue;
+
             // And afterwards all the joins
             for (int i = 0 ; i < p->npredicates ; i++){
-                const predicate &predicate = p->predicates[i];
+                const predicate &predicate = p->predicates[bestJoinOrder[i]];   // in the order git from optimizer!
                 CHECK( (predicate.rela_id < p->nrelations && predicate.relb_id < p->nrelations), "SQL Error: SQL join predicate contains a relation that does not exist in \'FROM\'. Aborting query...",
                        for (int ii = 0 ; ii < p->nrelations; ii++) { if ( QueryRelations[ii] != NULL && QueryRelations[ii]->isIntermediate ) delete QueryRelations[ii]; } delete[] QueryRelations; delete p; abort = true; break; )
                 unsigned int rela_pos = find_rel_pos(QueryRelations, p->nrelations, predicate.rela_id);

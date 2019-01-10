@@ -60,7 +60,7 @@ int Optimizer::JoinTree::bestJoinWithRel(const SQLParser &parser, unsigned int r
 		} else continue;
 		currF = float(treeF * relbStats->f) / (relbStats->u[colb] - relbStats->l[colb] + 1);
 		if (bestF == -1 || currF < bestF) {         // join at this column is the best join (yet)
-            cout << "currF: " << currF << endl;     // DEBUG
+//            cout << "currF: " << currF << endl;     // DEBUG
 			relaStats = relationsStats[relaId];
 			joinedRelaStats = relaStats;
 			joinedRelaId = relaId;
@@ -229,7 +229,7 @@ int *Optimizer::best_plan() {
 		string SIdStr(nrel - i, '0');
 		SIdStr.append(i, '1');
 		sort(SIdStr.begin(), SIdStr.end());
-		cout << "Level " << i << endl;
+//		cout << "Level " << i << endl;
 		do {	// get all treeIdStr permutations with exactly i '1's
 		    if (BestTree[SIdStr] == NULL) continue;
 			currTree = NULL;
@@ -248,7 +248,7 @@ int *Optimizer::best_plan() {
 				}
 			}
 			if (currTree == NULL) {		// No relations could be joined with currTree; CrossProducts are needed; Aborting best_plan()
-				cout << "CrossProducts were found; Aborting BestTree!" << endl;
+//				cout << "CrossProducts were found; Aborting BestTree!" << endl;
 				// cleaning up BestTree:
 //				auto it = BestTree.begin();
 //				while (it != BestTree.end()) {
@@ -262,7 +262,7 @@ int *Optimizer::best_plan() {
 	int *bestJoinOrder = new int[parser.npredicates];
 	string bestTreeIdStr(nrel, '1');
 	currTree = BestTree[bestTreeIdStr];
-	cout << "BestF: " << currTree->treeF << endl;            // DEBUG
+//	cout << "BestF: " << currTree->treeF << endl;            // DEBUG
 	for (unsigned int i = 0; i < parser.npredicates; i++) {
 		bestJoinOrder[i] = currTree->predsOrder[i];
 	}
