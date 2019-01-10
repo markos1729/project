@@ -33,6 +33,7 @@ public:
         }
     }
     RelationStats& operator= (const RelationStats& relStats) {
+        if(&relStats == this) return *this;
         ncol = relStats.ncol;
         f = relStats.f;
         delete[] l;
@@ -56,11 +57,10 @@ public:
 #ifdef DDEBUG
     void printStats(int relId) {
         printf("R%d stats: f=%d\n", relId, f);
-        // TODO
-//        if (f == 0) {
-//            printf("  column stats N/A\n");
-//            return;
-//        }
+        if (f == 0) {
+            printf("  column stats N/A\n");
+            return;
+        }
         for (int c = 0; c < ncol; c++) {
             printf("  col%d: { l:%lu | u:%lu | d:%d }\n", c, l[c], u[c], d[c]);
         }
@@ -73,7 +73,7 @@ class Optimizer {
     unsigned int nrel;  // number of relations
     RelationStats **relStats;
 
-    SQLParser parser;   // parser for this query
+    const SQLParser &parser;   // parser for this query
     unsigned int **N;   // bitmap size for each column
     uint64_t ***bitmap; // compact bitmap for each column
 
@@ -83,6 +83,7 @@ class Optimizer {
     public:
         unsigned int treeF;
         unordered_map<unsigned int, RelationStats*> relationsStats;
+        RelationStats* relStatsCreatedPtr;      // used for its deletion
         int *predsOrder;
         int predsOrderIndex;
         bool *predsJoined;

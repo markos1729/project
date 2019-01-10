@@ -169,8 +169,9 @@ int main(){
             //cout << endl << "Stats after filters:" << endl;
             //optimizer->printAllRelStats();
             int *bestJoinOrder = optimizer->best_plan();
-            //for (int i = 0; i < p->npredicates; i++) printf("%d_", bestJoinOrder[i]);
-            //cout << endl << endl;
+            delete optimizer;
+            for (int i = 0; i < p->npredicates; i++) printf("%d_", bestJoinOrder[i]);
+            cout << endl << endl;
             if (abort) continue;
 
             // And afterwards all the joins
@@ -211,6 +212,7 @@ int main(){
                            QueryRelations[rela_pos] = prev; )
                 }
             }
+            delete[] bestJoinOrder;
             if (abort) continue;
             CHECK( QueryRelations[0] != NULL, "Fatal error: Could not keep results to leftmost Intermediate QueryRelation (Should not happen). Please debug...",
                    for (int i = 0 ; i < p->nrelations; i++) { if ( QueryRelations[i] != NULL && QueryRelations[i]->isIntermediate ) delete QueryRelations[i]; } delete[] QueryRelations; delete p;
