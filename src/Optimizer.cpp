@@ -55,7 +55,7 @@ int Optimizer::JoinTree::bestJoinWithRel(const SQLParser &parser, unsigned int r
 			cola = parser.predicates[i].colb_id;
 			colb = parser.predicates[i].cola_id;
 		} else continue;
-		currF = float(treeF * relbStats->f) / (relbStats->u[colb] - relbStats->l[colb] + 1);
+		currF = ceil( float(treeF * relbStats->f) / (relbStats->u[colb] - relbStats->l[colb] + 1) );
 		if (bestF == -1 || currF < bestF) {         // join at this column is the best join (yet)
 			relaStats = relationsStats[relaId];
 			delete joinedRelaStats;
@@ -65,16 +65,16 @@ int Optimizer::JoinTree::bestJoinWithRel(const SQLParser &parser, unsigned int r
 			bestF = joinedRelaStats->f = joinedRelbStats->f = currF;
 			joinedRelaStats->l[cola] = joinedRelbStats->l[colb] = MAX(joinedRelaStats->l[cola], joinedRelbStats->l[colb]);
 			joinedRelaStats->u[cola] = joinedRelbStats->u[colb] = MIN(joinedRelaStats->u[cola], joinedRelbStats->u[colb]);
-			joinedRelaStats->d[cola] = joinedRelbStats->d[colb] = float(relaStats->d[cola] * relbStats->d[colb]) / (joinedRelaStats->u[colb] - joinedRelbStats->l[colb] + 1);
+			joinedRelaStats->d[cola] = joinedRelbStats->d[colb] = ceil( float(relaStats->d[cola] * relbStats->d[colb]) / (joinedRelaStats->u[colb] - joinedRelbStats->l[colb] + 1) );
 			// update stats for the other columns:
 			for (int c = 0; c < joinedRelaStats->ncol; c++) {
 				if (c == cola) continue;
-				joinedRelaStats->d[c] = relaStats->d[c] * (1 - pow((1 - joinedRelaStats->d[cola] / float(relaStats->d[cola])), float(joinedRelaStats->f) / relaStats->d[c]) );
+				joinedRelaStats->d[c] = relaStats->d[c] * ceil( (1 - pow((1 - joinedRelaStats->d[cola] / float(relaStats->d[cola])), float(joinedRelaStats->f) / relaStats->d[c]) ) );
 				if (joinedRelaStats->d[c] == 0 && currF > 0) joinedRelaStats->d[c] = 1;
 			}
 			for (int c = 0; c < joinedRelbStats->ncol; c++) {
 				if (c == colb) continue;
-				joinedRelbStats->d[c] = relbStats->d[c] * (1 - pow((1 - joinedRelbStats->d[colb] / float(relbStats->d[colb])), float(joinedRelbStats->f) / relbStats->d[c]) );
+				joinedRelbStats->d[c] = relbStats->d[c] * ceil( (1 - pow((1 - joinedRelbStats->d[colb] / float(relbStats->d[colb])), float(joinedRelbStats->f) / relbStats->d[c]) ) );
                 if (joinedRelbStats->d[c] == 0 && currF > 0) joinedRelbStats->d[c] = 1;
 			}
 			predJoined = i;
@@ -148,6 +148,14 @@ void Optimizer::filter() {
 
 		unsigned int pF = relStats[rel]->f;
 		if (cmp == '=') {
+			//check if value is outside range [l,u] first
+			if (value<relStats[rel]->l[col] || value>relStats[rel]->u[col]) {
+				relStats[rel]->l[col] = value;
+				relStats[rel]->u[col] = value;
+				relStats[rel]->d[col] = relStats[rel]->f = 0;
+				continue;
+				}
+
 			unsigned int cell = (value - relStats[rel]->l[col]) % N[rel][col];
 			relStats[rel]->l[col] = value;
 			relStats[rel]->u[col] = value;
