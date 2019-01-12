@@ -5,8 +5,62 @@
 #include "../Headers/macros.h"
 #include "../Headers/Optimizer.h"
 
-#define BIG_N 50000000
 
+/* RelationStats Implementation */
+RelationStats::RelationStats(const Relation *_R) : R(_R), ncol((_R != NULL) ?_R->getNumOfColumns() : 0), f((_R != NULL) ?_R->getSize() : 0) {
+	l = new intField[ncol]();
+	u = new intField[ncol]();
+	d = new unsigned int[ncol]();
+	N = new unsigned int[ncol]();
+	bitmap = new uint64_t*[ncol]();   // init pointers to NULL (!)
+
+}
+
+RelationStats::~RelationStats() {
+	delete[] l;
+	delete[] u;
+	delete[] d;
+	for (unsigned int i = 0; i < ncol; i++) delete[] bitmap[i];
+	delete[] bitmap;
+	delete[] N;
+}
+
+bool RelationStats::calculateStats() {
+	if (R == NULL) return false;
+
+	f = R->getSize();
+
+	for (unsigned int c = 0 ; c < ncol ; c++) {
+		intField u, l;
+		if (R->getSize() == 0) u = l = 0;
+		else u = l = R->getValueAt(c, 0);		// currMin = currMax = value of first row
+
+		for (unsigned int r = 1 ; r < R->getSize() ; r++) {
+			l = MIN(l, R->getValueAt(c, r));
+			u = MAX(u, R->getValueAt(c, r));
+		}
+
+		this->l[c] = l;
+		this->u[c] = u;
+		this->d[c] = 0;
+
+		N[c] = MIN(this->u[c] - this->l[c] + 1, BIG_N);
+		bitmap[c] = new uint64_t[N[c] / 64+1]();
+
+		for (unsigned int r = 0; r < R->getSize(); r++) {
+			unsigned int cell = (R->getValueAt(c, r) - this->l[c]) % N[c];
+			if ((bitmap[c][cell / 64] & (1LLU << (cell % 64)) ) == 0) {
+				this->d[c]++;
+				bitmap[c][cell / 64] |= (1LLU << (cell % 64));
+			}
+		}
+	}
+
+	return true;
+}
+
+
+/* JoinTree Implementation */
 Optimizer::JoinTree::JoinTree(unsigned int relId, RelationStats *relStats, unsigned int npredicates)
         : treeF(relStats->f), relStatsCreatedPtr(NULL), predsOrderIndex(0) {
     relationsStats[relId] = relStats;
@@ -88,58 +142,21 @@ int Optimizer::JoinTree::bestJoinWithRel(const SQLParser &parser, unsigned int r
     return predJoined;
 }
 
+
+/* Optimizer Implementation */
 Optimizer::Optimizer(const SQLParser &_parser) : nrel(_parser.nrelations), parser(_parser) {
     relStats = new RelationStats*[nrel];
-	N = new unsigned int*[nrel];
-	bitmap = new uint64_t**[nrel];
 }
 
 Optimizer::~Optimizer() {
-	for (unsigned int r = 0; r < nrel; r++) {
-		for (unsigned int c = 0; c < relStats[r]->ncol; c++) delete[] bitmap[r][c];
-        delete relStats[r];
-        delete[] N[r];
-		delete[] bitmap[r];
-	}
 	delete[] relStats;
-	delete[] N;
-	delete[] bitmap;
 }
 
-void Optimizer::initializeRelation(unsigned int rid, unsigned int rows, unsigned int cols, intField **columns) {
-	relStats[rid] = new RelationStats(cols);
-	N[rid] = new unsigned int[cols];
-	bitmap[rid] = new uint64_t*[cols];
-
-	relStats[rid]->f = rows;
-	for (unsigned int c = 0; c < cols; c++) {
-		intField u, l;
-		if (rows == 0) u = l = 0;
-		else u = l = columns[c][0];		// currMin = currMax = value of first row
-		
-		for (unsigned int r = 1; r < rows; r++) {
-			l = MIN(l, columns[c][r]);
-			u = MAX(u, columns[c][r]);
-		}
-
-		relStats[rid]->l[c] = l;
-		relStats[rid]->u[c] = u;
-		relStats[rid]->d[c] = 0;
-
-		N[rid][c] = MIN(relStats[rid]->u[c] - relStats[rid]->l[c] + 1, BIG_N);
-		bitmap[rid][c] = new uint64_t[N[rid][c] / 64+1]();
-
-		for (unsigned int r = 0; r < rows; r++) {
-			unsigned int cell = (columns[c][r]-relStats[rid]->l[c]) % N[rid][c];
-			if ((bitmap[rid][c][cell / 64] & (1LLU << (cell % 64)) ) == 0) {
-				relStats[rid]->d[c]++;
-				bitmap[rid][c][cell / 64] |= (1LLU << (cell % 64));
-			}
-		}
-	}
+void Optimizer::initializeRelation(unsigned int rid, RelationStats *stats) {
+	relStats[rid] = stats;
 }
 
-void Optimizer::filter() {
+void Optimizer::estimate_filters() {
 	for (unsigned int f = 0; f < parser.nfilters; f++) {
 		char cmp = parser.filters[f].cmp;
 		intField value = parser.filters[f].value;
@@ -156,11 +173,11 @@ void Optimizer::filter() {
 				continue;
 				}
 
-			unsigned int cell = (value - relStats[rel]->l[col]) % N[rel][col];
+			unsigned int cell = (value - relStats[rel]->l[col]) % relStats[rel]->N[col];
 			relStats[rel]->l[col] = value;
 			relStats[rel]->u[col] = value;
 
-			if (bitmap[rel][col][cell/64] & (1LLU<<(cell%64))) {
+			if (relStats[rel]->bitmap[col][cell/64] & (1LLU<<(cell%64))) {
 				relStats[rel]->f = ceil(float(relStats[rel]->f) / relStats[rel]->d[col]);
 				relStats[rel]->d[col]=1;
 			}
@@ -209,6 +226,12 @@ void Optimizer::filter() {
 		}
 	}
 }
+
+
+void Optimizer::estimate_eqColumns() {
+	//TODO
+}
+
 
 bool Optimizer::connected(int RId, string SIdStr) {
     /* linearly traversing the predicate list to check for connection between columns might not seem like optimal,

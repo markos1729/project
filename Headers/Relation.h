@@ -55,6 +55,7 @@ public:
     virtual unsigned int getSize() const = 0;
     virtual unsigned int getNumOfColumns() const = 0;
     virtual intField **getColumns() = 0;
+    virtual unsigned int getOnlyRelId() const = 0;
 protected:
 	bool *filterField(intField *field, unsigned int size, intField value, char cmp, unsigned int &count);
     bool *eqColumnsFields(intField *field1, intField *field2, unsigned int size, unsigned int &count);
@@ -75,6 +76,7 @@ public:
     unsigned int getNumOfColumns() const { return num_of_columns; }
     intField **getColumns() { return columns; }
     unsigned int getId() const { return id; }
+    unsigned int getOnlyRelId() const { return id; }
     void setId(unsigned int _id) { id = _id; }
     intField getValueAt(unsigned int columnNum, unsigned int rowId) const;
     bool addColumn(unsigned int col_num, const intField *values);
@@ -111,6 +113,7 @@ public:
     unsigned int getSize() const { return size; }
     unsigned int getNumOfColumns() const { return (numberOfRelations == 1) ? originalRelations.at(first_rel_id)->getNumOfColumns() : 0; }   // only used when Intermediate contains ONE relation
     intField **getColumns();
+    unsigned int getOnlyRelId() const { return (numberOfRelations == 1) ? first_rel_id : 9999999; }
     unsigned int *getRowIdsFor(unsigned int rel_id) { if ( containsRelation(rel_id) ) return rowids[rel_id]; else return NULL; }
     JoinRelation *extractJoinRelation(unsigned int rel_id, unsigned int col_id);
     IntermediateRelation *performJoinWithOriginal(const Relation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id);

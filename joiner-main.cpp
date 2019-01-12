@@ -73,6 +73,12 @@ int main(){
         }
     }
     delete fileList;
+    // Calculate statistics for all tables (once in the beginning!)
+    RelationStats **Rstats = new RelationStats *[Rlen];
+    for (int i = 0 ; i < Rlen ; i++){
+        Rstats[i] = new RelationStats(R[i]);
+        Rstats[i]->calculateStats();
+    }
     #ifdef PRINT_FEEDBACK_MESSAGES
     cout << "Loading done! Ready to accept queries." << endl << endl;
     #endif
@@ -158,20 +164,25 @@ int main(){
             //////////////////////////////
             /// Join Optimization here ///
             //////////////////////////////
+            // Initialize optimizer with pointers to the correct stats for each rel_id in the query
             Optimizer *optimizer = new Optimizer(*p);
             for (unsigned int i = 0; i < p->nrelations; i++) {   // all QueryRelations here are still only consisted by 1 original relation
                 CHECK( QueryRelations[i]->getNumOfColumns() > 0 , "Query Optimization Input Error: QueryRelation with more than one original relations?!",
                        for (int ii = 0 ; ii < p->nrelations; ii++) { if ( QueryRelations[ii] != NULL && QueryRelations[ii]->isIntermediate ) delete QueryRelations[ii]; } delete[] QueryRelations; delete p; abort = true; break; )
-                optimizer->initializeRelation(i, QueryRelations[i]->getSize(), QueryRelations[i]->getNumOfColumns(), QueryRelations[i]->getColumns());
+                optimizer->initializeRelation(i, Rstats[QueryRelations[i]->getOnlyRelId()]);
             }
-//            optimizer->filter();
+            // estimate filters
+            optimizer->estimate_filters();
+            // estimate equal columns
+            optimizer->estimate_eqColumns();
+            // estimate joins and come up with an optimal join-order plan according to assumptions
             int *bestJoinOrder = optimizer->best_plan();
             delete optimizer;
             if (abort) continue;
 
-            // And afterwards all the joins
+            // perform all joins in the order found best
             for (int i = 0 ; i < p->npredicates ; i++){
-                const predicate &predicate = p->predicates[bestJoinOrder[i]];   // in the order git from optimizer!
+                const predicate &predicate = p->predicates[bestJoinOrder[i]];   // in the order got from optimizer!
                 CHECK( (predicate.rela_id < p->nrelations && predicate.relb_id < p->nrelations), "SQL Error: SQL join predicate contains a relation that does not exist in \'FROM\'. Aborting query...",
                        for (int ii = 0 ; ii < p->nrelations; ii++) { if ( QueryRelations[ii] != NULL && QueryRelations[ii]->isIntermediate ) delete QueryRelations[ii]; } delete[] QueryRelations; delete p; abort = true; break; )
                 unsigned int rela_pos = find_rel_pos(QueryRelations, p->nrelations, predicate.rela_id);
@@ -211,7 +222,7 @@ int main(){
             if (abort) continue;
             CHECK( QueryRelations[0] != NULL, "Fatal error: Could not keep results to leftmost Intermediate QueryRelation (Should not happen). Please debug...",
                    for (int i = 0 ; i < p->nrelations; i++) { if ( QueryRelations[i] != NULL && QueryRelations[i]->isIntermediate ) delete QueryRelations[i]; } delete[] QueryRelations; delete p;
-                   for (unsigned int i = 0 ; i < Rlen ; i++ ) { delete R[i]; } delete[] R; delete scheduler; return -2; )
+                   for (int i = 0 ; i < Rlen ; i++ ) { delete Rstats[i]; delete R[i]; } delete[] Rstats; delete[] R; delete scheduler; return -2; )
 
             // Last but not least any cross-products left to do
             int lastpos = 0;
@@ -247,8 +258,10 @@ int main(){
     IOScheduler.waitUntilAllJobsHaveFinished();
     // cleanup
     for (unsigned int i = 0 ; i < Rlen ; i++ ) {
+        delete Rstats[i];
         delete R[i];
     }
+    delete[] Rstats;
     delete[] R;
     delete scheduler;
     return 0;

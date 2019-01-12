@@ -97,4 +97,4 @@ assert_objects_dir:
 	mkdir -p objects
 
 clean:
-	rm -f $(COMMON_OBJ) $(JOINER_OBJ) objects/radixhashjoin-main.o objects/test-main.o objects/test-joiner.o objects/test-radixhashjoin.o radixhashjoin joiner test-radixhashjoin test-joiner
+	rm -f $(COMMON_OBJ) $(JOINER_OBJ) objects/radixhashjoin-main.o objects/test-main.o objects/test-joiner.o objects/test-radixhashjoin.o objects/test-optimizer.o radixhashjoin joiner test-radixhashjoin test-joiner test-optimizer
