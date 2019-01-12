@@ -167,9 +167,7 @@ int main(){
             // Initialize optimizer with pointers to the correct stats for each rel_id in the query
             Optimizer *optimizer = new Optimizer(*p);
             for (unsigned int i = 0; i < p->nrelations; i++) {   // all QueryRelations here are still only consisted by 1 original relation
-                CHECK( QueryRelations[i]->getNumOfColumns() > 0 , "Query Optimization Input Error: QueryRelation with more than one original relations?!",
-                       for (int ii = 0 ; ii < p->nrelations; ii++) { if ( QueryRelations[ii] != NULL && QueryRelations[ii]->isIntermediate ) delete QueryRelations[ii]; } delete[] QueryRelations; delete p; abort = true; break; )
-                optimizer->initializeRelation(i, Rstats[QueryRelations[i]->getOnlyRelId()]);
+                optimizer->initializeRelation(i, Rstats[p->relations[i]]);   // (!) must map rel_id i to index of Rstats
             }
             // estimate filters
             optimizer->estimate_filters();

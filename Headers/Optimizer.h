@@ -23,54 +23,9 @@ struct RelationStats {
     unsigned int *N;    // bitmap size for each column
     uint64_t **bitmap;  // compact bitmap for each column
     ////////////////////////////////////////////////////////////////////////
-    explicit RelationStats(const Relation *_R);;
+    explicit RelationStats(const Relation *_R);
+    RelationStats(const RelationStats& relStats, bool keep_bitmap = false);
     ~RelationStats();
-
-    //TODO: need this?
-    explicit RelationStats(unsigned int num_of_columns, unsigned int _f) : R(NULL), ncol(num_of_columns), f(_f) {
-        l = new intField[ncol]();
-        u = new intField[ncol]();
-        d = new unsigned int[ncol]();
-        N = new unsigned int[ncol]();
-        bitmap = new uint64_t*[ncol]();   // init pointers to NULL (!)
-    };
-
-    //TODO: need this?
-    RelationStats(const RelationStats& relStats) : R(relStats.R), ncol(relStats.ncol), f(relStats.f) {
-        l = new intField[ncol];
-        u = new intField[ncol];
-        d = new unsigned int[ncol];
-        for (int i = 0; i < ncol; i++) {
-            l[i] = relStats.l[i];
-            u[i] = relStats.u[i];
-            d[i] = relStats.d[i];
-        }
-        // N, bitmap should not be used in objects created as such
-        N = NULL;
-        bitmap = NULL;
-    }
-
-    //TODO: need this?
-    RelationStats& operator= (const RelationStats& relStats) {
-        if(&relStats == this) return *this;
-        R = relStats.R;
-        f = relStats.f;
-        delete[] l;
-        l = new intField[R.getNumOfColumns()];
-        delete[] u;
-        u = new intField[R.getNumOfColumns()];
-        delete[] d;
-        d = new unsigned int[ncol];
-        for (int i = 0; i < ncol; i++) {
-            l[i] = relStats.l[i];
-            u[i] = relStats.u[i];
-            d[i] = relStats.d[i];
-        }
-        // N, bitmap should not be used in objects created as such
-        N = NULL;
-        bitmap = NULL;
-        return *this;
-    }
     bool calculateStats();
 #ifdef DDEBUG
     void printStats(int relId) {
@@ -111,9 +66,9 @@ public:
     explicit Optimizer(const SQLParser &_parser);
     ~Optimizer();
     void initializeRelation(unsigned int rid, RelationStats *stats);
-    void estimate_filters();
-    void estimate_eqColumns();
-    int *best_plan();
+    void estimate_filters();     // changes relStats accordingly
+    void estimate_eqColumns();   // changes relStats accordingly
+    int *best_plan();            // creates new relStats in JoinTrees
 #ifdef DDEBUG
     void printAllRelStats() {
         for (int i = 0; i < nrel; i++) {

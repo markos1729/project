@@ -16,13 +16,41 @@ RelationStats::RelationStats(const Relation *_R) : R(_R), ncol((_R != NULL) ?_R-
 
 }
 
+RelationStats::RelationStats(const RelationStats &relStats, bool keep_bitmap) : R((keep_bitmap) ? relStats.R : NULL), ncol(relStats.ncol), f(relStats.f) {
+	l = new intField[ncol];
+	u = new intField[ncol];
+	d = new unsigned int[ncol];
+	for (int i = 0; i < ncol; i++) {
+		l[i] = relStats.l[i];
+		u[i] = relStats.u[i];
+		d[i] = relStats.d[i];
+	}
+	if (keep_bitmap) {
+		N = new unsigned int[ncol];
+		bitmap = new uint64_t*[ncol];
+		for (int i = 0 ; i < ncol ; i++){
+			//TODO: Is this correct? N[i] or N[i] / 64 + 1?
+			N[i] = relStats.N[i];
+			bitmap[i] = new uint64_t[N[i] / 64 + 1]();
+			for (int j = 0; j < N[i] / 64 + 1 ; j++ ){
+				bitmap[i][j] = relStats.bitmap[i][j];
+			}
+		}
+	} else {
+		N = NULL;
+		bitmap = NULL;
+	}
+}
+
 RelationStats::~RelationStats() {
 	delete[] l;
 	delete[] u;
 	delete[] d;
-	for (unsigned int i = 0; i < ncol; i++) delete[] bitmap[i];
-	delete[] bitmap;
-	delete[] N;
+	if (bitmap != NULL /* && N != NULL */ ) {
+		for (unsigned int i = 0; i < ncol; i++) delete[] bitmap[i];
+		delete[] bitmap;
+		delete[] N;
+	}
 }
 
 bool RelationStats::calculateStats() {
@@ -45,7 +73,7 @@ bool RelationStats::calculateStats() {
 		this->d[c] = 0;
 
 		N[c] = MIN(this->u[c] - this->l[c] + 1, BIG_N);
-		bitmap[c] = new uint64_t[N[c] / 64+1]();
+		bitmap[c] = new uint64_t[N[c] / 64 + 1]();
 
 		for (unsigned int r = 0; r < R->getSize(); r++) {
 			unsigned int cell = (R->getValueAt(c, r) - this->l[c]) % N[c];
@@ -145,15 +173,19 @@ int Optimizer::JoinTree::bestJoinWithRel(const SQLParser &parser, unsigned int r
 
 /* Optimizer Implementation */
 Optimizer::Optimizer(const SQLParser &_parser) : nrel(_parser.nrelations), parser(_parser) {
-    relStats = new RelationStats*[nrel];
+    relStats = new RelationStats*[nrel]();   // init to NULL (!)
 }
 
 Optimizer::~Optimizer() {
+	for (int i = 0 ; i < nrel ; i++){
+		delete relStats[i];  // might be NULL if not initialized
+	}
 	delete[] relStats;
 }
 
 void Optimizer::initializeRelation(unsigned int rid, RelationStats *stats) {
-	relStats[rid] = stats;
+	if (stats == NULL || rid > nrel) { cerr << "Warning: invalid call of Optimizer::initializeRelation()" << endl; return; }
+	relStats[rid] = new RelationStats(*stats, true);  // keep bitmap = true -> copies bitmap
 }
 
 void Optimizer::estimate_filters() {
@@ -162,16 +194,16 @@ void Optimizer::estimate_filters() {
 		intField value = parser.filters[f].value;
 		unsigned int rel = parser.filters[f].rel_id;
 		unsigned int col = parser.filters[f].col_id;
-
 		unsigned int pF = relStats[rel]->f;
+
 		if (cmp == '=') {
 			//check if value is outside range [l,u] first
-			if (value<relStats[rel]->l[col] || value>relStats[rel]->u[col]) {
+			if (value < relStats[rel]->l[col] || value > relStats[rel]->u[col]) {
 				relStats[rel]->l[col] = value;
 				relStats[rel]->u[col] = value;
 				relStats[rel]->d[col] = relStats[rel]->f = 0;
 				continue;
-				}
+			}
 
 			unsigned int cell = (value - relStats[rel]->l[col]) % relStats[rel]->N[col];
 			relStats[rel]->l[col] = value;
@@ -184,22 +216,23 @@ void Optimizer::estimate_filters() {
 			else relStats[rel]->d[col] = relStats[rel]->f = 0;
 		}
 
-
 		/* some of the formulas below contain "uA - lA" at the denominator which cannot be right, right?
 		 * changed these to "uA - lA + 1" as is used elsewhere */
-		if (cmp == '<') {
+		else if (cmp == '<') {
 			if (value - 1 >= relStats[rel]->u[col]) continue;
 			relStats[rel]->d[col] = ceil(relStats[rel]->d[col] * float(value - relStats[rel]->l[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col] + 1));
 			relStats[rel]->f = ceil(relStats[rel]->f * float(value - relStats[rel]->l[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col] + 1));
 			relStats[rel]->u[col] = value - 1;
 		}
 			
-		if (cmp == '>') {
+		else if (cmp == '>') {
 			if (value + 1 <= relStats[rel]->l[col]) continue;
 			relStats[rel]->d[col] = ceil(relStats[rel]->d[col] * float(-value + relStats[rel]->u[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col] + 1));
-			relStats[rel]->f = ceil(relStats[rel]->f * float(- value + relStats[rel]->u[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col] + 1));
+			relStats[rel]->f = ceil(relStats[rel]->f * float(-value + relStats[rel]->u[col]) / (relStats[rel]->u[col] - relStats[rel]->l[col] + 1));
 			relStats[rel]->l[col] = value + 1;
 		}
+
+		else { cerr << "Warning: wrong cmp symbol in Optimizer::estimate_filters()" << endl; }
 		
 		for (unsigned int c = 0; c < relStats[rel]->ncol; c++) if (c != col) {
 			relStats[rel]->d[c] =ceil( relStats[rel]->d[c] * (1.0 - pow((1.0 - float(relStats[rel]->f) / pF), float(relStats[rel]->f) / relStats[rel]->d[c])));

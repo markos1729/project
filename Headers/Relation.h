@@ -53,9 +53,6 @@ public:
     virtual void performSelect(projection *projections, unsigned int nprojections) = 0;          // write select to stdout
     virtual void performSum(projection *projections, unsigned int nprojections) = 0;
     virtual unsigned int getSize() const = 0;
-    virtual unsigned int getNumOfColumns() const = 0;
-    virtual intField **getColumns() = 0;
-    virtual unsigned int getOnlyRelId() const = 0;
 protected:
 	bool *filterField(intField *field, unsigned int size, intField value, char cmp, unsigned int &count);
     bool *eqColumnsFields(intField *field1, intField *field2, unsigned int size, unsigned int &count);
@@ -74,9 +71,7 @@ public:
     ~Relation() override;
     unsigned int getSize() const { return size; }
     unsigned int getNumOfColumns() const { return num_of_columns; }
-    intField **getColumns() { return columns; }
     unsigned int getId() const { return id; }
-    unsigned int getOnlyRelId() const { return id; }
     void setId(unsigned int _id) { id = _id; }
     intField getValueAt(unsigned int columnNum, unsigned int rowId) const;
     bool addColumn(unsigned int col_num, const intField *values);
@@ -103,17 +98,11 @@ class IntermediateRelation : public QueryRelation {       // Intermediate Relati
     unsigned int numberOfRelations;                       // number of original Relations represented by this Intermediate Relation
     unordered_map<unsigned int, unsigned int *> rowids;   // a hash table map for: <key=relation_id, value=rowids_of_that_relation>
     unordered_map<unsigned int, const Relation *> originalRelations;  // a hash table map for: <key=relation_id, value=pointer to the original Relation for this relation_id>
-    // for optimizer:
-    const unsigned int first_rel_id;
-    intField **columns;    // collumns of first_rel_id ONLY! (!) will only be created once
 public:
     IntermediateRelation(unsigned int rel_id, unsigned int *_rowids, unsigned int _size, const Relation *original_rel);
     IntermediateRelation(unsigned int rela_id, unsigned int relb_id, unsigned int *_rowids_a, unsigned int *_rowids_b, unsigned int _size, const Relation *original_rel_a, const Relation *original_rel_b);
     ~IntermediateRelation() override;
     unsigned int getSize() const { return size; }
-    unsigned int getNumOfColumns() const { return (numberOfRelations == 1) ? originalRelations.at(first_rel_id)->getNumOfColumns() : 0; }   // only used when Intermediate contains ONE relation
-    intField **getColumns();
-    unsigned int getOnlyRelId() const { return (numberOfRelations == 1) ? first_rel_id : 9999999; }
     unsigned int *getRowIdsFor(unsigned int rel_id) { if ( containsRelation(rel_id) ) return rowids[rel_id]; else return NULL; }
     JoinRelation *extractJoinRelation(unsigned int rel_id, unsigned int col_id);
     IntermediateRelation *performJoinWithOriginal(const Relation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id);
