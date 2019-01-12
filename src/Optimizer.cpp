@@ -90,7 +90,7 @@ bool RelationStats::calculateStats() {
 /* JoinTree Implementation */
 Optimizer::JoinTree::JoinTree(unsigned int relId, RelationStats *relStats, unsigned int npredicates)
         : treeF(relStats->f), relStatsCreatedPtr(NULL), predsOrderIndex(0) {
-    relationsStats[relId] = relStats;
+    relationsStats[relId] = relStats;    // TODO: pointer or copy?
 	predsOrder = new int[npredicates]();
 	predsJoined = new bool[npredicates]();
 }
@@ -125,7 +125,7 @@ int Optimizer::JoinTree::bestJoinWithRel(const SQLParser &parser, unsigned int r
     unsigned int currF;
     unsigned int relaId, cola, colb, joinedRelaId;
     RelationStats *relaStats, *joinedRelaStats = NULL;
-	RelationStats *joinedRelbStats = relbStats;
+	RelationStats *joinedRelbStats = new RelationStats(*relbStats);  // TODO: cleanup leaks
     for (int i = 0; i < parser.npredicates; i++) {
         if (relationsStats.find(parser.predicates[i].rela_id) != relationsStats.end() && relbId == parser.predicates[i].relb_id) {      // rela is in tree and relbId is relb
         	relaId = parser.predicates[i].rela_id;
@@ -136,7 +136,10 @@ int Optimizer::JoinTree::bestJoinWithRel(const SQLParser &parser, unsigned int r
 			cola = parser.predicates[i].colb_id;
 			colb = parser.predicates[i].cola_id;
 		} else continue;
-		currF = ceil( float(treeF * relbStats->f) / (relbStats->u[colb] - relbStats->l[colb] + 1) );
+
+		//currF = ceil( float(treeF * relbStats->f) / (relbStats->u[colb] - relbStats->l[colb] + 1) );
+		currF = treeF * relbStats->f;               // estimate the worst
+
 		if (bestF == -1 || currF < bestF) {         // join at this column is the best join (yet)
 			relaStats = relationsStats[relaId];
 			delete joinedRelaStats;
@@ -234,7 +237,7 @@ void Optimizer::estimate_filters() {
 		else { cerr << "Warning: wrong cmp symbol in Optimizer::estimate_filters()" << endl; }
 		
 		for (unsigned int c = 0; c < relStats[rel]->ncol; c++) if (c != col) {
-			relStats[rel]->d[c] =ceil( relStats[rel]->d[c] * (1.0 - pow((1.0 - float(relStats[rel]->f) / pF), float(relStats[rel]->f) / relStats[rel]->d[c])));
+			relStats[rel]->d[c] = ceil( relStats[rel]->d[c] * (1.0 - pow((1.0 - float(relStats[rel]->f) / pF), float(relStats[rel]->f) / relStats[rel]->d[c])));
 		}
 	}
 		
@@ -322,6 +325,10 @@ int *Optimizer::best_plan() {
 	int *bestJoinOrder = new int[parser.npredicates];
 	string bestTreeIdStr(nrel, '1');
 	currTree = BestTree[bestTreeIdStr];
+#ifdef DDEBUG
+	cout << "Stats after Join Enumeration: " << endl;
+	this->printAllRelStats();
+#endif
 	for (unsigned int i = 0; i < parser.npredicates; i++) {
 		bestJoinOrder[i] = currTree->predsOrder[i];
 	}

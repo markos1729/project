@@ -25,7 +25,7 @@
 ///   COMPILE DEBUG CODE?   ///
 ///////////////////////////////
 
-//#define DDEBUG
+#define DDEBUG
 
 
 #endif
