@@ -29,7 +29,6 @@ RelationStats::RelationStats(const RelationStats &relStats, bool keep_bitmap) : 
 		N = new unsigned int[ncol];
 		bitmap = new uint64_t*[ncol];
 		for (int i = 0 ; i < ncol ; i++){
-			//TODO: Is this correct? N[i] or N[i] / 64 + 1?
 			N[i] = relStats.N[i];
 			bitmap[i] = new uint64_t[N[i] / 64 + 1]();
 			for (int j = 0; j < N[i] / 64 + 1 ; j++ ){

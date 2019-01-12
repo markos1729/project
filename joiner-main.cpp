@@ -176,7 +176,7 @@ int main(){
             // estimate joins and come up with an optimal join-order plan according to assumptions
             int *bestJoinOrder = optimizer->best_plan();
             delete optimizer;
-            if (abort) continue;
+
 
             // perform all joins in the order found best
             for (int i = 0 ; i < p->npredicates ; i++){
