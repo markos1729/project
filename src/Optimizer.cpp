@@ -1,5 +1,5 @@
 #include <cmath>
-#include <climits>
+#include <limits>
 #include <unordered_map>
 #include <algorithm>
 #include "../Headers/macros.h"
@@ -89,76 +89,81 @@ bool RelationStats::calculateStats() {
 
 /* JoinTree Implementation */
 Optimizer::JoinTree::JoinTree(unsigned int relId, RelationStats *relStats, unsigned int npredicates)
-        : treeF(relStats->f), relStatsCreatedPtr(NULL), predsOrderIndex(0) {
-    relationsStats[relId] = relStats;    // TODO: pointer or copy?
+        : treeF(relStats->f), predsOrderIndex(0) {
+    relationsStats[relId] = new RelationStats(*relStats, false);
 	predsOrder = new int[npredicates]();
 	predsJoined = new bool[npredicates]();
 }
 
-Optimizer::JoinTree::JoinTree(JoinTree *currBestTree, unsigned int relId, RelationStats *relStats, const SQLParser &parser)
-		: treeF(currBestTree->treeF), relStatsCreatedPtr(NULL), predsOrderIndex(currBestTree->predsOrderIndex) {
+Optimizer::JoinTree::JoinTree(JoinTree *currBestTree, unsigned int relId, const RelationStats *relStats, const SQLParser &parser)
+		: treeF(currBestTree->treeF), predsOrderIndex(currBestTree->predsOrderIndex) {
 	predsOrder = new int[parser.npredicates];
 	predsJoined = new bool[parser.npredicates];
 	for (int i = 0; i < parser.npredicates; i++) {
 		predsOrder[i] = currBestTree->predsOrder[i];
 		predsJoined[i] = currBestTree->predsJoined[i];
 	}
-	relationsStats = currBestTree->relationsStats;
-	int predJoined = bestJoinWithRel(parser, relId, relStats);
+	for (auto p = currBestTree->relationsStats.begin() ; p != currBestTree->relationsStats.end() ; p++){   // make hard copy
+        relationsStats[p->first] = new RelationStats(*p->second, false);   // copy of stats as well (!)
+	}
+	int predJoined = bestJoinWithRel(parser, relId, relStats);   // this will change this->relationsStats accordingly
 	CHECK( (predJoined > -1), "Error: tried to create Join Tree on non-connected relations", );
-    predsOrder[predsOrderIndex] = predJoined;
-    predsOrderIndex++;
+    predsOrder[predsOrderIndex++] = predJoined;
     predsJoined[predJoined] = true;
 }
 
 Optimizer::JoinTree::~JoinTree() {
-    delete relStatsCreatedPtr;
+    for (auto p = relationsStats.begin() ; p != relationsStats.end() ; p++){   // make hard copy
+        delete p->second;
+    }
 	delete[] predsOrder;
 	delete[] predsJoined;
 }
 
 /* Performs join between the JoinTree and the given relation using the best predicate (at the best column) according to the calculated stats.
  * It then updates JoinTree's stats and adds the new relation's stats to relationsStats */
-int Optimizer::JoinTree::bestJoinWithRel(const SQLParser &parser, unsigned int relbId, RelationStats *relbStats) {
+int Optimizer::JoinTree::bestJoinWithRel(const SQLParser &parser, unsigned int relbId, const RelationStats *relbStats) {
     int predJoined = -1;
-    int bestF = -1;
+    unsigned int bestF = std::numeric_limits<unsigned int>::max();
     unsigned int currF;
-    unsigned int relaId, cola, colb, joinedRelaId;
-    RelationStats *relaStats, *joinedRelaStats = NULL;
-	RelationStats *joinedRelbStats = new RelationStats(*relbStats);  // TODO: cleanup leaks
+    unsigned int relaId, cola, colb, joinedRelaId = 99999999;
+    const RelationStats *relaStats;
+    RelationStats *joinedRelaStats = NULL, *joinedRelbStats = new RelationStats(*relbStats);
     for (int i = 0; i < parser.npredicates; i++) {
         if (relationsStats.find(parser.predicates[i].rela_id) != relationsStats.end() && relbId == parser.predicates[i].relb_id) {      // rela is in tree and relbId is relb
         	relaId = parser.predicates[i].rela_id;
             cola = parser.predicates[i].cola_id;
             colb = parser.predicates[i].colb_id;
-		} else if (relationsStats.find(parser.predicates[i].relb_id) != relationsStats.end() && relbId == parser.predicates[i].rela_id) {    // reverse rela and relb so that the follwing code remains the same
+		} else if (relationsStats.find(parser.predicates[i].relb_id) != relationsStats.end() && relbId == parser.predicates[i].rela_id) {    // reverse rela and relb so that the following code remains the same
 			relaId = parser.predicates[i].relb_id;
 			cola = parser.predicates[i].colb_id;
 			colb = parser.predicates[i].cola_id;
 		} else continue;
 
+        /// CHOOSE STATISTIC FOR f
 		//currF = ceil( float(treeF * relbStats->f) / (relbStats->u[colb] - relbStats->l[colb] + 1) );
 		currF = treeF * relbStats->f;               // estimate the worst
 
-		if (bestF == -1 || currF < bestF) {         // join at this column is the best join (yet)
+
+		if (bestF == std::numeric_limits<unsigned int>::max() || currF < bestF) {         // join at this column is the best join (yet)
 			relaStats = relationsStats[relaId];
-			delete joinedRelaStats;
-			joinedRelaStats = new RelationStats(*relaStats);
+			delete joinedRelaStats;                // the first time this will be NULL - it's ok
+			joinedRelaStats = new RelationStats(*relaStats, false);
 			joinedRelaId = relaId;
 			// update stats for joined columns
 			bestF = joinedRelaStats->f = joinedRelbStats->f = currF;
-			joinedRelaStats->l[cola] = joinedRelbStats->l[colb] = MAX(joinedRelaStats->l[cola], joinedRelbStats->l[colb]);
-			joinedRelaStats->u[cola] = joinedRelbStats->u[colb] = MIN(joinedRelaStats->u[cola], joinedRelbStats->u[colb]);
-			joinedRelaStats->d[cola] = joinedRelbStats->d[colb] = ceil( float(relaStats->d[cola] * relbStats->d[colb]) / (joinedRelaStats->u[colb] - joinedRelbStats->l[colb] + 1) );
+			joinedRelaStats->l[cola] = joinedRelbStats->l[colb] = MAX(relaStats->l[cola], relbStats->l[colb]);
+			joinedRelaStats->u[cola] = joinedRelbStats->u[colb] = MIN(relaStats->u[cola], relbStats->u[colb]);
+			joinedRelaStats->d[cola] = joinedRelbStats->d[colb] = ceil( float(relaStats->d[cola] * relbStats->d[colb]) / (joinedRelaStats->u[colb] - joinedRelbStats->l[colb] + 1.0) );
 			// update stats for the other columns:
 			for (int c = 0; c < joinedRelaStats->ncol; c++) {
 				if (c == cola) continue;
-				joinedRelaStats->d[c] = relaStats->d[c] * ceil( (1 - pow((1 - joinedRelaStats->d[cola] / float(relaStats->d[cola])), float(joinedRelaStats->f) / relaStats->d[c]) ) );
+				joinedRelaStats->d[c] = relaStats->d[c] * ceil( (1 - pow((1.0 - joinedRelaStats->d[cola] / float(relaStats->d[cola])), float(joinedRelaStats->f) / relaStats->d[c]) ) );
 				if (joinedRelaStats->d[c] == 0 && currF > 0) joinedRelaStats->d[c] = 1;
 			}
 			for (int c = 0; c < joinedRelbStats->ncol; c++) {
 				if (c == colb) continue;
-				joinedRelbStats->d[c] = relbStats->d[c] * ceil( (1 - pow((1 - joinedRelbStats->d[colb] / float(relbStats->d[colb])), float(joinedRelbStats->f) / relbStats->d[c]) ) );
+				joinedRelbStats->d[c] = relbStats->d[c] * ceil( (1 - pow((1.0 - joinedRelbStats->d[colb] / float(relbStats->d[colb])), float(joinedRelbStats->f) / relbStats->d[c]) ) );
                 if (joinedRelbStats->d[c] == 0 && currF > 0) joinedRelbStats->d[c] = 1;
 			}
 			predJoined = i;
@@ -166,9 +171,14 @@ int Optimizer::JoinTree::bestJoinWithRel(const SQLParser &parser, unsigned int r
     }
 	CHECK( (predJoined > -1), "Error: bestJoinWithRel() failed to join at all", return -1;);
     treeF = bestF;
-	relationsStats[joinedRelaId] = joinedRelaStats;
+#ifdef DDEBUG
+    if ( relationsStats.find(joinedRelaId) ==  relationsStats.end() ) {
+        cerr << "JoinedRelaId not in relationStats!!!" << endl;   // should not happen
+    }
+#endif
+    delete relationsStats[joinedRelaId];
+    relationsStats[joinedRelaId] = joinedRelaStats;
 	relationsStats[relbId] = joinedRelbStats;
-    relStatsCreatedPtr = joinedRelaStats;
     return predJoined;
 }
 
@@ -256,7 +266,7 @@ void Optimizer::estimate_eqColumns() {
 
 		relStats[rela]->l[cola] = relStats[rela]->l[colb] = MAX(relStats[rela]->l[cola], relStats[rela]->l[colb]);
 		relStats[rela]->u[cola] = relStats[rela]->u[colb] = MIN(relStats[rela]->u[cola], relStats[rela]->u[colb]);
-		relStats[rela]->f = ceil(float(relStats[rela]->f) / (relStats[rela]->u[cola] - relStats[rela]->l[cola] + 1));
+		relStats[rela]->f = ceil(float(relStats[rela]->f) / (relStats[rela]->u[cola] - relStats[rela]->l[cola] + 1));   // TODO: use d instead?
 		relStats[rela]->d[cola] = relStats[rela]->d[colb] = ceil(relStats[rela]->d[cola] * (1.0 - pow((1.0 - float(relStats[rela]->f) / pF), float(pF) / relStats[rela]->d[cola]) ));
 		
 		for (unsigned int c = 0; c < relStats[rela]->ncol; c++) if (c != cola && c != colb) {

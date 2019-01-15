@@ -117,6 +117,8 @@ int main(){
             }
             cout << endl << endl;
 
+            delete[] bestJoinOrder;
+
             // cleanup
             for (int i = 1 ; i < p->nrelations; i++){   // (!) DO NOT delete QueryRelations[0] as this will be cleaned up after the IOJob scheduled has finished
                 if ( QueryRelations[i] != NULL && QueryRelations[i]->isIntermediate ) delete QueryRelations[i];

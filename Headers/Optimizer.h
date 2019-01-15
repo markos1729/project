@@ -51,15 +51,15 @@ class Optimizer {
     public:
         unsigned int treeF;
         unordered_map<unsigned int, RelationStats*> relationsStats;
-        RelationStats* relStatsCreatedPtr;      // used for its deletion
+        // used for its deletion
         int *predsOrder;
         int predsOrderIndex;
         bool *predsJoined;
 
         JoinTree(unsigned int relId, RelationStats *relStats, unsigned int npredicates);
-        JoinTree(JoinTree *currBestTree, unsigned int relId, RelationStats *relStats, const SQLParser &parser);
+        JoinTree(JoinTree *currBestTree, unsigned int relId, const RelationStats *relStats, const SQLParser &parser);
         ~JoinTree();
-        int bestJoinWithRel(const SQLParser &parser, unsigned int relbId, RelationStats *relbStats);
+        int bestJoinWithRel(const SQLParser &parser, unsigned int relbId, const RelationStats *relbStats);
     };
 
 public:
