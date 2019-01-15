@@ -240,7 +240,10 @@ void Optimizer::estimate_filters() {
 			relStats[rel]->d[c] = ceil( relStats[rel]->d[c] * (1.0 - pow((1.0 - float(relStats[rel]->f) / pF), float(relStats[rel]->f) / relStats[rel]->d[c])));
 		}
 	}
-		
+}
+
+
+void Optimizer::estimate_eqColumns() {
 	for (unsigned int p=0; p<parser.npredicates; p++) {
 		unsigned int rela = parser.predicates[p].rela_id;
 		unsigned int relb = parser.predicates[p].relb_id;
@@ -260,11 +263,6 @@ void Optimizer::estimate_filters() {
 			relStats[rela]->d[c] = ceil(relStats[rela]->d[c] * (1.0 - pow((1.0 - float(relStats[rela]->f) / pF), float(relStats[rela]->f) / relStats[rela]->d[c]) ));
 		}
 	}
-}
-
-
-void Optimizer::estimate_eqColumns() {
-	//TODO
 }
 
 
