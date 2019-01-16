@@ -50,8 +50,10 @@ class Optimizer {
     class JoinTree {
     public:
         unsigned int treeF;
-        unordered_map<unsigned int, RelationStats*> relationsStats;
-        // used for its deletion
+        unordered_map<unsigned int, const RelationStats*> relationsStats;
+
+        const RelationStats *allocated1, *allocated2;   // only used for deletion
+
         int *predsOrder;
         int predsOrderIndex;
         bool *predsJoined;

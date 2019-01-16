@@ -89,14 +89,14 @@ bool RelationStats::calculateStats() {
 
 /* JoinTree Implementation */
 Optimizer::JoinTree::JoinTree(unsigned int relId, RelationStats *relStats, unsigned int npredicates)
-        : treeF(relStats->f), predsOrderIndex(0) {
-    relationsStats[relId] = new RelationStats(*relStats, false);
+        : treeF(relStats->f), predsOrderIndex(0), allocated1(NULL), allocated2(NULL) {
+    relationsStats[relId] = relStats;                           // pointer to previous stats (read only)
 	predsOrder = new int[npredicates]();
 	predsJoined = new bool[npredicates]();
 }
 
 Optimizer::JoinTree::JoinTree(JoinTree *currBestTree, unsigned int relId, const RelationStats *relStats, const SQLParser &parser)
-		: treeF(currBestTree->treeF), predsOrderIndex(currBestTree->predsOrderIndex) {
+		: treeF(currBestTree->treeF), predsOrderIndex(currBestTree->predsOrderIndex), allocated1(NULL), allocated2(NULL) {
 	predsOrder = new int[parser.npredicates];
 	predsJoined = new bool[parser.npredicates];
 	for (int i = 0; i < parser.npredicates; i++) {
@@ -104,7 +104,7 @@ Optimizer::JoinTree::JoinTree(JoinTree *currBestTree, unsigned int relId, const 
 		predsJoined[i] = currBestTree->predsJoined[i];
 	}
 	for (auto p = currBestTree->relationsStats.begin() ; p != currBestTree->relationsStats.end() ; p++){   // make hard copy
-        relationsStats[p->first] = new RelationStats(*p->second, false);   // copy of stats as well (!)
+        relationsStats[p->first] = p->second;                    // pointer to previous stats (read only)
 	}
 	int predJoined = bestJoinWithRel(parser, relId, relStats);   // this will change this->relationsStats accordingly
 	CHECK( (predJoined > -1), "Error: tried to create Join Tree on non-connected relations", );
@@ -113,9 +113,8 @@ Optimizer::JoinTree::JoinTree(JoinTree *currBestTree, unsigned int relId, const 
 }
 
 Optimizer::JoinTree::~JoinTree() {
-    for (auto p = relationsStats.begin() ; p != relationsStats.end() ; p++){   // make hard copy
-        delete p->second;
-    }
+    delete allocated1;
+    delete allocated2;
 	delete[] predsOrder;
 	delete[] predsJoined;
 }
@@ -176,9 +175,11 @@ int Optimizer::JoinTree::bestJoinWithRel(const SQLParser &parser, unsigned int r
     }
 	CHECK( (predJoined > -1), "Error: bestJoinWithRel() failed to join at all", return -1;);
     treeF = bestF;
-    delete relationsStats[joinedRelaId];
-    relationsStats[joinedRelaId] = joinedRelaStats;
+    relationsStats[joinedRelaId] = joinedRelaStats;   // previous relationsStats[joinedRelaId] was read-only and should not be deleted here
 	relationsStats[relbId] = joinedRelbStats;
+    // save addresses for future deletion
+	allocated1 = joinedRelaStats;
+    allocated2 = joinedRelbStats;
     return predJoined;
 }
 
