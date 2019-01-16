@@ -94,16 +94,8 @@ int main(){
             for (unsigned int i = 0; i < p->nrelations; i++) {   // all QueryRelations here are still only consisted by 1 original relation
                 optimizer->initializeRelation(i, Rstats[p->relations[i]]);   // (!) must map rel_id i to index of Rstats
             }
-#ifdef DDEBUG
-            cout << "stats before filters:" << endl;
-            optimizer->printAllRelStats();
-#endif
             // estimate filters
             optimizer->estimate_filters();
-#ifdef DDEBUG
-            cout << "Stats after filters:" << endl;
-            optimizer->printAllRelStats();
-#endif
             // estimate equal columns
             optimizer->estimate_eqColumns();
             // estimate joins and come up with an optimal join-order plan according to assumptions

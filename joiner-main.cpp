@@ -160,7 +160,7 @@ int main(){
             }
             if (abort) continue;
 
-
+#ifdef DO_QUERY_OPTIMIZATION
             //////////////////////////////
             /// Join Optimization here ///
             //////////////////////////////
@@ -176,11 +176,15 @@ int main(){
             // estimate joins and come up with an optimal join-order plan according to assumptions
             int *bestJoinOrder = optimizer->best_plan();
             delete optimizer;
-
+#endif
 
             // perform all joins in the order found best
             for (int i = 0 ; i < p->npredicates ; i++){
+#ifdef DO_QUERY_OPTIMIZATION
                 const predicate &predicate = p->predicates[bestJoinOrder[i]];   // in the order got from optimizer!
+#else
+                const predicate &predicate = p->predicates[i];
+#endif
                 CHECK( (predicate.rela_id < p->nrelations && predicate.relb_id < p->nrelations), "SQL Error: SQL join predicate contains a relation that does not exist in \'FROM\'. Aborting query...",
                        for (int ii = 0 ; ii < p->nrelations; ii++) { if ( QueryRelations[ii] != NULL && QueryRelations[ii]->isIntermediate ) delete QueryRelations[ii]; } delete[] QueryRelations; delete p; abort = true; break; )
                 unsigned int rela_pos = find_rel_pos(QueryRelations, p->nrelations, predicate.rela_id);
@@ -216,7 +220,9 @@ int main(){
                            QueryRelations[rela_pos] = prev; )
                 }
             }
+#ifdef DO_QUERY_OPTIMIZATION
             delete[] bestJoinOrder;
+#endif
             if (abort) continue;
             CHECK( QueryRelations[0] != NULL, "Fatal error: Could not keep results to leftmost Intermediate QueryRelation (Should not happen). Please debug...",
                    for (int i = 0 ; i < p->nrelations; i++) { if ( QueryRelations[i] != NULL && QueryRelations[i]->isIntermediate ) delete QueryRelations[i]; } delete[] QueryRelations; delete p;

@@ -139,14 +139,19 @@ int Optimizer::JoinTree::bestJoinWithRel(const SQLParser &parser, unsigned int r
 			cola = parser.predicates[i].colb_id;
 			colb = parser.predicates[i].cola_id;
 		} else continue;
+        relaStats = relationsStats[relaId];
 
-        /// CHOOSE STATISTIC FOR f
-		//currF = ceil( float(treeF * relbStats->f) / (relbStats->u[colb] - relbStats->l[colb] + 1) );
-		currF = treeF * relbStats->f;               // estimate the worst
-
+#if JOIN_STATS_FOR_F == 0                          // Cartesian Product
+        currF = treeF * relbStats->f;
+#elif JOIN_STATS_FOR_F == 1                        // Divide by u - l + 1
+        currF = ceil( float(treeF * relbStats->f) / (MIN(relaStats->u[cola], relbStats->u[colb]) - (MAX(relaStats->l[cola], relbStats->l[colb])) + 1) );
+#elif JOIN_STATS_FOR_F == 2                        // Divide by d (Recommended)
+        currF = ceil( float(treeF * relbStats->f) / (MAX(relaStats->d[cola], relbStats->d[colb] )) );
+#else                                              // default: divide by d
+        currF = ceil( float(treeF * relbStats->f) / (MAX(relaStats->d[cola], relbStats->d[colb] )) );
+#endif
 
 		if (bestF == std::numeric_limits<unsigned int>::max() || currF < bestF) {         // join at this column is the best join (yet)
-			relaStats = relationsStats[relaId];
 			delete joinedRelaStats;                // the first time this will be NULL - it's ok
 			joinedRelaStats = new RelationStats(*relaStats, false);
 			joinedRelaId = relaId;
@@ -171,11 +176,6 @@ int Optimizer::JoinTree::bestJoinWithRel(const SQLParser &parser, unsigned int r
     }
 	CHECK( (predJoined > -1), "Error: bestJoinWithRel() failed to join at all", return -1;);
     treeF = bestF;
-#ifdef DDEBUG
-    if ( relationsStats.find(joinedRelaId) ==  relationsStats.end() ) {
-        cerr << "JoinedRelaId not in relationStats!!!" << endl;   // should not happen
-    }
-#endif
     delete relationsStats[joinedRelaId];
     relationsStats[joinedRelaId] = joinedRelaStats;
 	relationsStats[relbId] = joinedRelbStats;
@@ -291,12 +291,18 @@ bool Optimizer::connected(int RId, string SIdStr) {
 int *Optimizer::best_plan() {
 	unordered_map<string, class JoinTree*> BestTree;
 	JoinTree *currTree;
+#ifdef DDEBUG
+    cout << "> best_plan_stats: " << endl;
+#endif
 	for (unsigned int i = 0; i < nrel; i++) {
 		string RIdStr(nrel, '0');
 		RIdStr[i] = '1';
 		// e.g. RIdStr for rel 2 with nrel=4 would be "0010" (relIds start from 0)
 		currTree = new JoinTree(i, relStats[i], parser.npredicates);
 		BestTree[RIdStr] = currTree;
+#ifdef DDEBUG
+		//cout << RIdStr << ": f = " << currTree->treeF << endl;
+#endif
 	}
 	for (unsigned int i = 1; i < nrel; i++) {
 		string SIdStr(nrel - i, '0');
@@ -305,14 +311,20 @@ int *Optimizer::best_plan() {
 		do {	// get all treeIdStr permutations with exactly i '1's
 		    if (BestTree[SIdStr] == NULL) continue;
 			currTree = NULL;
+            unordered_map<string, unsigned int> usedTreeF;     // the parent's SIdStr's TreeF used to get newSIdStr -> we can get the same NewSIdStr from different parents SIdStrs with different TreeFs
 			for (unsigned int j = 0; j < nrel; j++) {
 				// if R[j] is included in S or is not to be joined with S, continue
 				if ( SIdStr[j] == '1' || !connected(j, SIdStr) ) continue;
 				currTree = new JoinTree(BestTree[SIdStr], j, relStats[j], parser);
 				string newSIdStr = SIdStr;
 				newSIdStr[j] = '1';
+#ifdef DDEBUG
+				cout << "Candidate for " << newSIdStr << " from " << SIdStr << ": f = " << currTree->treeF << endl;
+#endif
 				// if there's no BestTree yet for newS or its cost is greater than currTree
-				if ( BestTree.find(newSIdStr) == BestTree.end() || BestTree[newSIdStr]->treeF > currTree->treeF) {
+				if ( BestTree.find(newSIdStr) == BestTree.end() || BestTree[newSIdStr]->treeF > currTree->treeF ||
+				   ( BestTree[newSIdStr]->treeF == currTree->treeF && (usedTreeF.find(newSIdStr) == usedTreeF.end() || usedTreeF[newSIdStr] > BestTree[SIdStr]->treeF )) ) {
+                    usedTreeF[newSIdStr] = BestTree[SIdStr]->treeF;
 				    delete BestTree[newSIdStr];
 					BestTree[newSIdStr] = currTree;
 				} else {
@@ -334,8 +346,20 @@ int *Optimizer::best_plan() {
 	string bestTreeIdStr(nrel, '1');
 	currTree = BestTree[bestTreeIdStr];
 #ifdef DDEBUG
-	cout << "Stats after Join Enumeration: " << endl;
-	this->printAllRelStats();
+	for (unordered_map<string, class JoinTree*>::const_iterator p = BestTree.begin() ; p != BestTree.end() ; p++){
+        if (p->second == NULL) continue;
+        cout << p->first << ": f = " << p->second->treeF << endl << "  best order: ";
+        for (int i = 0 ; i < MIN(p->second->predsOrderIndex, nrel) ; i++){
+            cout << p->second->predsOrder[i] << " ";
+        }
+        cout << endl;
+	}
+	///////////////////////////////////////////////
+    cout << "BEST: " << bestTreeIdStr << ": f = " << currTree->treeF << endl << "  best order: ";
+    for (int i = 0 ; i < MIN(currTree->predsOrderIndex, nrel) ; i++){
+        cout << currTree->predsOrder[i] << " ";
+    }
+    cout << endl;
 #endif
 	for (unsigned int i = 0; i < parser.npredicates; i++) {
 		bestJoinOrder[i] = currTree->predsOrder[i];
