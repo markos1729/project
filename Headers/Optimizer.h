@@ -65,7 +65,7 @@ class Optimizer {
 public:
     explicit Optimizer(const SQLParser &_parser);
     ~Optimizer();
-    void initializeRelation(unsigned int rid, RelationStats *stats);
+    void initializeRelation(unsigned int rid, const RelationStats *stats);
     void estimate_filters();     // changes relStats accordingly
     void estimate_eqColumns();   // changes relStats accordingly
     int *best_plan();            // creates new relStats in JoinTrees

@@ -25,6 +25,7 @@
 ///    QUERY OPTIMIZATION   ///
 ///////////////////////////////
 #define DO_QUERY_OPTIMIZATION      // use optimization or not?
+#define PARALLEL_OPTIMIZATION      // run Query Optimization an a different thread while the main thread executes FROM and filters & eq columns
 #define JOIN_STATS_FOR_F 2         // 0 -> Cartesian Product | 1 -> Divide by u - l + 1 (NOT Recommended) | 2 -> Divide by MAX(dA, dB) (Recommended)
 
 

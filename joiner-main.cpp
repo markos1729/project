@@ -42,6 +42,17 @@ public:
     bool run();
 };
 
+#if defined(DO_QUERY_OPTIMIZATION) && defined(PARALLEL_OPTIMIZATION)
+class OptimizeJob : public Job {
+    const SQLParser &parser;
+    int **bestJoinOrder;
+    const RelationStats **Rstats;
+public:
+    OptimizeJob(const SQLParser &p, int **_bestJoinOrder, const RelationStats **_Rstats) : Job(), parser(p), bestJoinOrder(_bestJoinOrder), Rstats(_Rstats) {}
+    bool run();
+};
+#endif
+
 
 int main(){
     #ifdef PRINT_FEEDBACK_MESSAGES
@@ -84,7 +95,10 @@ int main(){
     #endif
     // initing JobScheduler
     scheduler = new JobScheduler();
-    JobScheduler IOScheduler(1);             // make a new Scheduler only for IO with 1 thread in order not to waste CPU cycles
+    JobScheduler IOScheduler(1);             // a new Scheduler for printing results so that the main-thread can move onto the next query
+    #if defined(DO_QUERY_OPTIMIZATION) && defined(PARALLEL_OPTIMIZATION)
+    JobScheduler OptimizationScheduler(1);   // a new Scheduler for running Query Optimization for joins parallel to actually performing filters & eq columns
+    #endif
     // then start parsing 'sql' statements
     #ifdef PRINT_FEEDBACK_MESSAGES
     unsigned int count = 0;
@@ -105,6 +119,14 @@ int main(){
             // Parse line as an SQL-like statement
             SQLParser *p = new SQLParser(currStatement.c_str());
             CHECK( p->relations != NULL && p->projections != NULL , "Error: invalid query: \"" + currStatement + "\"", continue; )
+
+
+            #if defined(DO_QUERY_OPTIMIZATION) && defined(PARALLEL_OPTIMIZATION)
+            // all we need for query optimization in joins is the parser (the parsed SQL query)
+            // so schedule it to be done in parallel to FROM and filters & eq columns to win time
+            int *bestJoinOrder;
+            OptimizationScheduler.schedule(new OptimizeJob(*p, &bestJoinOrder, (const RelationStats **) Rstats));
+            #endif
 
             bool abort = false;
 
@@ -127,9 +149,13 @@ int main(){
                 }
             }
             delete[] seen_at;
-            if (abort) continue;
-
-
+            if (abort) {
+            #if defined(DO_QUERY_OPTIMIZATION) && defined(PARALLEL_OPTIMIZATION)
+                OptimizationScheduler.waitUntilAllJobsHaveFinished();
+                delete[] bestJoinOrder;
+                #endif
+                continue;
+            }
             // execute WHERE: filters > equal columns > joins (+ equal columns if they end up to be)
             // First, do filters
             for (int i = 0 ; i < p->nfilters ; i++){
@@ -142,7 +168,13 @@ int main(){
                 CHECK(QueryRelations[filter.rel_id] != NULL, "Error: Could not execute filter: " + to_string(filter.rel_id) + filter.cmp + to_string(filter.col_id),
                       QueryRelations[filter.rel_id] = prev; )  // restore prev
             }
-            if (abort) continue;
+            if (abort) {
+                #if defined(DO_QUERY_OPTIMIZATION) && defined(PARALLEL_OPTIMIZATION)
+                OptimizationScheduler.waitUntilAllJobsHaveFinished();
+                delete[] bestJoinOrder;
+                #endif
+                continue;
+            }
 
             // Then equal columns operations
             for (int i = 0 ; i < p->npredicates ; i++){
@@ -158,12 +190,18 @@ int main(){
                 }
                 // else if p->predicates[i].rela_id == p->predicates[i].relb_id -> ignore predicate
             }
-            if (abort) continue;
+            if (abort) {
+                #if defined(DO_QUERY_OPTIMIZATION) && defined(PARALLEL_OPTIMIZATION)
+                OptimizationScheduler.waitUntilAllJobsHaveFinished();
+                delete[] bestJoinOrder;
+                #endif
+                continue;
+            }
 
-#ifdef DO_QUERY_OPTIMIZATION
-            //////////////////////////////
-            /// Join Optimization here ///
-            //////////////////////////////
+            #if defined(DO_QUERY_OPTIMIZATION) && defined(PARALLEL_OPTIMIZATION)
+            // must make sure Optimization has finished before starting executing the joins
+            OptimizationScheduler.waitUntilAllJobsHaveFinished();  // bestJoinOrder will point to an int[] with the optimization's result when this unblocks
+            #elif defined(DO_QUERY_OPTIMIZATION)
             // Initialize optimizer with pointers to the correct stats for each rel_id in the query
             Optimizer *optimizer = new Optimizer(*p);
             for (unsigned int i = 0; i < p->nrelations; i++) {   // all QueryRelations here are still only consisted by 1 original relation
@@ -176,15 +214,15 @@ int main(){
             // estimate joins and come up with an optimal join-order plan according to assumptions
             int *bestJoinOrder = optimizer->best_plan();
             delete optimizer;
-#endif
+            #endif
 
             // perform all joins in the order found best
             for (int i = 0 ; i < p->npredicates ; i++){
-#ifdef DO_QUERY_OPTIMIZATION
+                #ifdef DO_QUERY_OPTIMIZATION
                 const predicate &predicate = p->predicates[bestJoinOrder[i]];   // in the order got from optimizer!
-#else
+                #else
                 const predicate &predicate = p->predicates[i];
-#endif
+                #endif
                 CHECK( (predicate.rela_id < p->nrelations && predicate.relb_id < p->nrelations), "SQL Error: SQL join predicate contains a relation that does not exist in \'FROM\'. Aborting query...",
                        for (int ii = 0 ; ii < p->nrelations; ii++) { if ( QueryRelations[ii] != NULL && QueryRelations[ii]->isIntermediate ) delete QueryRelations[ii]; } delete[] QueryRelations; delete p; abort = true; break; )
                 unsigned int rela_pos = find_rel_pos(QueryRelations, p->nrelations, predicate.rela_id);
@@ -301,3 +339,20 @@ bool IOJob::run() {
     cout.flush();    // (!) important for harness to work
     return true;
 }
+
+#if defined(DO_QUERY_OPTIMIZATION) && defined(PARALLEL_OPTIMIZATION)
+bool OptimizeJob::run(){
+    // Initialize optimizer with pointers to the correct stats for each rel_id in the query
+    Optimizer optimizer(parser);
+    for (unsigned int i = 0; i < parser.nrelations; i++) {   // all QueryRelations here are still only consisted by 1 original relation
+        optimizer.initializeRelation(i, Rstats[parser.relations[i]]);   // (!) must map rel_id i to index of Rstats
+    }
+    // estimate filters
+    optimizer.estimate_filters();
+    // estimate equal columns
+    optimizer.estimate_eqColumns();
+    // estimate joins and come up with an optimal join-order plan according to assumptions
+    (*bestJoinOrder) = optimizer.best_plan();
+    return true;
+}
+#endif

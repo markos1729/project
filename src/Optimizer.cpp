@@ -195,7 +195,7 @@ Optimizer::~Optimizer() {
 	delete[] relStats;
 }
 
-void Optimizer::initializeRelation(unsigned int rid, RelationStats *stats) {
+void Optimizer::initializeRelation(unsigned int rid, const RelationStats *stats) {
 	if (stats == NULL || rid > nrel) { cerr << "Warning: invalid call of Optimizer::initializeRelation()" << endl; return; }
 	relStats[rid] = new RelationStats(*stats, true);  // keep bitmap = true -> copies bitmap
 }
