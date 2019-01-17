@@ -42,6 +42,13 @@ public:
     bool run();
 };
 
+class NULLIOJob : public Job {
+    unsigned int nprojections;
+public:
+    NULLIOJob(unsigned int _nprojections) : Job(), nprojections(_nprojections) {}
+    bool run();
+};
+
 #if defined(DO_QUERY_OPTIMIZATION) && defined(PARALLEL_OPTIMIZATION)
 class OptimizeJob : public Job {
     const SQLParser &parser;
@@ -135,7 +142,7 @@ int main(){
             int *seen_at = new int[Rlen]();
             for (int i = 0 ; i < Rlen ; i++) seen_at[i] = -1;      // init to -1
             for (unsigned int i = 0; i < p->nrelations ; i++){
-                CHECK( p->relations[i] < Rlen, "SQL Error: SQL query contains non-existent Relation in \'FROM\'. Aborting query...", delete[] QueryRelations; delete p; abort = true; break; )
+                CHECK( p->relations[i] < Rlen, "SQL Error: SQL query contains non-existent Relation in \'FROM\'. Aborting query...", delete[] QueryRelations; abort = true; break; )
                 if ( seen_at[p->relations[i]] == -1 ) {
                     QueryRelations[i] = R[p->relations[i]];
                     R[p->relations[i]]->setId(i);                  // id of relations are in ascending order in 'FROM'
@@ -150,10 +157,11 @@ int main(){
             }
             delete[] seen_at;
             if (abort) {
-            #if defined(DO_QUERY_OPTIMIZATION) && defined(PARALLEL_OPTIMIZATION)
+                #if defined(DO_QUERY_OPTIMIZATION) && defined(PARALLEL_OPTIMIZATION)
                 OptimizationScheduler.waitUntilAllJobsHaveFinished();
                 delete[] bestJoinOrder;
                 #endif
+                delete p;
                 continue;
             }
             // execute WHERE: filters > equal columns > joins (+ equal columns if they end up to be)
@@ -162,17 +170,27 @@ int main(){
                 //FILTER
                 const filter &filter = p->filters[i];
                 CHECK( (filter.rel_id < p->nrelations), "SQL Error: SQL filter contains a relation that does not exist in \'FROM\'. Aborting query...",
-                       for (int ii = 0 ; ii < p->nrelations; ii++) { if ( QueryRelations[ii] != NULL && QueryRelations[ii]->isIntermediate ) delete QueryRelations[ii]; } delete[] QueryRelations; delete p; abort = true; break; )
+                       for (int ii = 0 ; ii < p->nrelations; ii++) { if ( QueryRelations[ii] != NULL && QueryRelations[ii]->isIntermediate ) delete QueryRelations[ii]; } delete[] QueryRelations; abort = true; break; )
                 QueryRelation *prev = QueryRelations[filter.rel_id];
                 QueryRelations[filter.rel_id] = QueryRelations[filter.rel_id]->performFilter(filter.rel_id, filter.col_id, filter.value, filter.cmp);
                 CHECK(QueryRelations[filter.rel_id] != NULL, "Error: Could not execute filter: " + to_string(filter.rel_id) + filter.cmp + to_string(filter.col_id),
                       QueryRelations[filter.rel_id] = prev; )  // restore prev
+                if (QueryRelations[filter.rel_id]->getSize() == 0) {            // if detected 0 sized QueryRelation then no point continuing since we know the result will be NULL
+                    IOScheduler.schedule(new NULLIOJob(p->nprojections));
+                    for (int ii = 0 ; ii < p->nrelations; ii++) {
+                        if ( QueryRelations[ii] != NULL && QueryRelations[ii]->isIntermediate ) delete QueryRelations[ii];
+                    }
+                    delete[] QueryRelations;
+                    abort = true;
+                    break;
+                }
             }
             if (abort) {
                 #if defined(DO_QUERY_OPTIMIZATION) && defined(PARALLEL_OPTIMIZATION)
                 OptimizationScheduler.waitUntilAllJobsHaveFinished();
                 delete[] bestJoinOrder;
                 #endif
+                delete p;
                 continue;
             }
 
@@ -182,11 +200,20 @@ int main(){
                     // EQUAL COLUMNS UNARY OPERATION
                     const predicate &predicate = p->predicates[i];
                     CHECK( (predicate.rela_id < p->nrelations), "SQL Error: SQL equal columns predicate on one relation that does not exist in \'FROM\'. Aborting query...",
-                           for (int ii = 0 ; ii < p->nrelations; ii++) { if ( QueryRelations[ii] != NULL && QueryRelations[ii]->isIntermediate ) delete QueryRelations[ii]; } delete[] QueryRelations; delete p; abort = true; break;)
+                           for (int ii = 0 ; ii < p->nrelations; ii++) { if ( QueryRelations[ii] != NULL && QueryRelations[ii]->isIntermediate ) delete QueryRelations[ii]; } delete[] QueryRelations; abort = true; break;)
                     QueryRelation *prev = QueryRelations[predicate.rela_id];
                     QueryRelations[predicate.rela_id] = QueryRelations[predicate.rela_id]->performEqColumns(predicate.rela_id, predicate.relb_id, predicate.cola_id, predicate.colb_id);
                     CHECK(QueryRelations[predicate.rela_id] != NULL, "Error: Could not execute equal columns: " + to_string(predicate.rela_id) + "." + to_string(predicate.cola_id) + "=" + to_string(predicate.relb_id) + "." + to_string(predicate.colb_id),
                           QueryRelations[predicate.rela_id] = prev; )  // restore prev
+                    if (QueryRelations[predicate.rela_id]->getSize() == 0) {            // if detected 0 sized QueryRelation then no point continuing since we know the result will be NULL
+                        IOScheduler.schedule(new NULLIOJob(p->nprojections));
+                        for (int ii = 0 ; ii < p->nrelations; ii++) {
+                            if ( QueryRelations[ii] != NULL && QueryRelations[ii]->isIntermediate ) delete QueryRelations[ii];
+                        }
+                        delete[] QueryRelations;
+                        abort = true;
+                        break;
+                    }
                 }
                 // else if p->predicates[i].rela_id == p->predicates[i].relb_id -> ignore predicate
             }
@@ -195,6 +222,7 @@ int main(){
                 OptimizationScheduler.waitUntilAllJobsHaveFinished();
                 delete[] bestJoinOrder;
                 #endif
+                delete p;
                 continue;
             }
 
@@ -224,7 +252,7 @@ int main(){
                 const predicate &predicate = p->predicates[i];
                 #endif
                 CHECK( (predicate.rela_id < p->nrelations && predicate.relb_id < p->nrelations), "SQL Error: SQL join predicate contains a relation that does not exist in \'FROM\'. Aborting query...",
-                       for (int ii = 0 ; ii < p->nrelations; ii++) { if ( QueryRelations[ii] != NULL && QueryRelations[ii]->isIntermediate ) delete QueryRelations[ii]; } delete[] QueryRelations; delete p; abort = true; break; )
+                       for (int ii = 0 ; ii < p->nrelations; ii++) { if ( QueryRelations[ii] != NULL && QueryRelations[ii]->isIntermediate ) delete QueryRelations[ii]; } delete[] QueryRelations; abort = true; break; )
                 unsigned int rela_pos = find_rel_pos(QueryRelations, p->nrelations, predicate.rela_id);
                 unsigned int relb_pos = find_rel_pos(QueryRelations, p->nrelations, predicate.relb_id);
                 CHECK( rela_pos != -1 && relb_pos != -1, "Warning: searched for a rel_id that was not found in QueryRelations! rela_id = " + ( (rela_pos == -1) ? to_string(predicate.rela_id) : "OK") + " relb_id = " + ( (relb_pos == -1) ? to_string(predicate.relb_id) : "OK"), continue; )
@@ -250,18 +278,40 @@ int main(){
                             QueryRelations[rela_pos] = NULL;
                         }
                     }
+                    if (QueryRelations[(rela_pos < relb_pos) ? rela_pos : relb_pos] != NULL && QueryRelations[(rela_pos < relb_pos) ? rela_pos : relb_pos]->getSize() == 0) {            // if detected 0 sized QueryRelation then no point continuing since we know the result will be NULL
+                        IOScheduler.schedule(new NULLIOJob(p->nprojections));
+                        for (int ii = 0 ; ii < p->nrelations; ii++) {
+                            if ( QueryRelations[ii] != NULL && QueryRelations[ii]->isIntermediate ) delete QueryRelations[ii];
+                        }
+                        delete[] QueryRelations;
+                        abort = true;
+                        break;
+                    }
                 } else {   // (!) if two tables are joined two times then the first it will be join whilst the second time it will be an equal columns operation!
                     // EQUAL COLUMNS UNARY OPERATION (self join)
                     QueryRelation *prev = QueryRelations[rela_pos];   // (!) rela_id == relb_id
                     QueryRelations[rela_pos] = QueryRelations[rela_pos]->performEqColumns(predicate.rela_id, predicate.relb_id, predicate.cola_id, predicate.colb_id);
                     CHECK( QueryRelations[rela_pos] != NULL, "Error: Could not execute equal columns (self join): " + to_string(predicate.rela_id) + "." + to_string(predicate.cola_id) + "=" + to_string(predicate.relb_id) + "." + to_string(predicate.colb_id),
                            QueryRelations[rela_pos] = prev; )
+                    if (QueryRelations[rela_pos]->getSize() == 0) {            // if detected 0 sized QueryRelation then no point continuing since we know the result will be NULL
+                        IOScheduler.schedule(new NULLIOJob(p->nprojections));
+                        for (int ii = 0 ; ii < p->nrelations; ii++) {
+                            if ( QueryRelations[ii] != NULL && QueryRelations[ii]->isIntermediate ) delete QueryRelations[ii];
+                        }
+                        delete[] QueryRelations;
+                        abort = true;
+                        break;
+                    }
                 }
             }
 #ifdef DO_QUERY_OPTIMIZATION
             delete[] bestJoinOrder;
 #endif
-            if (abort) continue;
+            if (abort) {
+                delete p;
+                continue;
+            }
+
             CHECK( QueryRelations[0] != NULL, "Fatal error: Could not keep results to leftmost Intermediate QueryRelation (Should not happen). Please debug...",
                    for (int i = 0 ; i < p->nrelations; i++) { if ( QueryRelations[i] != NULL && QueryRelations[i]->isIntermediate ) delete QueryRelations[i]; } delete[] QueryRelations; delete p;
                    for (int i = 0 ; i < Rlen ; i++ ) { delete Rstats[i]; delete R[i]; } delete[] Rstats; delete[] R; delete scheduler; return -2; )
@@ -336,6 +386,13 @@ bool IOJob::run() {
     #else
     R->performSelect(projections, nprojections);
     #endif
+    cout.flush();    // (!) important for harness to work
+    return true;
+}
+
+bool NULLIOJob::run() {
+    for (unsigned int i = 0 ; i < nprojections - 1 ; i++) printf("NULL ");
+    printf("NULL\n");
     cout.flush();    // (!) important for harness to work
     return true;
 }
