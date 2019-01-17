@@ -1,17 +1,17 @@
-Files/r0
-Files/r1
-Files/r2
-Files/r3
-Files/r4
-Files/r5
-Files/r6
-Files/r7
-Files/r8
-Files/r9
-Files/r10
-Files/r11
-Files/r12
-Files/r13
+workloads/small/r0
+workloads/small/r1
+workloads/small/r2
+workloads/small/r3
+workloads/small/r4
+workloads/small/r5
+workloads/small/r6
+workloads/small/r7
+workloads/small/r8
+workloads/small/r9
+workloads/small/r10
+workloads/small/r11
+workloads/small/r12
+workloads/small/r13
 Done
 3 0 1|0.2=1.0&0.1=2.0&0.2>3499|1.2 0.1
 5 0|0.2=1.0&0.3=9881|1.1 0.2 1.0

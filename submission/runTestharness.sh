@@ -14,4 +14,4 @@ cd $WORKLOAD_DIR
 
 WORKLOAD=$(basename "$PWD")
 echo execute $WORKLOAD ...
-$DIR/harness *.init *.work *.result $DIR/run.sh
+$DIR/../harness/harness *.init *.work *.result ../../submission/run.sh
