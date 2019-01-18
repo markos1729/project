@@ -518,20 +518,32 @@ void Relation::performSum(projection *projections, unsigned int nprojections) {
 
 
 /* IntermediateRelation Implementation */
-IntermediateRelation::IntermediateRelation(unsigned int rel_id, unsigned int *_rowids, unsigned int _size, const Relation *original_rel) : QueryRelation(true), numberOfRelations(1), size(_size) {
+IntermediateRelation::IntermediateRelation(unsigned int rel_id, unsigned int *_rowids, unsigned int _size, const Relation *original_rel, unsigned int _maplength) : QueryRelation(true), numberOfRelations(1), size(_size), maplength(_maplength) {
+    CHECK( maplength > 0 ,"maplength = 0 in Intermediate constructor! Have you forgotten to set_nrelations in QueryRelation?", )
+    rowids = new unsigned int *[maplength];
+    originalRelations = new const Relation *[maplength];
+    for (unsigned int i = 0 ; i < maplength ; i++){
+        rowids[i] = NULL;
+        originalRelations[i] = NULL;
+    }
     if (size > 0) {
         unsigned int *column = new unsigned int[size];
         for (unsigned int i = 0; i < size; i++) {
             column[i] = _rowids[i];
         }
-        rowids.insert(make_pair(rel_id, column));
-    } else {
-        rowids.insert(make_pair(rel_id, (unsigned int *) NULL));
+        rowids[rel_id] = column;
     }
-    originalRelations.insert(make_pair(rel_id, original_rel));
+    originalRelations[rel_id] = original_rel;
 }
 
-IntermediateRelation::IntermediateRelation(unsigned int rela_id, unsigned int relb_id, unsigned int *_rowids_a, unsigned int *_rowids_b, unsigned int _size, const Relation *original_rel_a, const Relation *original_rel_b) : QueryRelation(true), numberOfRelations(2), size(_size) {
+IntermediateRelation::IntermediateRelation(unsigned int rela_id, unsigned int relb_id, unsigned int *_rowids_a, unsigned int *_rowids_b, unsigned int _size, const Relation *original_rel_a, const Relation *original_rel_b, unsigned int _maplength) : QueryRelation(true), numberOfRelations(2), size(_size), maplength(_maplength) {
+    CHECK( maplength > 0 ,"maplength = 0 in Intermediate constructor! Have you forgotten to set_nrelations in QueryRelation?", )
+    rowids = new unsigned int *[maplength];
+    originalRelations = new const Relation *[maplength];
+    for (unsigned int i = 0 ; i < maplength ; i++){
+        rowids[i] = NULL;
+        originalRelations[i] = NULL;
+    }
     if (size > 0) {
         unsigned int *column_a = new unsigned int[size];
         unsigned int *column_b = new unsigned int[size];
@@ -539,27 +551,26 @@ IntermediateRelation::IntermediateRelation(unsigned int rela_id, unsigned int re
             column_a[i] = _rowids_a[i];
             column_b[i] = _rowids_b[i];
         }
-        rowids.insert(make_pair(rela_id, column_a));
-        rowids.insert(make_pair(relb_id, column_b));
-    } else {
-        rowids.insert(make_pair(rela_id, (unsigned int *) NULL));
-        rowids.insert(make_pair(relb_id, (unsigned int *) NULL));
+        rowids[rela_id] = column_a;
+        rowids[relb_id] = column_b;
     }
-    originalRelations.insert(make_pair(rela_id, original_rel_a));
-    originalRelations.insert(make_pair(relb_id, original_rel_b));
+    originalRelations[rela_id] = original_rel_a;
+    originalRelations[relb_id] = original_rel_b;
 }
 
 IntermediateRelation::~IntermediateRelation() {
     if (size > 0) {
-        for (auto iter = rowids.begin(); iter != rowids.end(); iter++) {
-            delete[] iter->second;   // get unsigned int * from <unsigned int, unsigned int *> pair (!) if is necessary!
+        for (unsigned int i = 0 ; i < maplength ; i++){
+            delete[] rowids[i];        // some might be NULL
         }
     }
+    delete[] rowids;
+    delete[] originalRelations;
 }
 
 JoinRelation *IntermediateRelation::extractJoinRelation(unsigned int rel_id, unsigned int col_id) {
     // find rel_id's original Relation in R
-    const Relation *OriginalR = getOriginalRelationFor(rel_id);
+    const Relation *OriginalR = originalRelations[rel_id];
     CHECK(OriginalR != NULL, "Warning: rel_id invalid or originalRelations map corrupted in IntermediateRelation::extractJoinRelation()", return NULL; )
     // create intField for col_id
     intField *joinField = new intField[size];
@@ -577,11 +588,12 @@ JoinRelation *IntermediateRelation::extractJoinRelation(unsigned int rel_id, uns
 
 IntermediateRelation *IntermediateRelation::performFilter(unsigned int rel_id, unsigned int col_id, intField value, char cmp) {
     if (size <= 0) return this;
-    CHECK( rowids.find(rel_id) != rowids.end(), "Error: filter requested on intermediate for non existing relation", return NULL; )
+    CHECK( rel_id < maplength, "Invalid rel_id: smaller than maplength = nrelations!", return NULL; )
+    CHECK( rowids[rel_id] != NULL && originalRelations[rel_id] != NULL, "Error: filter requested on intermediate for non existing relation", return NULL; )
     // recreate intField to be filtered from rowids
     const unsigned int *fieldrowids = rowids[rel_id];
     intField *field = new intField[size];
-    const Relation *OriginalR = getOriginalRelationFor(rel_id);
+    const Relation *OriginalR = originalRelations[rel_id];
     CHECK(OriginalR != NULL, "Warning: rel_id invalid or originalRelations map corrupted in IntermediateRelation::performFilter()", delete[] field; return NULL; )
     for (int i = 0 ; i < size ; i++){
         field[i] = OriginalR->getValueAt(col_id, fieldrowids[i] - 1);   // (!) -1 because rowids start at 1
@@ -598,14 +610,15 @@ IntermediateRelation *IntermediateRelation::performFilter(unsigned int rel_id, u
 
 IntermediateRelation *IntermediateRelation::performEqColumns(unsigned int rela_id, unsigned int relb_id, unsigned int cola_id, unsigned int colb_id) {
     if (size <= 0) return this;
-    CHECK( rowids.find(rela_id) != rowids.end() && rowids.find(relb_id) != rowids.end(), "Error: equal columns requested on intermediate for non existing relation", return NULL; )
+    CHECK( rela_id < maplength && relb_id < maplength, "Invalid rela_id or relb_id: smaller than maplength = nrelations!", return NULL; )
+    CHECK( rowids[rela_id] != NULL && rowids[relb_id] != NULL && originalRelations[rela_id] != NULL && originalRelations[relb_id] != NULL, "Error: equal columns requested on intermediate for non existing relation", return NULL; )
     // recreate intFields to be checked for equal values from rowids
     const unsigned int *fieldrowids_a = rowids[rela_id];
     const unsigned int *fieldrowids_b = rowids[relb_id];
     intField *field1 = new intField[size];
     intField *field2 = new intField[size];
-    const Relation *OriginalRa = getOriginalRelationFor(rela_id);
-    const Relation *OriginalRb = getOriginalRelationFor(relb_id);
+    const Relation *OriginalRa = originalRelations[rela_id];
+    const Relation *OriginalRb = originalRelations[relb_id];
     CHECK(OriginalRa != NULL && OriginalRb != NULL, "Warning: rela_id or relb_id invalid or originalRelations map corrupted in IntermediateRelation::performEqColumns()", delete[] field1; delete[] field2; return NULL; )
     for (int i = 0 ; i < size ; i++){
         field1[i] = OriginalRa->getValueAt(cola_id, fieldrowids_a[i] - 1);   // (!) -1 because rowids start at 1
@@ -627,15 +640,17 @@ IntermediateRelation *IntermediateRelation::performJoinWith(QueryRelation &B, un
 }
 
 IntermediateRelation *IntermediateRelation::performJoinWithOriginal(const Relation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) {
+    CHECK( rela_id < maplength && relb_id < maplength, "Invalid rela_id or relb_id: smaller than maplength = nrelations!", return NULL; )
     if (size <= 0) {
         numberOfRelations++;
-        rowids[relb_id] = (unsigned int *) NULL;
-        originalRelations[relb_id] = &B;   // insert new original relation's address
+        originalRelations[relb_id] = &B;   // insert new original relation's address (previously NULL)
         return this;
     } else if (B.getSize() <= 0){
         // clear the old map
-        for (auto &p : rowids) { delete[] p.second; p.second = NULL; }
-        rowids.clear();
+        for (unsigned int i = 0 ; i < maplength ; i++){
+            delete[] rowids[i];            // some might already be NULL
+            rowids[i] = NULL;
+        }
         // change variables accordingly
         size = 0;
         numberOfRelations++;
@@ -655,10 +670,15 @@ IntermediateRelation *IntermediateRelation::performJoinWithOriginal(const Relati
 
     if (number_of_tuples > 0) {
         // create new rowids map
-        unordered_map<unsigned int, unsigned int *> new_rowids;
-        for (auto &p : rowids) {
-            new_rowids[p.first] = new unsigned int[number_of_tuples];
+        unsigned int **new_rowids = new unsigned int *[maplength];
+        for (unsigned int i = 0 ; i < maplength ; i++){
+            if (rowids[i] != NULL){
+                new_rowids[i] = new unsigned int[number_of_tuples];
+            } else {
+                new_rowids[i] = NULL;
+            }
         }
+        CHECK( new_rowids[relb_id] == NULL, "Warning: join with rel_id that is already a part of intermediate?", delete[] new_rowids[relb_id]; )
         new_rowids[relb_id] = new unsigned int[number_of_tuples];
 
         // based on previous and RHJ's results
@@ -668,27 +688,31 @@ IntermediateRelation *IntermediateRelation::performJoinWithOriginal(const Relati
             CHECK( aid > 0 && bid > 0, "WARNING: row id is zero in IntermediateRelation::performJoinWithOriginal()", )
             CHECK(pos < number_of_tuples, "Error: pos >= number_of_tuples", break; )
             CHECK(aid > 0 && aid <= size, "Error: aid out of bounds: aid = " + to_string(aid), break; )
-            for (auto &p : rowids) {
-                new_rowids[p.first][pos] = p.second[aid - 1];
+            for (unsigned int i = 0 ; i < maplength ; i++) {
+                if (rowids[i] != NULL) {
+                    new_rowids[i][pos] = rowids[i][aid - 1];
+                }
             }
             new_rowids[relb_id][pos] = bid;
             pos++; //current # of tuples
         }
 
-        // clear the old map
-        for (auto &p : rowids) delete[] p.second;
-        rowids.clear();
-
-        // and replace it with the new
-        rowids = new_rowids;  // slow copy of the whole struct. TODO: make rowids a pointer to heap? (is it worth it?)
+        // clear the old map and replace it with the new
+        for (unsigned int i = 0 ; i < maplength ; i++) {
+            delete[] rowids[i];            // some might be NULL
+            rowids[i] = new_rowids[i];
+        }
+        delete[] new_rowids;
 
         // change size accordingly
-        size = number_of_tuples;    // TODO: change size to unsigned long long int?
+        size = number_of_tuples;
 
     } else {
         // clear the old map
-        for (auto &p : rowids) { delete[] p.second; p.second = NULL; }
-        rowids.clear();
+        for (unsigned int i = 0 ; i < maplength ; i++){
+            delete[] rowids[i];            // some might be NULL
+            rowids[i] = NULL;
+        }
 
         // change size accordingly
         size = 0;
@@ -700,25 +724,36 @@ IntermediateRelation *IntermediateRelation::performJoinWithOriginal(const Relati
 }
 
 IntermediateRelation *IntermediateRelation::performJoinWithIntermediate(IntermediateRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) {
+    CHECK( rela_id < maplength && relb_id < maplength, "Invalid rela_id or relb_id: smaller than maplength = nrelations!", return NULL; )
     if (size <= 0) {
-        numberOfRelations += B.numberOfRelations;
-        for (auto &p: B.originalRelations){            // for every original relation in B
-            rowids[p.first] = (unsigned int *) NULL;
-            originalRelations[p.first] = p.second;   // insert new original relation's address to this
+        // clear the old map in B and add originalRelations in B to those in *this
+        for (unsigned int i = 0 ; i < maplength ; i++){
+            delete[] B.rowids[i];            // some might already be NULL
+            B.rowids[i] = NULL;
+            if ( B.originalRelations[i] != NULL ){
+                CHECK(originalRelations[i] == NULL, "Intermediate join with zero-sized intermediate have the same rel_id!", )
+                originalRelations[i] = B.originalRelations[i];
+            }
         }
+        // change variables accordingly
+        B.size = 0;
+        numberOfRelations += B.numberOfRelations;
         return this;
     } else if ( B.getSize() <= 0 ){
-        // clear the old map
-        for (auto &p : rowids) { delete[] p.second; p.second = NULL; }
-        rowids.clear();
+        // clear the old map and  add originalRelations in B to those in *this
+        for (unsigned int i = 0 ; i < maplength ; i++) {
+            delete[] rowids[i];    // some might be NULL
+            rowids[i] = NULL;
+            if (B.originalRelations[i] != NULL){
+                originalRelations[i] = B.originalRelations[i];
+            }
+        }
         // change variables accordingly
         size = 0;
         numberOfRelations += B.numberOfRelations;
-        for (auto &p: B.originalRelations){          // for every original relation in B
-            originalRelations[p.first] = p.second;   // insert new original relation's address to this
-        }
         return this;
     }
+
     // extract the correct join relations
     JoinRelation *JA = extractJoinRelation(rela_id, cola_id);
     JoinRelation *JB = B.extractJoinRelation(relb_id, colb_id);
@@ -733,41 +768,62 @@ IntermediateRelation *IntermediateRelation::performJoinWithIntermediate(Intermed
 
     if (number_of_tuples > 0) {
         //create new rowids map
-        unordered_map<unsigned int, unsigned int *> new_rowids;
-        for (auto &p : rowids) new_rowids[p.first] = new unsigned int[number_of_tuples];
-        for (auto &p : B.rowids) new_rowids[p.first] = new unsigned int[number_of_tuples];
+        unsigned int **new_rowids = new unsigned int *[maplength];
+        for (unsigned int i = 0 ; i < maplength ; i++) {
+            if (rowids[i] != NULL && B.rowids[i] != NULL) {
+                cerr << "Different Intermediates with the same relation_id in them at join!" << endl;
+                delete[] new_rowids;
+                delete AxB;
+                return NULL;
+            } else if ( rowids[i] != NULL || B.rowids[i] != NULL ){
+                new_rowids[i] = new unsigned int[number_of_tuples];
+            } else {
+                new_rowids[i] = NULL;
+            }
+        }
 
         // based on previous and RHJ's results
         Iterator I(AxB);
         unsigned int aid, bid, pos = 0;
         while (I.getNext(aid, bid)) {
             CHECK( aid > 0 && bid > 0, "WARNING: row id is zero in IntermediateRelation::performJoinWithIntermediate()", )
-            for (auto &p : rowids) new_rowids[p.first][pos] = rowids[p.first][aid - 1];
-            for (auto &p : B.rowids) new_rowids[p.first][pos] = B.rowids[p.first][bid - 1];
+            for (unsigned int i = 0 ; i < maplength ; i++) {
+                if ( rowids[i] != NULL ){
+                    new_rowids[i][pos] = rowids[i][aid - 1];
+                } else if ( B.rowids[i] != NULL ){
+                    new_rowids[i][pos] = B.rowids[i][bid - 1];
+                }
+            }
             pos++; //current # of tuples
         }
 
-        // clear the old map
-        for (auto &p : rowids) delete[] p.second;
-        rowids.clear();
-
-        // and replace it with the new
-        rowids = new_rowids;  // slow copy of the whole struct. TODO: make rowids a pointer to heap? (is it worth it?)
+        // clear the old map and replace it with the new
+        for (unsigned int i = 0 ; i < maplength ; i++) {
+            delete[] rowids[i];             // some might be NULL
+            rowids[i] = new_rowids[i];
+        }
+        delete[] new_rowids;
 
         // change size accordingly
-        size = number_of_tuples;    // TODO: change size to unsigned long long int?
+        size = number_of_tuples;
     } else {
         // clear the old map
-        for (auto &p : rowids) { delete[] p.second; p.second = NULL; }
-        rowids.clear();
+        for (unsigned int i = 0 ; i < maplength ; i++){
+            delete[] rowids[i];            // some might be NULL
+            rowids[i] = NULL;
+        }
 
         // change size accordingly
-        size = 0;    // TODO: change size to unsigned long long int?
+        size = 0;
+    }
+    // add originalRelations in B to those in *this
+    for (unsigned int i = 0 ; i < maplength ; i++){
+        if ( B.originalRelations[i] != NULL ){
+            CHECK(originalRelations[i] == NULL, "Intermediate join intermediate have the same rel_id!", )
+            originalRelations[i] = B.originalRelations[i];
+        }
     }
     numberOfRelations += B.numberOfRelations;
-    for (auto &p: B.originalRelations){          // for every original relation in B
-        originalRelations[p.first] = p.second;   // insert new original relation's address to this
-    }
     delete AxB;
     return this;
 }
@@ -777,15 +833,17 @@ IntermediateRelation *IntermediateRelation::performCrossProductWith(QueryRelatio
 }
 
 IntermediateRelation *IntermediateRelation::performCrossProductWithOriginal(const Relation &B) {
+    CHECK( B.getId() < maplength, "Invalid B.getId(): smaller than maplength = nrelations!", return NULL; )
     if (size <= 0) {
         numberOfRelations++;
-        rowids[B.getId()] = (unsigned int *) NULL;
         originalRelations[B.getId()] = &B;   // insert new original relation's address
         return this;
     } else if (B.getSize() <= 0){
         // clear the old map
-        for (auto &p : rowids) { delete[] p.second; p.second = NULL; }
-        rowids.clear();
+        for (unsigned int i = 0 ; i < maplength ; i++){
+            delete[] rowids[i];            // some might already be NULL
+            rowids[i] = NULL;
+        }
         // change variables accordingly
         size = 0;
         numberOfRelations++;
@@ -798,34 +856,47 @@ IntermediateRelation *IntermediateRelation::performCrossProductWithOriginal(cons
 
     if (number_of_tuples > 0) {
         // create new rowids map
-        unordered_map<unsigned int, unsigned int *> new_rowids;
-        for (auto &p : rowids) {
-            new_rowids[p.first] = new unsigned int[number_of_tuples];
+        unsigned int **new_rowids = new unsigned int *[maplength];
+        for (unsigned int i = 0 ; i < maplength ; i++){
+            if (rowids[i] != NULL){
+                new_rowids[i] = new unsigned int[number_of_tuples];
+            } else {
+                new_rowids[i] = NULL;
+            }
         }
+        CHECK( new_rowids[B.getId()] == NULL, "Warning: cross product with rel_id that is already a part of intermediate?", delete[] new_rowids[B.getId()]; )
         new_rowids[B.getId()] = new unsigned int[number_of_tuples];
 
         unsigned int pos = 0;
         // every row from A (this) is matched with every row from B
         for (unsigned int bi = 1; bi <= sizeB; bi++) {
             for (unsigned int ai = 0; ai < size; ai++, pos++) {
-                for (auto &p : rowids) new_rowids[p.first][pos] = rowids[p.first][ai];
+                for (unsigned int i = 0 ; i < maplength ; i++) {
+                    if (rowids[i] != NULL) {
+                        new_rowids[i][pos] = rowids[i][ai];
+                    }
+                }
                 new_rowids[B.getId()][pos] = bi;
             }
         }
 
-        // clear the old map
-        for (auto &p : rowids) delete[] p.second;
-        rowids.clear();
-
-        // and replace it with the new
-        rowids = new_rowids;  // slow copy of the whole struct.
+        // clear the old map and replace it with the new
+        for (unsigned int i = 0 ; i < maplength ; i++) {
+            delete[] rowids[i];            // some might be NULL
+            rowids[i] = new_rowids[i];
+        }
+        delete[] new_rowids;
 
         // change size accordingly
         size = number_of_tuples;
     } else {
         // clear the old map
-        for (auto &p : rowids) { delete[] p.second; p.second = NULL; }
-        rowids.clear();
+        for (unsigned int i = 0 ; i < maplength ; i++){
+            delete[] rowids[i];            // some might be NULL
+            rowids[i] = NULL;
+        }
+
+        // change size accordingly
         size = 0;
     }
     numberOfRelations++;
@@ -835,22 +906,31 @@ IntermediateRelation *IntermediateRelation::performCrossProductWithOriginal(cons
 
 IntermediateRelation *IntermediateRelation::performCrossProductWithIntermediate(IntermediateRelation &B) {
     if (size <= 0) {
-        numberOfRelations += B.numberOfRelations;
-        for (auto &p: B.originalRelations){            // for every original relation in B
-            rowids[p.first] = (unsigned int *) NULL;
-            originalRelations[p.first] = p.second;   // insert new original relation's address to this
+        // clear the old map in B and add originalRelations in B to those in *this
+        for (unsigned int i = 0 ; i < maplength ; i++){
+            delete[] B.rowids[i];            // some might already be NULL
+            B.rowids[i] = NULL;
+            if ( B.originalRelations[i] != NULL ){
+                CHECK(originalRelations[i] == NULL, "Intermediate join with zero-sized intermediate have the same rel_id!", )
+                originalRelations[i] = B.originalRelations[i];
+            }
         }
+        // change variables accordingly
+        B.size = 0;
+        numberOfRelations += B.numberOfRelations;
         return this;
     } else if ( B.getSize() <= 0 ){
-        // clear the old map
-        for (auto &p : rowids) { delete[] p.second; p.second = NULL; }
-        rowids.clear();
+        // clear the old map and  add originalRelations in B to those in *this
+        for (unsigned int i = 0 ; i < maplength ; i++) {
+            delete[] rowids[i];    // some might be NULL
+            rowids[i] = NULL;
+            if (B.originalRelations[i] != NULL){
+                originalRelations[i] = B.originalRelations[i];
+            }
+        }
         // change variables accordingly
         size = 0;
         numberOfRelations += B.numberOfRelations;
-        for (auto &p : B.originalRelations){
-            originalRelations[p.first] = p.second;
-        }
         return this;
     }
 
@@ -858,39 +938,61 @@ IntermediateRelation *IntermediateRelation::performCrossProductWithIntermediate(
     unsigned long long number_of_tuples = size * sizeB;
 
     if (number_of_tuples > 0) {
-        // create new rowids map
-        unordered_map<unsigned int, unsigned int *> new_rowids;
-        for (auto &p : rowids) new_rowids[p.first] = new unsigned int[number_of_tuples];
-        for (auto &p : B.rowids) new_rowids[p.first] = new unsigned int[number_of_tuples];
+        //create new rowids map
+        unsigned int **new_rowids = new unsigned int *[maplength];
+        for (unsigned int i = 0 ; i < maplength ; i++) {
+            if (rowids[i] != NULL && B.rowids[i] != NULL) {
+                cerr << "Different Intermediates with the same relation_id in them at join!" << endl;
+                delete[] new_rowids;
+                return NULL;
+            } else if ( rowids[i] != NULL || B.rowids[i] != NULL ){
+                new_rowids[i] = new unsigned int[number_of_tuples];
+            } else {
+                new_rowids[i] = NULL;
+            }
+        }
 
         unsigned int pos = 0;
         // every row from A (this) is matched with every row from B
         for (unsigned int bi = 0; bi < sizeB; bi++) {
             for (unsigned int ai = 0; ai < size; ai++, pos++) {
-                for (auto &p : rowids) new_rowids[p.first][pos] = rowids[p.first][ai];
-                for (auto &p : B.rowids) new_rowids[p.first][pos] = B.rowids[p.first][bi];
+                for (unsigned int i = 0 ; i < maplength ; i++) {
+                    if ( rowids[i] != NULL ){
+                        new_rowids[i][pos] = rowids[i][ai];
+                    } else if ( B.rowids[i] != NULL ){
+                        new_rowids[i][pos] = B.rowids[i][bi];
+                    }
+                }
             }
         }
 
-        // clear the old map
-        for (auto &p : rowids) delete[] p.second;
-        rowids.clear();
-
-        // and replace it with the new
-        rowids = new_rowids;  // slow copy of the whole struct.
+        // clear the old map and replace it with the new
+        for (unsigned int i = 0 ; i < maplength ; i++) {
+            delete[] rowids[i];             // some might be NULL
+            rowids[i] = new_rowids[i];
+        }
+        delete[] new_rowids;
 
         // change size and numberOfRelations accordingly
         size = number_of_tuples;
     } else {
         // clear the old map
-        for (auto &p : rowids) { delete[] p.second; p.second = NULL; }
-        rowids.clear();
+        for (unsigned int i = 0 ; i < maplength ; i++){
+            delete[] rowids[i];            // some might be NULL
+            rowids[i] = NULL;
+        }
+
+        // change size accordingly
         size = 0;
     }
-    numberOfRelations += B.numberOfRelations;
-    for (auto &p : B.originalRelations){
-        originalRelations[p.first] = p.second;
+    // add originalRelations in B to those in *this
+    for (unsigned int i = 0 ; i < maplength ; i++){
+        if ( B.originalRelations[i] != NULL ){
+            CHECK(originalRelations[i] == NULL, "Intermediate join intermediate have the same rel_id!", )
+            originalRelations[i] = B.originalRelations[i];
+        }
     }
+    numberOfRelations += B.numberOfRelations;
     return this;
 }
 
@@ -905,7 +1007,7 @@ void IntermediateRelation::performSelect(projection *projections, unsigned int n
 
     const Relation **OriginalRs = new const Relation *[nprojections];
     for (unsigned int j = 0 ; j < nprojections ; j++) {
-        OriginalRs[j] = getOriginalRelationFor(projections[j].rel_id);
+        OriginalRs[j] = originalRelations[projections[j].rel_id];
         CHECK(OriginalRs[j] != NULL, "Warning: rel_id invalid or originalRelations map corrupted in IntermediateRelation::performSelect() ", break; )
     }
 
@@ -924,35 +1026,6 @@ void IntermediateRelation::performSelect(projection *projections, unsigned int n
     delete[] OriginalRs;
 }
 
-const Relation *IntermediateRelation::getOriginalRelationFor(unsigned int rel_id) {
-    return ( originalRelations.find(rel_id) != originalRelations.end() ) ? originalRelations[rel_id] : NULL;
-}
-
-void IntermediateRelation::keepOnlyMarkedRows(const bool *passing_rowids, unsigned int count) {
-    if (count > 0) {
-        for (auto iter = rowids.begin(); iter != rowids.end(); iter++) {
-            unsigned int *rids = iter->second;
-            unsigned int *newrowids = new unsigned int[count];
-            unsigned int j = 0;
-            for (unsigned int i = 0; i < size; i++) {
-                if (passing_rowids[i]) {
-                    CHECK( j < count, "Warning: miscounted passing rowids in IntermediateRelation::keepOnlyMarkedRows()", break; )
-                    newrowids[j++] = rids[i];
-                }
-            }
-            delete[] rids;
-            iter->second = newrowids;
-        }
-        size = count;                      // (!) size must now change to count
-    } else {
-        for (auto iter = rowids.begin(); iter != rowids.end(); iter++) {
-            delete[] iter->second;
-            iter->second = NULL;
-        }
-        size = 0;
-    }
-}
-
 void IntermediateRelation::performSum(projection *projections, unsigned int nprojections) {
     if (size == 0) {
         for (unsigned int k=0; k<nprojections-1; ++k) printf("NULL ");
@@ -963,7 +1036,8 @@ void IntermediateRelation::performSum(projection *projections, unsigned int npro
     intField *sum = new intField[nprojections]();
 
     for (unsigned int j = 0; j < nprojections; ++j) {
-        const Relation *OriginalR = getOriginalRelationFor(projections[j].rel_id);
+        const Relation *OriginalR = originalRelations[projections[j].rel_id];
+        CHECK(OriginalR != NULL, "Warning: rel_id invalid or originalRelations map corrupted in IntermediateRelation::performSum() ", break; )
         for (unsigned int i = 0; i < size; ++i) {
             sum[j] += OriginalR->getValueAt(projections[j].col_id, rowids[projections[j].rel_id][i] - 1);
         }
@@ -975,4 +1049,29 @@ void IntermediateRelation::performSum(projection *projections, unsigned int npro
     delete[] sum;
 }
 
-
+void IntermediateRelation::keepOnlyMarkedRows(const bool *passing_rowids, unsigned int count) {
+    if (count > 0) {
+        for (unsigned int i = 0 ; i < maplength ; i++) {
+            if (rowids[i] != NULL){
+                unsigned int *rids = rowids[i];
+                unsigned int *newrowids = new unsigned int[count];
+                unsigned int j = 0;
+                for (unsigned int i = 0; i < size; i++) {
+                    if (passing_rowids[i]) {
+                        CHECK( j < count, "Warning: miscounted passing rowids in IntermediateRelation::keepOnlyMarkedRows()", break; )
+                        newrowids[j++] = rids[i];
+                    }
+                }
+                delete[] rids;
+                rowids[i] = newrowids;
+            }
+        }
+        size = count;                      // (!) size must now change to count
+    } else {
+        for (unsigned int i = 0 ; i < maplength ; i++){
+            delete[] rowids[i];            // some might be NULL
+            rowids[i] = NULL;
+        }
+        size = 0;
+    }
+}

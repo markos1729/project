@@ -97,6 +97,7 @@ TEST_CASE("Relation::performFilter() - trivial case", "[FILTER]") {
     R[1]->setId(1);
     R[2]->setId(2);
 
+
     IntermediateRelation *result=R[0]->performFilter(0,1,10,'=');
     REQUIRE(result!=NULL);
     CHECK(result->getSize()==0);

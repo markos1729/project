@@ -53,8 +53,10 @@ public:
     virtual void performSelect(projection *projections, unsigned int nprojections) = 0;          // write select to stdout
     virtual void performSum(projection *projections, unsigned int nprojections) = 0;
     virtual unsigned int getSize() const = 0;
+    static void set_nrelations(unsigned int nrelations) { NumberOfRelationsInQuery = nrelations; }
 protected:
-	bool *filterField(intField *field, unsigned int size, intField value, char cmp, unsigned int &count);
+    static unsigned int NumberOfRelationsInQuery;
+    bool *filterField(intField *field, unsigned int size, intField value, char cmp, unsigned int &count);
     bool *eqColumnsFields(intField *field1, intField *field2, unsigned int size, unsigned int &count);
 };
 
@@ -96,11 +98,12 @@ private:
 class IntermediateRelation : public QueryRelation {       // Intermediate Relations need only store the rowids of tuples from their original Relations
     unsigned int size;                                    // size of rowids array for EVERY relation_id in 'rowids' hashmap
     unsigned int numberOfRelations;                       // number of original Relations represented by this Intermediate Relation
-    unordered_map<unsigned int, unsigned int *> rowids;   // a hash table map for: <key=relation_id, value=rowids_of_that_relation>
-    unordered_map<unsigned int, const Relation *> originalRelations;  // a hash table map for: <key=relation_id, value=pointer to the original Relation for this relation_id>
+    const unsigned int maplength;                               // lentgh of arrays rowids and orginalRelations used as hash maps
+    unsigned int **rowids;                                 // an array used as a hash table map for: <key=relation_id, value=rowids_of_that_relation>
+    const Relation **originalRelations;                    // an array used as a hash table map for: <key=relation_id, value=pointer to the original Relation for this relation_id>
 public:
-    IntermediateRelation(unsigned int rel_id, unsigned int *_rowids, unsigned int _size, const Relation *original_rel);
-    IntermediateRelation(unsigned int rela_id, unsigned int relb_id, unsigned int *_rowids_a, unsigned int *_rowids_b, unsigned int _size, const Relation *original_rel_a, const Relation *original_rel_b);
+    IntermediateRelation(unsigned int rel_id, unsigned int *_rowids, unsigned int _size, const Relation *original_rel, unsigned int _maplength = NumberOfRelationsInQuery);
+    IntermediateRelation(unsigned int rela_id, unsigned int relb_id, unsigned int *_rowids_a, unsigned int *_rowids_b, unsigned int _size, const Relation *original_rel_a, const Relation *original_rel_b, unsigned int _maplength = NumberOfRelationsInQuery);
     ~IntermediateRelation() override;
     unsigned int getSize() const { return size; }
     unsigned int *getRowIdsFor(unsigned int rel_id) { if ( containsRelation(rel_id) ) return rowids[rel_id]; else return NULL; }
@@ -110,7 +113,7 @@ public:
     IntermediateRelation *performCrossProductWithOriginal(const Relation &B);
     IntermediateRelation *performCrossProductWithIntermediate(IntermediateRelation &B);
     /* @Override */
-    bool containsRelation(unsigned int rel_id) override { return rowids.find(rel_id) != rowids.end(); }
+    bool containsRelation(unsigned int rel_id) override { return (rel_id < maplength) ? (originalRelations[rel_id] != NULL) : false; }
     IntermediateRelation *performFilter(unsigned int rel_id, unsigned int col_id, intField value, char cmp) override;
     IntermediateRelation *performEqColumns(unsigned int rela_id, unsigned int relb_id, unsigned int cola_id, unsigned int colb_id) override;
     IntermediateRelation *performJoinWith(QueryRelation &B, unsigned int rela_id, unsigned int cola_id, unsigned int relb_id, unsigned int colb_id) override;
@@ -118,7 +121,6 @@ public:
     void performSelect(projection *projections, unsigned int nprojections) override;
     void performSum(projection *projections, unsigned int nprojections) override;
 private:
-    const Relation *getOriginalRelationFor(unsigned int rel_id);
     void keepOnlyMarkedRows(const bool *passing_rowids, unsigned int count);
 };
 

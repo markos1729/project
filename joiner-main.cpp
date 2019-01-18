@@ -21,6 +21,7 @@ using namespace std;
 
 /* Global variables */
 JobScheduler *scheduler = NULL;
+unsigned int QueryRelation::NumberOfRelationsInQuery = 0;
 
 
 /* Local Functions */
@@ -137,6 +138,7 @@ int main(){
             bool abort = false;
 
             // execute FROM: load original Relations to an array of pointers to such
+            QueryRelation::set_nrelations(p->nrelations);          // (!) VERY-VERY important (must change each query)
             QueryRelation **QueryRelations = new QueryRelation*[p->nrelations]();
             int *seen_at = new int[Rlen]();
             for (int i = 0 ; i < Rlen ; i++) seen_at[i] = -1;      // init to -1
@@ -150,7 +152,7 @@ int main(){
                     unsigned int tempsize = R[seen_at[p->relations[i]]]->getSize();
                     unsigned int *temprowids = new unsigned int[tempsize];
                     for (unsigned int j = 0 ; j < tempsize ; j++){ temprowids[j] = j + 1; }
-                    QueryRelations[i] = new IntermediateRelation(i, temprowids, tempsize, R[seen_at[p->relations[i]]]);
+                    QueryRelations[i] = new IntermediateRelation(i, temprowids, tempsize, R[seen_at[p->relations[i]]], p->nrelations);
                     delete[] temprowids;
                 }
             }
