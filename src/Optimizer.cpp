@@ -333,7 +333,6 @@ int *Optimizer::best_plan() {
 				}
 			}
 			if (currTree == NULL) {		// No relations could be joined with currTree; CrossProducts are needed; Aborting best_plan()
-				cout << "CrossProducts were found; Aborting BestTree!" << endl;
 				// cleaning up BestTree:
                 for (auto it = BestTree.begin(); it != BestTree.end(); ) {
                     delete it->second;

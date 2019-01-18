@@ -25,7 +25,6 @@ JobScheduler *scheduler = NULL;
 
 /* Local Functions */
 unsigned int find_rel_pos(QueryRelation **QueryRelations, unsigned int size, unsigned int rel_id);
-unsigned int count_not_null(void **ptrarray, unsigned int size);
 
 
 /* Local Structs */
@@ -244,10 +243,12 @@ int main(){
             delete optimizer;
             #endif
 
+            int separate_from_tables_left = p->nrelations;
+
             // perform all joins in the order found best
             for (int i = 0 ; i < p->npredicates ; i++){
                 #ifdef DO_QUERY_OPTIMIZATION
-                const predicate &predicate = p->predicates[bestJoinOrder[i]];   // in the order got from optimizer!
+                const predicate &predicate = (bestJoinOrder != NULL) ? p->predicates[bestJoinOrder[i]] : p->predicates[i];   // in the order got from optimizer (if NULL then there are cross-products
                 #else
                 const predicate &predicate = p->predicates[i];
                 #endif
@@ -287,6 +288,7 @@ int main(){
                         abort = true;
                         break;
                     }
+                    separate_from_tables_left--;   // each join reduces that number by 1 until it is 1 and we have only one relation
                 } else {   // (!) if two tables are joined two times then the first it will be join whilst the second time it will be an equal columns operation!
                     // EQUAL COLUMNS UNARY OPERATION (self join)
                     QueryRelation *prev = QueryRelations[rela_pos];   // (!) rela_id == relb_id
@@ -318,7 +320,7 @@ int main(){
 
             // Last but not least any cross-products left to do
             int lastpos = 0;
-            while ( count_not_null((void **) QueryRelations, p->nrelations) > 1 ){
+            while ( separate_from_tables_left > 1 ){
                 // CROSS PRODUCT: perform cross product between remaining Relations uniting them into one in the leftest position until only one QueryRelation remains
                 int i = lastpos + 1;
                 while ( i < p->nrelations && QueryRelations[i] == NULL ) i++;
@@ -329,6 +331,7 @@ int main(){
                 if (QueryRelations[0]->isIntermediate && QueryRelations[i]->isIntermediate) delete QueryRelations[i];
                 QueryRelations[i] = NULL;
                 lastpos = i;
+                separate_from_tables_left--;
             }
 
             // schedules results to be printed to std::out
@@ -368,14 +371,6 @@ unsigned int find_rel_pos(QueryRelation **QueryRelations, unsigned int size, uns
         }
     }
     return -1;  // unsigned -> 111..1 -> should be caught by a CHECK(..)
-}
-
-unsigned int count_not_null(void **ptrarray, unsigned int size){
-    unsigned int count = 0;
-    for (unsigned int i = 0 ; i < size ; i++){
-        if ( ptrarray[i] != NULL ) count++;
-    }
-    return count;
 }
 
 bool IOJob::run() {
