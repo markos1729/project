@@ -358,6 +358,7 @@ TEST_CASE("IntermediateRelation::performJoinWithOriginal() - trivial case", "[JO
     IntermediateRelation *result = I.performJoinWithOriginal(Empty, 1, 1, 2, 1);
     REQUIRE( result != NULL );
     CHECK( result->getSize() == 0 );
+    R[1]->setId(3);
     IntermediateRelation I_Empty(3, NULL, 0, R[1]);
     result = I_Empty.performJoinWithOriginal(Empty, 3, 1, 2, 1);
     REQUIRE( result != NULL );
@@ -392,14 +393,20 @@ TEST_CASE("IntermediateRelation::performJoinWithOriginal()", "[JOIN]"){
 TEST_CASE("IntermediateRelation::performJoinWithIntermediate() - trivial case", "[JOIN]"){
     R_init1();
     unsigned int rowids[] = {1, 3, 4, 6};
-    IntermediateRelation I1(0, rowids, 4, R[0]);
-    IntermediateRelation I2(1, (unsigned int *) NULL, 0, R[1]);
-    IntermediateRelation *result = I1.performJoinWithIntermediate(I2, 1, 1, 0, 1);
-    REQUIRE( result != NULL );
-    CHECK( result->getSize() == 0 );
-    result = I2.performJoinWithIntermediate(I1, 0, 1, 1, 1);
-    REQUIRE( result != NULL );
-    CHECK( result->getSize() == 0 );
+    {
+        IntermediateRelation I1(0, rowids, 4, R[0]);
+        IntermediateRelation I2(1, (unsigned int *) NULL, 0, R[1]);
+        IntermediateRelation *result = I1.performJoinWithIntermediate(I2, 1, 1, 0, 1);
+        REQUIRE(result != NULL);
+        CHECK(result->getSize() == 0);
+    }
+    {
+        IntermediateRelation I1(0, rowids, 4, R[0]);
+        IntermediateRelation I2(1, (unsigned int *) NULL, 0, R[1]);
+        IntermediateRelation *result = I2.performJoinWithIntermediate(I1, 0, 1, 1, 1);
+        REQUIRE(result != NULL);
+        CHECK(result->getSize() == 0);
+    }
     R_destroy1();
 }
 
@@ -527,14 +534,20 @@ TEST_CASE("IntermediateRelation::performCrossProductWithIntermediate() - trivial
     R[0]->setId(0);
     R[1]->setId(1);
     unsigned int rowids[] = {1, 3, 4, 6};
-    IntermediateRelation I1(0, rowids, 4, R[0]);
-    IntermediateRelation I2(1, (unsigned int *) NULL, 0, R[1]);
-    IntermediateRelation *result = I1.performCrossProductWithIntermediate(I2);
-    REQUIRE( result != NULL );
-    CHECK( result->getSize() == 0 );
-    result = I2.performCrossProductWithIntermediate(I1);
-    REQUIRE( result != NULL );
-    CHECK( result->getSize() == 0 );
+    {
+        IntermediateRelation I1(0, rowids, 4, R[0]);
+        IntermediateRelation I2(1, (unsigned int *) NULL, 0, R[1]);
+        IntermediateRelation *result = I1.performCrossProductWithIntermediate(I2);
+        REQUIRE(result != NULL);
+        CHECK(result->getSize() == 0);
+    }
+    {
+        IntermediateRelation I1(0, rowids, 4, R[0]);
+        IntermediateRelation I2(1, (unsigned int *) NULL, 0, R[1]);
+        IntermediateRelation *result = I2.performCrossProductWithIntermediate(I1);
+        REQUIRE(result != NULL);
+        CHECK(result->getSize() == 0);
+    }
     R_destroy1();
 }
 

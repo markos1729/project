@@ -28,7 +28,7 @@ TEST_CASE("Simple case partition check", "[partition]") {
 }
 
 TEST_CASE("Realistic case partition check", "[partition]"){
-    const char file_r[] = "Files/r7";
+    const char file_r[] = "workloads/small/r7";
     try {
         Relation R(file_r);
         
@@ -239,8 +239,8 @@ SCENARIO("The entire join is being tested on a simple case", "[RHJ]") {
 
 SCENARIO("The entire join is being tested on a realistic case", "[RHJ]") {
     GIVEN("Some input files from SIGMOD's assignment") {
-        char file_r[]="Files/r7";
-        char file_s[]="Files/r12";
+        char file_r[]="workloads/small/r7";
+        char file_s[]="workloads/small/r12";
         
         try {
             Relation R(file_r);
@@ -280,7 +280,7 @@ SCENARIO("The entire join is being tested on a realistic case", "[RHJ]") {
 }
 
 TEST_CASE("Test multi-threaded partition", "[multithreaded-partition]"){
-    char file_r[]="Files/r7";
+    char file_r[]="workloads/small/r7";
 
     try {
         Relation R1(file_r);

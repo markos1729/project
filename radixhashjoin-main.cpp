@@ -8,6 +8,7 @@ using namespace std;
 
 
 JobScheduler *scheduler = NULL;
+unsigned int QueryRelation::NumberOfRelationsInQuery = 0;   // wont be used but gotta declare it
 
 
 /* Local Functions */

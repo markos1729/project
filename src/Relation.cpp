@@ -731,7 +731,7 @@ IntermediateRelation *IntermediateRelation::performJoinWithIntermediate(Intermed
             delete[] B.rowids[i];            // some might already be NULL
             B.rowids[i] = NULL;
             if ( B.originalRelations[i] != NULL ){
-                CHECK(originalRelations[i] == NULL, "Intermediate join with zero-sized intermediate have the same rel_id!", )
+                CHECK(originalRelations[i] == NULL, "Intermediate join with zero-sized intermediate have the same rel_id! : " + to_string(i), )
                 originalRelations[i] = B.originalRelations[i];
             }
         }
@@ -911,7 +911,7 @@ IntermediateRelation *IntermediateRelation::performCrossProductWithIntermediate(
             delete[] B.rowids[i];            // some might already be NULL
             B.rowids[i] = NULL;
             if ( B.originalRelations[i] != NULL ){
-                CHECK(originalRelations[i] == NULL, "Intermediate join with zero-sized intermediate have the same rel_id!", )
+                CHECK(originalRelations[i] == NULL, "Intermediate cross-product with zero-sized intermediate have the same rel_id : " + to_string(i), )
                 originalRelations[i] = B.originalRelations[i];
             }
         }
