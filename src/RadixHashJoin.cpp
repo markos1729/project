@@ -35,7 +35,7 @@ void *thread_partition(void *args);
 Result* radixHashJoin(JoinRelation &R, JoinRelation &S) {
     CHECK( scheduler != NULL, "JobScheduler is not initiated: cannot run parallel RHJ", return NULL; )
     // Partition R and S, whilst keeping a 'Psum' table for each bucket in R and S (phase 1)
-    H1_N = (unsigned int) ( ceil( log2( MAX(R.getSize(), S.getSize()) / CACHE ))); // H1_N is the same for both Relations rounded up  TODO: I think ceil() does not work properly!
+    H1_N = (unsigned int) ( ceil( log2( MAX(R.getSize(), S.getSize()) / CACHE ))); // H1_N is the same for both Relations rounded up
     H2_N = H1_N/2;
 #ifdef PARALLEL_IMPLEMENTATION_OF_PARTITION_INSTEAD_OF_THEIR_CALL
     CHECK( R.partitionRelation(H1_N) , "partitioning R failed", return NULL; )

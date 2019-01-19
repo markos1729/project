@@ -1,6 +1,7 @@
 #ifndef OPTIMIZER_H
 #define OPTIMIZER_H
 
+#include <unordered_map>
 #include "SQLParser.h"
 #include "FieldTypes.h"
 #include "ConfigureParameters.h"

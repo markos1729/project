@@ -7,9 +7,8 @@
 ///////////////////////////////
 
 #define CACHE 512                  // expected average bucket size: smaller CACHE SIZE means more buckets (=> more parallel joins but bigger parallel partition cost)
-#define NUMBER_OF_THREADS 8        // joiner's scheduler thread pool size
-#define CPU_CORES 8                // this will be taken into account when chunking bigger arrays into parts
-#define BUFFER_SIZE 128000         // buffer size for result nodes. Recommended: 128KB
+#define NUMBER_OF_THREADS 8        // joiner's scheduler thread pool size (Recommended: CPU_CORES * THREADS_PER_CORE)
+#define BUFFER_SIZE (128*1024)     // buffer size for result nodes. Recommended: 128KB
 
 
 ///////////////////////////////

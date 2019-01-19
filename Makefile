@@ -1,6 +1,6 @@
 CXX         = g++
 CXXFLAGS    = -O2 -g3 -pedantic -std=c++11 #-Wall -Wextra
-COMMON_OBJ  = objects/Relation.o objects/RadixHashJoin.o objects/JoinResults.o objects/JobScheduler.o
+COMMON_OBJ  = objects/Relation.o objects/JoinRelation.o objects/RadixHashJoin.o objects/JoinResults.o objects/JobScheduler.o
 JOINER_OBJ  = objects/joiner-main.o objects/SQLParser.o objects/Optimizer.o
 COMMON_HEAD = Headers/*.h
 
@@ -18,6 +18,10 @@ radixhashjoin: assert_objects_dir objects/radixhashjoin-main.o $(COMMON_OBJ)
 objects/radixhashjoin-main.o: radixhashjoin-main.cpp $(COMMON_HEAD)
 	$(CXX) -c $(CXXFLAGS) radixhashjoin-main.cpp
 	mv radixhashjoin-main.o objects/radixhashjoin-main.o
+
+objects/JoinRelation.o: src/JoinRelation.cpp $(COMMON_HEAD)
+	$(CXX) -c $(CXXFLAGS) src/JoinRelation.cpp
+	mv JoinRelation.o objects/JoinRelation.o
 
 objects/Relation.o: src/Relation.cpp $(COMMON_HEAD)
 	$(CXX) -c $(CXXFLAGS) src/Relation.cpp

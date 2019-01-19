@@ -319,9 +319,6 @@ int *Optimizer::best_plan() {
 				currTree = new JoinTree(BestTree[SIdStr], j, relStats[j], parser);
 				string newSIdStr = SIdStr;
 				newSIdStr[j] = '1';
-#ifdef DDEBUG
-				cout << "Candidate for " << newSIdStr << " from " << SIdStr << ": f = " << currTree->treeF << endl;
-#endif
 				// if there's no BestTree yet for newS or its cost is greater than currTree
 				if ( BestTree.find(newSIdStr) == BestTree.end() || BestTree[newSIdStr]->treeF > currTree->treeF ||
 				   ( BestTree[newSIdStr]->treeF == currTree->treeF && (usedTreeF.find(newSIdStr) == usedTreeF.end() || usedTreeF[newSIdStr] > BestTree[SIdStr]->treeF )) ) {
@@ -345,22 +342,6 @@ int *Optimizer::best_plan() {
 	int *bestJoinOrder = new int[parser.npredicates];
 	string bestTreeIdStr(nrel, '1');
 	currTree = BestTree[bestTreeIdStr];
-#ifdef DDEBUG
-	for (unordered_map<string, class JoinTree*>::const_iterator p = BestTree.begin() ; p != BestTree.end() ; p++){
-        if (p->second == NULL) continue;
-        cout << p->first << ": f = " << p->second->treeF << endl << "  best order: ";
-        for (int i = 0 ; i < MIN(p->second->predsOrderIndex, nrel) ; i++){
-            cout << p->second->predsOrder[i] << " ";
-        }
-        cout << endl;
-	}
-	///////////////////////////////////////////////
-    cout << "BEST: " << bestTreeIdStr << ": f = " << currTree->treeF << endl << "  best order: ";
-    for (int i = 0 ; i < MIN(currTree->predsOrderIndex, nrel) ; i++){
-        cout << currTree->predsOrder[i] << " ";
-    }
-    cout << endl;
-#endif
 	for (unsigned int i = 0; i < parser.npredicates; i++) {
 		bestJoinOrder[i] = currTree->predsOrder[i];
 	}
