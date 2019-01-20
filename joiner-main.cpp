@@ -91,12 +91,14 @@ int main(){
         }
     }
     delete fileList;
+    #ifdef DO_QUERY_OPTIMIZATION
     // Calculate statistics for all tables (once in the beginning!)
     RelationStats **Rstats = new RelationStats *[Rlen];
     for (int i = 0 ; i < Rlen ; i++){
         Rstats[i] = new RelationStats(R[i]);
         Rstats[i]->calculateStats();
     }
+    #endif
     #ifdef PRINT_FEEDBACK_MESSAGES
     cout << "Loading done! Ready to accept queries." << endl << endl;
     #endif
@@ -316,9 +318,16 @@ int main(){
                 continue;
             }
 
+            // check that everything went ok
+            #ifdef DO_QUERY_OPTIMIZATION
             CHECK( QueryRelations[0] != NULL, "Fatal error: Could not keep results to leftmost Intermediate QueryRelation (Should not happen). Please debug...",
                    for (int i = 0 ; i < p->nrelations; i++) { if ( QueryRelations[i] != NULL && QueryRelations[i]->isIntermediate ) delete QueryRelations[i]; } delete[] QueryRelations; delete p;
                    for (int i = 0 ; i < Rlen ; i++ ) { delete Rstats[i]; delete R[i]; } delete[] Rstats; delete[] R; delete scheduler; return -2; )
+            #else
+            CHECK( QueryRelations[0] != NULL, "Fatal error: Could not keep results to leftmost Intermediate QueryRelation (Should not happen). Please debug...",
+                   for (int i = 0 ; i < p->nrelations; i++) { if ( QueryRelations[i] != NULL && QueryRelations[i]->isIntermediate ) delete QueryRelations[i]; } delete[] QueryRelations; delete p;
+                   for (int i = 0 ; i < Rlen ; i++ ) { delete R[i]; } delete[] R; delete scheduler; return -2; )
+            #endif
 
             // Last but not least any cross-products left to do
             int lastpos = 0;
@@ -355,10 +364,14 @@ int main(){
     IOScheduler.waitUntilAllJobsHaveFinished();
     // cleanup
     for (unsigned int i = 0 ; i < Rlen ; i++ ) {
+        #ifdef DO_QUERY_OPTIMIZATION
         delete Rstats[i];
+        #endif
         delete R[i];
     }
+    #ifdef DO_QUERY_OPTIMIZATION
     delete[] Rstats;
+    #endif
     delete[] R;
     delete scheduler;
     return 0;
