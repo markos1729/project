@@ -90,48 +90,53 @@ void R_init4() {
     }
 }
 
-
 /*
-TEST_CASE("Optimizer::initializeRelation()", "[INIT]") {
+TEST_CASE("Optimizer::estimate_filters()", "[FILTER]") {
     R_init3();
-    SQLParser *parser = new SQLParser("0 1 2|0.0=0.0|0.0");
+    RelationStats **Rstats = new RelationStats *[Rlen];
+    for (int i = 0 ; i < Rlen ; i++) {
+        Rstats[i] = new RelationStats(R[i]);
+        Rstats[i]->calculateStats();
+    }
+
+    SQLParser *p = new SQLParser("0 1 2|0.1=5&1.0>4&2.2<3|0.0");
     printf("---------------------------------\n");
-    Optimizer *optimizer = new Optimizer(*parser);
-    for (unsigned int i = 0; i < Rlen; i++) {
-        optimizer->initializeRelation(i, R[i]->getSize(), R[i]->getNumOfColumns(), R[i]->getColumns());
+    Optimizer *optimizer = new Optimizer(*p);
+    for (unsigned int i = 0; i < p->nrelations; i++) {
+        optimizer->initializeRelation(i, Rstats[p->relations[i]]);
     }
     optimizer->printAllRelStats();
+    printf("---------------------------------\n");
+    optimizer->estimate_filters();
+    optimizer->printAllRelStats();
     printf("=================================\n");
+    delete optimizer;
+    delete p;
+    R_destroy3();
 }
 
-TEST_CASE("Optimizer::filter()", "[FILTER]") {
+TEST_CASE("Optimizer::estimate_eqColumns()", "[FILTER]") {
     R_init3();
-    SQLParser *parser = new SQLParser("0 1 2|0.1=5&1.0>4&2.2<3|0.0");
-    printf("---------------------------------\n");
-    Optimizer *optimizer = new Optimizer(*parser);
-    for (unsigned int i = 0; i < Rlen; i++) {
-        optimizer->initializeRelation(i, R[i]->getSize(), R[i]->getNumOfColumns(), R[i]->getColumns());
+    RelationStats **Rstats = new RelationStats *[Rlen];
+    for (int i = 0 ; i < Rlen ; i++) {
+        Rstats[i] = new RelationStats(R[i]);
+        Rstats[i]->calculateStats();
     }
-    optimizer->printAllRelStats();
-    printf("---------------------------------\n");
-    optimizer->filter();
-    optimizer->printAllRelStats();
-    printf("=================================\n");
-}
 
-TEST_CASE("Optimizer::filter() - equal columns", "[FILTER]") {
-    R_init3();
-    SQLParser *parser = new SQLParser("0 1 2|0.0=0.1&2.0=2.1|0.0");
+    SQLParser *p = new SQLParser("0 1 2|0.0=0.1&2.0=2.1|0.0");
     printf("---------------------------------\n");
-    Optimizer *optimizer = new Optimizer(*parser);
-    for (unsigned int i = 0; i < Rlen; i++) {
-        optimizer->initializeRelation(i, R[i]->getSize(), R[i]->getNumOfColumns(), R[i]->getColumns());
+    Optimizer *optimizer = new Optimizer(*p);
+    for (unsigned int i = 0; i < p->nrelations; i++) {
+        optimizer->initializeRelation(i, Rstats[p->relations[i]]);
     }
     optimizer->printAllRelStats();
     printf("---------------------------------\n");
-    optimizer->filter();
+    optimizer->estimate_eqColumns();
     optimizer->printAllRelStats();
     printf("=================================\n");
+    delete optimizer;
+    delete p;
+    R_destroy3();
 }
 */
 
@@ -169,6 +174,7 @@ TEST_CASE("Optimizer::best_plan() - simple", "[BEST_PLAN]") {
     delete optimizer;
     delete p;
     delete[] bestJoinOrder;
+    R_destroy4();
 }
 
 TEST_CASE("Optimizer::best_plan() - column prioritizing", "[BEST_PLAN]") {
@@ -206,4 +212,5 @@ TEST_CASE("Optimizer::best_plan() - column prioritizing", "[BEST_PLAN]") {
     delete optimizer;
     delete p;
     delete[] bestJoinOrder;
+    R_destroy4();
 }
