@@ -140,15 +140,21 @@ int Optimizer::JoinTree::bestJoinWithRel(const SQLParser &parser, unsigned int r
 		} else continue;
         relaStats = relationsStats[relaId];
 
-#if JOIN_STATS_FOR_F == 0                          // Cartesian Product
-        currF = treeF * relbStats->f;
-#elif JOIN_STATS_FOR_F == 1                        // Divide by u - l + 1
-        currF = ceil( float(treeF * relbStats->f) / (MIN(relaStats->u[cola], relbStats->u[colb]) - (MAX(relaStats->l[cola], relbStats->l[colb])) + 1) );
-#elif JOIN_STATS_FOR_F == 2                        // Divide by d (Recommended)
-        currF = ceil( float(treeF * relbStats->f) / (MAX(relaStats->d[cola], relbStats->d[colb] )) );
-#else                                              // default: divide by d
-        currF = ceil( float(treeF * relbStats->f) / (MAX(relaStats->d[cola], relbStats->d[colb] )) );
-#endif
+        unsigned int l_cut = MAX(relaStats->l[cola], relbStats->l[colb]);
+        unsigned int u_cut = MIN(relaStats->u[cola], relbStats->u[colb]);
+        if ( u_cut < l_cut ) {   // they have no common elements
+            currF = 0;
+        } else {
+            #if JOIN_STATS_FOR_F == 0                          // Cartesian Product
+                currF = treeF * relbStats->f;
+            #elif JOIN_STATS_FOR_F == 1                        // Divide by u - l + 1
+                currF = ceil( float(treeF * relbStats->f) / (MIN(relaStats->u[cola], relbStats->u[colb]) - (MAX(relaStats->l[cola], relbStats->l[colb])) + 1) );
+            #elif JOIN_STATS_FOR_F == 2                        // Divide by d (Recommended)
+                currF = ceil( float(treeF * relbStats->f) / (MAX(relaStats->d[cola], relbStats->d[colb] )) );
+            #else                                              // default: divide by d
+                currF = ceil( float(treeF * relbStats->f) / (MAX(relaStats->d[cola], relbStats->d[colb] )) );
+            #endif
+        }
 
 		if (bestF == std::numeric_limits<unsigned int>::max() || currF < bestF) {         // join at this column is the best join (yet)
 			delete joinedRelaStats;                // the first time this will be NULL - it's ok
@@ -156,8 +162,8 @@ int Optimizer::JoinTree::bestJoinWithRel(const SQLParser &parser, unsigned int r
 			joinedRelaId = relaId;
 			// update stats for joined columns
 			bestF = joinedRelaStats->f = joinedRelbStats->f = currF;
-			joinedRelaStats->l[cola] = joinedRelbStats->l[colb] = MAX(relaStats->l[cola], relbStats->l[colb]);
-			joinedRelaStats->u[cola] = joinedRelbStats->u[colb] = MIN(relaStats->u[cola], relbStats->u[colb]);
+			joinedRelaStats->l[cola] = joinedRelbStats->l[colb] = l_cut;
+			joinedRelaStats->u[cola] = joinedRelbStats->u[colb] = u_cut;
 			joinedRelaStats->d[cola] = joinedRelbStats->d[colb] = ceil( float(relaStats->d[cola] * relbStats->d[colb]) / (joinedRelaStats->u[colb] - joinedRelbStats->l[colb] + 1.0) );
 			// update stats for the other columns:
 			for (int c = 0; c < joinedRelaStats->ncol; c++) {

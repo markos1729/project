@@ -74,7 +74,7 @@ void R_init4() {
     }
     {   ////////////////////////////
         R[1] = new Relation(6, 2);
-        intField col1[] = {5, 5, 5, 8, 8, 8};
+        intField col1[] = {1, 1, 2, 2, 4, 4};
         intField col2[] = {7, 7, 7, 7, 7, 7};
         R[1]->addColumn(0, col1);
         R[1]->addColumn(1, col2);
@@ -90,7 +90,7 @@ void R_init4() {
     }
 }
 
-// TODO: prints to catch CHECK()s
+
 /*
 TEST_CASE("Optimizer::initializeRelation()", "[INIT]") {
     R_init3();
@@ -135,46 +135,75 @@ TEST_CASE("Optimizer::filter() - equal columns", "[FILTER]") {
 }
 */
 
-/* TODO: Update with new version of Optimizer
-
 TEST_CASE("Optimizer::best_plan() - simple", "[BEST_PLAN]") {
     R_init4();
-    // "0.0=1.1" produce 6 results, while "0.1=2.0" 12 results
-    SQLParser *parser = new SQLParser("0 1 2|0.0=1.1&0.1=2.0|0.0");
-    Optimizer *optimizer = new Optimizer(*parser);
-    for (unsigned int i = 0; i < Rlen; i++) {
-        optimizer->initializeRelation(i, R[i]->getSize(), R[i]->getNumOfColumns(), R[i]->getColumns());
+    // "0.0=1.1" produces 6 results, while "0.1=2.0" 12 results
+    RelationStats **Rstats = new RelationStats *[Rlen];
+    for (int i = 0 ; i < Rlen ; i++) {
+        Rstats[i] = new RelationStats(R[i]);
+        Rstats[i]->calculateStats();
     }
+
+    SQLParser *p = new SQLParser("0 1 2|0.0=1.1&0.1=2.0|0.0");
+    Optimizer *optimizer = new Optimizer(*p);
+    for (unsigned int i = 0; i < p->nrelations; i++) {
+        optimizer->initializeRelation(i, Rstats[p->relations[i]]);
+    }
+    optimizer->estimate_filters();
+    optimizer->estimate_eqColumns();
     int *bestJoinOrder = optimizer->best_plan();
     CHECK( bestJoinOrder[0] == 0 );
+    delete optimizer;
+    delete p;
+    delete[] bestJoinOrder;
 
-    parser = new SQLParser("0 1 2|0.1=2.0&0.0=1.1|0.0");
-    optimizer = new Optimizer(*parser);
-    for (unsigned int i = 0; i < Rlen; i++) {
-        optimizer->initializeRelation(i, R[i]->getSize(), R[i]->getNumOfColumns(), R[i]->getColumns());
+    p = new SQLParser("0 1 2|0.1=2.0&0.0=1.1|0.0");
+    optimizer = new Optimizer(*p);
+    for (unsigned int i = 0; i < p->nrelations; i++) {
+        optimizer->initializeRelation(i, Rstats[p->relations[i]]);
     }
+    optimizer->estimate_filters();
+    optimizer->estimate_eqColumns();
     bestJoinOrder = optimizer->best_plan();
     CHECK( bestJoinOrder[0] == 1 );
+    delete optimizer;
+    delete p;
+    delete[] bestJoinOrder;
 }
 
 TEST_CASE("Optimizer::best_plan() - column prioritizing", "[BEST_PLAN]") {
-    R_init3();
-    // "0.1=2.0" produces 0 results
-    SQLParser *parser = new SQLParser("0 1 2|0.0=1.1&0.1=2.1&0.1=2.0|0.0");
-    Optimizer *optimizer = new Optimizer(*parser);
-    for (unsigned int i = 0; i < Rlen; i++) {
-        optimizer->initializeRelation(i, R[i]->getSize(), R[i]->getNumOfColumns(), R[i]->getColumns());
+    R_init4();
+    // "0.1=1.1" will be cacluclated to have f=0, unlike "0.1=1.0"
+    RelationStats **Rstats = new RelationStats *[Rlen];
+    for (int i = 0 ; i < Rlen ; i++) {
+        Rstats[i] = new RelationStats(R[i]);
+        Rstats[i]->calculateStats();
     }
+
+    SQLParser *p = new SQLParser("1 2|0.0=1.0&0.0=1.1|0.0");
+    Optimizer *optimizer = new Optimizer(*p);
+    for (unsigned int i = 0; i < p->nrelations; i++) {
+        optimizer->initializeRelation(i, Rstats[p->relations[i]]);
+    }
+    optimizer->estimate_filters();
+    optimizer->estimate_eqColumns();
     int *bestJoinOrder = optimizer->best_plan();
     CHECK( bestJoinOrder[0] == 1 );
+    delete optimizer;
+    delete p;
+    delete[] bestJoinOrder;
 
-    // it will still be prefered even if there's an available join between "0" and "2" at another column
-    parser = new SQLParser("0 1 2|0.0=1.1&0.1=2.0&0.1=2.1|0.0");
-    optimizer = new Optimizer(*parser);
-    for (unsigned int i = 0; i < Rlen; i++) {
-        optimizer->initializeRelation(i, R[i]->getSize(), R[i]->getNumOfColumns(), R[i]->getColumns());
+    // it will still be preferred even if there's an available join between "0" and "1" at another column
+    p = new SQLParser("1 2|0.0=1.1&0.0=1.0|0.0");
+    optimizer = new Optimizer(*p);
+    for (unsigned int i = 0; i < p->nrelations; i++) {
+        optimizer->initializeRelation(i, Rstats[p->relations[i]]);
     }
+    optimizer->estimate_filters();
+    optimizer->estimate_eqColumns();
     bestJoinOrder = optimizer->best_plan();
-    CHECK( bestJoinOrder[0] == 2 );
+    CHECK( bestJoinOrder[0] == 0 );
+    delete optimizer;
+    delete p;
+    delete[] bestJoinOrder;
 }
- */
