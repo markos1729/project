@@ -298,18 +298,12 @@ bool Optimizer::connected(int RId, string SIdStr) {
 int *Optimizer::best_plan() {
 	unordered_map<string, class JoinTree*> BestTree;
 	JoinTree *currTree;
-#ifdef DDEBUG
-    cout << "> best_plan_stats: " << endl;
-#endif
 	for (unsigned int i = 0; i < nrel; i++) {
 		string RIdStr(nrel, '0');
 		RIdStr[i] = '1';
 		// e.g. RIdStr for rel 2 with nrel=4 would be "0010" (relIds start from 0)
 		currTree = new JoinTree(i, relStats[i], parser.npredicates);
 		BestTree[RIdStr] = currTree;
-#ifdef DDEBUG
-		//cout << RIdStr << ": f = " << currTree->treeF << endl;
-#endif
 	}
 	for (unsigned int i = 1; i < nrel; i++) {
 		string SIdStr(nrel - i, '0');

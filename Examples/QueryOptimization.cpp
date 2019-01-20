@@ -13,6 +13,7 @@
 
 
 JobScheduler *scheduler = NULL;
+unsigned int QueryRelation::NumberOfRelationsInQuery = 0;
 
 
 using namespace std;
@@ -65,6 +66,7 @@ int main(){
             bool abort = false;
 
             // execute FROM: load original Relations to an array of pointers to such
+            QueryRelation::set_nrelations(p->nrelations);          // (!) VERY-VERY important (must change each query)
             QueryRelation **QueryRelations = new QueryRelation*[p->nrelations]();
             int *seen_at = new int[Rlen]();
             for (int i = 0 ; i < Rlen ; i++) seen_at[i] = -1;      // init to -1
