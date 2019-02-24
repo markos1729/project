@@ -35,11 +35,8 @@ JobScheduler::~JobScheduler() {
 
 void JobScheduler::schedule(Job *job) {
     CHECK_PERROR(pthread_mutex_lock(&queue_lock), "pthread_mutex_lock failed", )
-    bool wasEmpty = job_queue.empty();
     job_queue.push(job);
-    if (wasEmpty) {   // wake up one blocked thread to pick up this job
-        CHECK_PERROR(pthread_cond_signal(&queue_cond), "pthread_cond_signal failed", )
-    }
+    CHECK_PERROR(pthread_cond_signal(&queue_cond), "pthread_cond_signal failed", )
     CHECK_PERROR(pthread_mutex_unlock(&queue_lock), "pthread_mutex_unlock failed", )
 }
 
@@ -92,7 +89,7 @@ void *thread_code(void *args) {
         CHECK_PERROR(pthread_mutex_lock(queue_lock), "pthread_mutex_lock failed", )
         (*jobs_running_ptr)--;
 
-        CHECK_PERROR(pthread_cond_signal(jobs_finished_cond_ptr), "pthread_cond_signal failed", )
+        CHECK_PERROR(pthread_cond_broadcast(jobs_finished_cond_ptr), "pthread_cond_signal failed", )
         CHECK_PERROR(pthread_mutex_unlock(queue_lock), "pthread_mutex_unlock failed", )
     }
     pthread_exit((void *) 0);
